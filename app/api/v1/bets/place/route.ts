@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
   const user = await requireUser(token).catch(() => null);
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  const { bet_id, option_id, points } = await req.json();
+  const { bet_id, option_id, points, is_anonymous } = await req.json();
   if (!bet_id || !option_id || !points) {
     return NextResponse.json({ error: "bet_id, option_id, and points required" }, { status: 400 });
   }
@@ -33,6 +33,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "already placed a bet" }, { status: 422 });
     }
     return NextResponse.json({ error: msg }, { status: 500 });
+  }
+
+  // Mark anonymous after the RPC creates the entry
+  if (is_anonymous) {
+    await supabase
+      .from("bet_entries")
+      .update({ is_anonymous: true })
+      .eq("bet_id", bet_id)
+      .eq("user_id", user.userId);
   }
 
   return NextResponse.json({ ok: true });

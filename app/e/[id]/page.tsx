@@ -5,7 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
 
 type BetOption = { id: string; label: string };
-type BetEntry = { id: string; user_id: string; option_id: string; points_staked: number; balances?: { display_name: string | null; avatar_url: string | null } };
+type BetEntry = { id: string; user_id: string; option_id: string; points_staked: number; is_anonymous: boolean; balances?: { display_name: string | null; avatar_url: string | null } };
 type BetInvite = { user_id: string };
 type Bet = {
   id: string;
@@ -307,6 +307,7 @@ function BetCard({
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [stakeInput, setStakeInput] = useState("100");
   const [placing, setPlacing] = useState(false);
+  const [isAnonymous, setIsAnonymous] = useState(false);
 
   // Resolve state
   const [resolving, setResolving] = useState(false);
@@ -380,7 +381,7 @@ function BetCard({
     const res = await fetch("/api/v1/bets/place", {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ bet_id: bet.id, option_id: selectedOption, points: stake }),
+      body: JSON.stringify({ bet_id: bet.id, option_id: selectedOption, points: stake, is_anonymous: isAnonymous }),
     });
     setPlacing(false);
     setSelectedOption(null);
@@ -597,7 +598,12 @@ function BetCard({
                           const name = e.balances?.display_name;
                           const avatar = e.balances?.avatar_url;
                           const isMe = e.user_id === userId;
-                          return avatar ? (
+                          const anon = e.is_anonymous && !isMe;
+                          return anon ? (
+                            <div key={e.id} className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] border border-[var(--card)]" style={{ marginLeft: i === 0 ? 0 : -6, zIndex: pickers.length - i, background: "rgba(255,255,255,0.08)" }}>
+                              👻
+                            </div>
+                          ) : avatar ? (
                             <img key={e.id} src={avatar} alt={name ?? ""} className="w-5 h-5 rounded-full object-cover border border-[var(--card)]" style={{ marginLeft: i === 0 ? 0 : -6, zIndex: pickers.length - i }} />
                           ) : (
                             <div key={e.id} className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black border border-[var(--card)]" style={{ marginLeft: i === 0 ? 0 : -6, zIndex: pickers.length - i, background: isMe ? "var(--accent)" : "var(--muted)", color: "#fff" }}>
@@ -621,27 +627,40 @@ function BetCard({
 
       {/* Stake input */}
       {canBet && selectedOption && (
-        <div className="mt-3 flex gap-2">
-          <input
-            type="number"
-            min="1"
-            value={stakeInput}
-            onChange={(e) => setStakeInput(e.target.value)}
-            className="flex-1 rounded-2xl px-4 py-2.5 text-[15px] outline-none"
-            style={{
-              background: "rgba(255,255,255,0.05)",
-              border: "1px solid var(--accent-border)",
-              color: "var(--text)",
-            }}
-            placeholder="points"
-          />
+        <div className="mt-3 flex flex-col gap-2">
+          <div className="flex gap-2">
+            <input
+              type="number"
+              min="1"
+              value={stakeInput}
+              onChange={(e) => setStakeInput(e.target.value)}
+              className="flex-1 rounded-2xl px-4 py-2.5 text-[15px] outline-none"
+              style={{
+                background: "rgba(255,255,255,0.05)",
+                border: "1px solid var(--accent-border)",
+                color: "var(--text)",
+              }}
+              placeholder="points"
+            />
+            <button
+              onClick={placeBet}
+              disabled={placing}
+              className="px-5 py-2.5 rounded-2xl font-bold text-[14px] text-white disabled:opacity-40"
+              style={{ background: "var(--accent)", fontFamily: "var(--font-nunito)" }}
+            >
+              {placing ? "..." : "bet"}
+            </button>
+          </div>
           <button
-            onClick={placeBet}
-            disabled={placing}
-            className="px-5 py-2.5 rounded-2xl font-bold text-[14px] text-white disabled:opacity-40"
-            style={{ background: "var(--accent)", fontFamily: "var(--font-nunito)" }}
+            onClick={() => setIsAnonymous((a) => !a)}
+            className="flex items-center gap-1.5 self-start text-[12px] font-bold px-3 py-1.5 rounded-full"
+            style={{
+              background: isAnonymous ? "rgba(255,255,255,0.08)" : "transparent",
+              border: `1px solid ${isAnonymous ? "var(--border)" : "var(--border-soft)"}`,
+              color: isAnonymous ? "var(--text)" : "var(--dimmer)",
+            }}
           >
-            {placing ? "..." : "bet"}
+            👻 {isAnonymous ? "ghost mode on" : "bet anonymously"}
           </button>
         </div>
       )}

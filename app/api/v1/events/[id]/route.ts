@@ -78,7 +78,7 @@ export async function GET(
       bets(
         id, question, deadline, visibility, status, winning_option_id, creator_id, created_at,
         bet_options!bet_options_bet_id_fkey(id, label),
-        bet_entries(id, user_id, option_id, points_staked, balances(display_name, avatar_url)),
+        bet_entries(id, user_id, option_id, points_staked, is_anonymous, balances(display_name, avatar_url)),
         bet_invites(user_id)
       )
     `)
