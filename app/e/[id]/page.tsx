@@ -37,18 +37,25 @@ export default function EventPage() {
   const [event, setEvent] = useState<Event | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   const fetchEvent = useCallback(async () => {
-    const token = await getAccessToken();
-    const res = await fetch(`/api/v1/events/${eventId}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (res.status === 404) { router.replace("/events"); return; }
-    const data = await res.json();
-    setEvent(data.event);
-    setUserId(data.userId);
-    setLoading(false);
+    try {
+      const token = await getAccessToken();
+      const res = await fetch(`/api/v1/events/${eventId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.status === 404) { router.replace("/events"); return; }
+      const data = await res.json();
+      if (!res.ok) { setFetchError(data.error ?? `error ${res.status}`); setLoading(false); return; }
+      setEvent(data.event);
+      setUserId(data.userId);
+      setLoading(false);
+    } catch (e) {
+      setFetchError(String(e));
+      setLoading(false);
+    }
   }, [eventId, getAccessToken, router]);
 
   useEffect(() => {
@@ -64,6 +71,13 @@ export default function EventPage() {
   }
 
   if (!ready || loading) return null;
+  if (fetchError) return (
+    <div className="min-h-screen flex flex-col items-center justify-center gap-3 px-6" style={{ background: "var(--bg)", color: "var(--text)" }}>
+      <p className="text-[13px] font-bold" style={{ color: "var(--accent)" }}>something went wrong</p>
+      <p className="text-[12px] text-center" style={{ color: "var(--muted)" }}>{fetchError}</p>
+      <button onClick={() => router.push("/events")} className="text-[13px] font-bold mt-2" style={{ color: "var(--accent)" }}>← back to events</button>
+    </div>
+  );
   if (!event) return null;
 
   const isHost = userId === event.host_id;
