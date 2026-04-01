@@ -21,7 +21,7 @@ export async function GET(
     .eq("id", id)
     .single();
 
-  if (metaError || !eventMeta) return NextResponse.json({ error: metaError?.message ?? "not found" }, { status: 404 });
+  if (metaError || !eventMeta) return NextResponse.json({ error: "not found" }, { status: 404 });
 
   const isHost = eventMeta.host_id === user.userId;
 
@@ -50,7 +50,7 @@ export async function GET(
       event_guests(user_id),
       bets(
         id, question, deadline, visibility, status, winning_option_id, creator_id, created_at,
-        bet_options(id, label),
+        bet_options!bet_options_bet_id_fkey(id, label),
         bet_entries(id, user_id, option_id, points_staked)
       )
     `)
