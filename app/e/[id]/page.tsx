@@ -707,7 +707,7 @@ function BetCard({
                 + add people
               </button>
               <button onClick={shareBet} className="text-[12px] font-bold" style={{ color: betSharedCopied ? "var(--win)" : "var(--purple)" }}>
-                {betSharedCopied ? "copied!" : "share 👀"}
+                {betSharedCopied ? "copied!" : "share"}
               </button>
             </>
           )}
