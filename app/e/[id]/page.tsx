@@ -333,7 +333,7 @@ function BetCard({
     ?? (bet.creator_id === userId ? "you" : null);
 
   async function shareBet() {
-    const url = `${window.location.origin}/join/${eventInviteToken}`;
+    const url = `${window.location.origin}/join/${eventInviteToken}?bet=${bet.id}`;
     const senderName = eventGuests.find((g) => g.user_id === userId)?.balances?.display_name ?? "someone";
     const text = `${senderName} just invited you to a private bet 👀`;
     if (navigator.share) {

@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
   const user = await requireUser(token).catch(() => null);
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  const { invite_token } = await req.json();
+  const { invite_token, bet_id } = await req.json();
   if (!invite_token) return NextResponse.json({ error: "invite_token required" }, { status: 400 });
 
   // Look up event by token
@@ -31,6 +31,13 @@ export async function POST(req: NextRequest) {
   await supabase
     .from("event_guests")
     .upsert({ event_id: event.id, user_id: user.userId }, { onConflict: "event_id,user_id" });
+
+  // If joining via a private bet share link, add to that bet's invite list
+  if (bet_id) {
+    await supabase
+      .from("bet_invites")
+      .upsert({ bet_id, user_id: user.userId }, { onConflict: "bet_id,user_id", ignoreDuplicates: true });
+  }
 
   return NextResponse.json({ eventId: event.id, eventName: event.name });
 }

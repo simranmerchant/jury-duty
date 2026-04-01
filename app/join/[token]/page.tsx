@@ -1,8 +1,8 @@
 "use client";
 
 import { usePrivy } from "@privy-io/react-auth";
-import { useRouter, useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
+import { useEffect, useState, Suspense } from "react";
 
 type EventPreview = {
   id: string;
@@ -11,11 +11,13 @@ type EventPreview = {
   guest_count: number;
 };
 
-export default function JoinPage() {
+function JoinPageInner() {
   const { ready, authenticated, login, getAccessToken } = usePrivy();
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const inviteToken = params.token as string;
+  const betId = searchParams.get("bet");
 
   const [preview, setPreview] = useState<EventPreview | null>(null);
   const [notFound, setNotFound] = useState(false);
@@ -47,7 +49,7 @@ export default function JoinPage() {
     const res = await fetch("/api/v1/join", {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ invite_token: inviteToken }),
+      body: JSON.stringify({ invite_token: inviteToken, ...(betId ? { bet_id: betId } : {}) }),
     });
     const data = await res.json();
     if (!res.ok) {
@@ -59,8 +61,8 @@ export default function JoinPage() {
   }
 
   function handleGetStarted() {
-    // Save the join URL so login redirects back here
-    router.push(`/login?redirect=/join/${inviteToken}`);
+    const betParam = betId ? `?bet=${betId}` : "";
+    router.push(`/login?redirect=/join/${inviteToken}${betParam}`);
   }
 
   if (notFound) {
@@ -160,5 +162,13 @@ export default function JoinPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function JoinPage() {
+  return (
+    <Suspense>
+      <JoinPageInner />
+    </Suspense>
   );
 }
