@@ -19,9 +19,13 @@ export async function POST(req: NextRequest) {
 
   const { data } = await supabase
     .from("balances")
-    .select("points")
+    .select("points, display_name")
     .eq("user_id", user.userId)
     .single();
 
-  return NextResponse.json({ userId: user.userId, points: data?.points ?? 1000 });
+  return NextResponse.json({
+    userId: user.userId,
+    points: data?.points ?? 1000,
+    hasName: !!data?.display_name,
+  });
 }

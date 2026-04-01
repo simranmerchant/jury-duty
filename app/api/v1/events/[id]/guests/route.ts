@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser, privy } from "@/lib/privy";
+import { requireUser } from "@/lib/privy";
 import { supabase } from "@/lib/supabase";
 
 export async function GET(
@@ -14,7 +14,7 @@ export async function GET(
 
   const { id } = await params;
 
-  // Must be a guest or host of this event
+  // Must be host or guest
   const { data: eventMeta } = await supabase
     .from("events")
     .select("host_id")
@@ -35,30 +35,14 @@ export async function GET(
 
   const { data: guestRows } = await supabase
     .from("event_guests")
-    .select("user_id")
-    .eq("event_id", id);
+    .select("user_id, balances(display_name)")
+    .eq("event_id", id)
+    .neq("user_id", user.userId);
 
-  const guestIds = guestRows?.map((g) => g.user_id) ?? [];
+  const guests = (guestRows ?? []).map((g: any) => ({
+    userId: g.user_id,
+    label: g.balances?.display_name ?? "guest",
+  }));
 
-  // Fetch phone info from Privy for each guest (masked)
-  const guests = await Promise.all(
-    guestIds.map(async (userId) => {
-      try {
-        const privyUser = await privy.getUser(userId);
-        const phoneAccount = privyUser.linkedAccounts.find(
-          (a: any) => a.type === "phone"
-        );
-        const phone = phoneAccount?.phoneNumber as string | undefined;
-        const label = phone ? `···${phone.slice(-4)}` : userId.slice(-6);
-        return { userId, label };
-      } catch {
-        return { userId, label: userId.slice(-6) };
-      }
-    })
-  );
-
-  // Exclude the requesting user (you don't invite yourself)
-  const others = guests.filter((g) => g.userId !== user.userId);
-
-  return NextResponse.json({ guests: others });
+  return NextResponse.json({ guests });
 }

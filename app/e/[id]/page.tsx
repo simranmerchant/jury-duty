@@ -64,10 +64,23 @@ export default function EventPage() {
     fetchEvent();
   }, [ready, authenticated, router, fetchEvent]);
 
-  function copyInvite() {
-    navigator.clipboard.writeText(`${window.location.origin}/join/${event!.invite_token}`);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  async function shareInvite() {
+    const url = `${window.location.origin}/join/${event!.invite_token}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `Join "${event!.name}" on betsygal`,
+          text: "Make bets with your friends 🎉",
+          url,
+        });
+      } catch {
+        // user dismissed — no-op
+      }
+    } else {
+      navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   }
 
   if (!ready || loading) return null;
@@ -125,7 +138,7 @@ export default function EventPage() {
         </div>
 
         <button
-          onClick={copyInvite}
+          onClick={shareInvite}
           className="mt-3 text-[12px] font-bold px-3 py-1.5 rounded-full"
           style={{
             background: "var(--accent-dim)",
@@ -134,7 +147,7 @@ export default function EventPage() {
             transition: "color 0.2s, border-color 0.2s",
           }}
         >
-          {copied ? "copied!" : "copy invite link"}
+          {copied ? "copied!" : "invite friends"}
         </button>
       </div>
 

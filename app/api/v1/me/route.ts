@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
   const [{ data: balance }, { data: entries }] = await Promise.all([
     supabase
       .from("balances")
-      .select("points")
+      .select("points, display_name")
       .eq("user_id", user.userId)
       .single(),
 
@@ -58,5 +58,28 @@ export async function GET(req: NextRequest) {
     pending: history.filter((h) => h.outcome === "pending").length,
   };
 
-  return NextResponse.json({ points: balance?.points ?? 0, history, stats });
+  return NextResponse.json({ points: balance?.points ?? 0, display_name: balance?.display_name ?? null, history, stats });
+}
+
+export async function PATCH(req: NextRequest) {
+  const token = req.headers.get("authorization")?.replace("Bearer ", "");
+  if (!token) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+  const user = await requireUser(token).catch(() => null);
+  if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+  const { display_name } = await req.json();
+  const name = display_name?.trim();
+  if (!name || name.length < 1 || name.length > 40) {
+    return NextResponse.json({ error: "name must be 1–40 characters" }, { status: 400 });
+  }
+
+  const { error } = await supabase
+    .from("balances")
+    .update({ display_name: name })
+    .eq("user_id", user.userId);
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  return NextResponse.json({ display_name: name });
 }

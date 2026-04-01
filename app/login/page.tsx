@@ -16,9 +16,13 @@ function LoginInner() {
       fetch("/api/v1/auth/init", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
-      }).then(() => {
+      }).then((r) => r.json()).then((data) => {
         const redirect = searchParams.get("redirect");
-        router.replace(redirect ?? "/events");
+        if (!data.hasName) {
+          router.replace(`/onboarding${redirect ? `?redirect=${encodeURIComponent(redirect)}` : ""}`);
+        } else {
+          router.replace(redirect ?? "/events");
+        }
       });
     });
   }, [ready, authenticated, getAccessToken, router, searchParams]);

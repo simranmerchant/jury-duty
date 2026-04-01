@@ -28,6 +28,10 @@ export default function ProfilePage() {
   const router = useRouter();
 
   const [points, setPoints] = useState<number | null>(null);
+  const [displayName, setDisplayName] = useState<string>("");
+  const [editingName, setEditingName] = useState(false);
+  const [nameInput, setNameInput] = useState("");
+  const [savingName, setSavingName] = useState(false);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -39,10 +43,28 @@ export default function ProfilePage() {
     });
     const data = await res.json();
     setPoints(data.points);
+    setDisplayName(data.display_name ?? "");
     setHistory(data.history ?? []);
     setStats(data.stats ?? null);
     setLoading(false);
   }, [getAccessToken]);
+
+  async function saveName() {
+    const trimmed = nameInput.trim();
+    if (!trimmed || savingName) return;
+    setSavingName(true);
+    const token = await getAccessToken();
+    const res = await fetch("/api/v1/me", {
+      method: "PATCH",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ display_name: trimmed }),
+    });
+    if (res.ok) {
+      setDisplayName(trimmed);
+      setEditingName(false);
+    }
+    setSavingName(false);
+  }
 
   useEffect(() => {
     if (!ready) return;
@@ -66,12 +88,49 @@ export default function ProfilePage() {
         >
           ← events
         </button>
-        <h1
-          className="text-[32px] font-black tracking-tight"
-          style={{ fontFamily: "var(--font-nunito)" }}
-        >
-          betsy<span style={{ color: "var(--accent)" }}>gal</span>
-        </h1>
+        <div className="flex items-center justify-between">
+          {editingName ? (
+            <div className="flex items-center gap-2 flex-1">
+              <input
+                className="rounded-xl px-3 py-2 text-[18px] font-bold outline-none flex-1"
+                style={{ background: "rgba(255,255,255,0.06)", border: "1px solid var(--accent-border)", color: "var(--text)" }}
+                value={nameInput}
+                onChange={(e) => setNameInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && saveName()}
+                maxLength={40}
+                autoFocus
+              />
+              <button
+                onClick={saveName}
+                disabled={!nameInput.trim() || savingName}
+                className="px-3 py-2 rounded-xl font-bold text-[13px] text-white disabled:opacity-40"
+                style={{ background: "var(--accent)" }}
+              >
+                {savingName ? "..." : "save"}
+              </button>
+              <button
+                onClick={() => setEditingName(false)}
+                className="px-3 py-2 rounded-xl font-bold text-[13px]"
+                style={{ background: "rgba(255,255,255,0.06)", color: "var(--muted)" }}
+              >
+                cancel
+              </button>
+            </div>
+          ) : (
+            <>
+              <h1 className="text-[32px] font-black tracking-tight" style={{ fontFamily: "var(--font-nunito)" }}>
+                {displayName || "you"}
+              </h1>
+              <button
+                onClick={() => { setNameInput(displayName); setEditingName(true); }}
+                className="text-[12px] font-bold px-3 py-1.5 rounded-full"
+                style={{ background: "rgba(255,255,255,0.06)", color: "var(--muted)" }}
+              >
+                edit name
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       <div className="px-4 pb-32 flex flex-col gap-4">
