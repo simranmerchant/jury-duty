@@ -14,15 +14,34 @@ export async function GET(
 
   const { id } = await params;
 
-  // Verify the requesting user is a guest of this event
-  const { data: guest } = await supabase
-    .from("event_guests")
-    .select("user_id")
-    .eq("event_id", id)
-    .eq("user_id", user.userId)
+  // Verify the requesting user is the host or a guest of this event
+  const { data: eventMeta } = await supabase
+    .from("events")
+    .select("host_id")
+    .eq("id", id)
     .single();
 
-  if (!guest) return NextResponse.json({ error: "not found" }, { status: 404 });
+  if (!eventMeta) return NextResponse.json({ error: "not found" }, { status: 404 });
+
+  const isHost = eventMeta.host_id === user.userId;
+
+  if (!isHost) {
+    const { data: guest } = await supabase
+      .from("event_guests")
+      .select("user_id")
+      .eq("event_id", id)
+      .eq("user_id", user.userId)
+      .single();
+
+    if (!guest) return NextResponse.json({ error: "not found" }, { status: 404 });
+  }
+
+  // Backfill: ensure host is always in event_guests (idempotent)
+  if (isHost) {
+    await supabase
+      .from("event_guests")
+      .upsert({ event_id: id, user_id: user.userId }, { onConflict: "event_id,user_id", ignoreDuplicates: true });
+  }
 
   const { data: event, error } = await supabase
     .from("events")
