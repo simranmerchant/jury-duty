@@ -2,6 +2,33 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/privy";
 import { supabase } from "@/lib/supabase";
 
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const token = req.headers.get("authorization")?.replace("Bearer ", "");
+  if (!token) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+  const user = await requireUser(token).catch(() => null);
+  if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+  const { id } = await params;
+
+  const { data: event } = await supabase
+    .from("events")
+    .select("host_id")
+    .eq("id", id)
+    .single();
+
+  if (!event) return NextResponse.json({ error: "not found" }, { status: 404 });
+  if (event.host_id !== user.userId) return NextResponse.json({ error: "only the host can delete this event" }, { status: 403 });
+
+  const { error } = await supabase.from("events").delete().eq("id", id);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  return NextResponse.json({ ok: true });
+}
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }

@@ -39,6 +39,8 @@ export default function EventPage() {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchEvent = useCallback(async () => {
     try {
@@ -63,6 +65,17 @@ export default function EventPage() {
     if (!authenticated) { router.replace("/login"); return; }
     fetchEvent();
   }, [ready, authenticated, router, fetchEvent]);
+
+  async function deleteEvent() {
+    setDeleting(true);
+    const token = await getAccessToken();
+    const res = await fetch(`/api/v1/events/${eventId}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.ok) router.replace("/events");
+    else setDeleting(false);
+  }
 
   async function shareInvite() {
     const url = `${window.location.origin}/join/${event!.invite_token}`;
@@ -137,9 +150,10 @@ export default function EventPage() {
           )}
         </div>
 
+        <div className="mt-3 flex items-center gap-2 flex-wrap">
         <button
           onClick={shareInvite}
-          className="mt-3 text-[12px] font-bold px-3 py-1.5 rounded-full"
+          className="text-[12px] font-bold px-3 py-1.5 rounded-full"
           style={{
             background: "var(--accent-dim)",
             color: copied ? "var(--win)" : "var(--accent)",
@@ -149,6 +163,27 @@ export default function EventPage() {
         >
           {copied ? "copied!" : "invite friends"}
         </button>
+        {isHost && (
+          confirmDelete ? (
+            <button
+              onClick={deleteEvent}
+              disabled={deleting}
+              className="text-[12px] font-bold px-3 py-1.5 rounded-full"
+              style={{ background: "rgba(255,60,60,0.15)", color: "#ff3c3c", border: "1px solid rgba(255,60,60,0.3)" }}
+            >
+              {deleting ? "deleting..." : "tap again to confirm"}
+            </button>
+          ) : (
+            <button
+              onClick={() => setConfirmDelete(true)}
+              className="text-[12px] font-bold px-3 py-1.5 rounded-full"
+              style={{ background: "rgba(255,255,255,0.04)", color: "var(--dimmer)", border: "1px solid var(--border-soft)" }}
+            >
+              delete event
+            </button>
+          )
+        )}
+        </div>
       </div>
 
       {/* Bets list */}
