@@ -15,13 +15,13 @@ export async function GET(
   const { id } = await params;
 
   // Verify the requesting user is the host or a guest of this event
-  const { data: eventMeta } = await supabase
+  const { data: eventMeta, error: metaError } = await supabase
     .from("events")
     .select("host_id")
     .eq("id", id)
     .single();
 
-  if (!eventMeta) return NextResponse.json({ error: "not found" }, { status: 404 });
+  if (metaError || !eventMeta) return NextResponse.json({ error: metaError?.message ?? "not found" }, { status: 404 });
 
   const isHost = eventMeta.host_id === user.userId;
 
