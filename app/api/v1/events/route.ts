@@ -48,7 +48,7 @@ export async function GET(req: NextRequest) {
       bets(id, status, visibility)
     `)
     .eq("event_guests.user_id", user.userId)
-    .order("date", { ascending: false });
+    .order("ends_at", { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
