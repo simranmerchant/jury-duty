@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
   const file = formData.get("file") as File | null;
   if (!file) return NextResponse.json({ error: "no file" }, { status: 400 });
   if (!file.type.startsWith("image/")) return NextResponse.json({ error: "must be an image" }, { status: 400 });
-  if (file.size > 5 * 1024 * 1024) return NextResponse.json({ error: "max 5MB" }, { status: 400 });
+  if (file.size > 2 * 1024 * 1024) return NextResponse.json({ error: "max 2MB" }, { status: 400 });
 
   const ext = file.type.split("/")[1]?.replace("jpeg", "jpg") ?? "jpg";
   const path = `${user.userId}.${ext}`;
@@ -26,8 +26,10 @@ export async function POST(req: NextRequest) {
   if (uploadError) return NextResponse.json({ error: uploadError.message }, { status: 500 });
 
   const { data: { publicUrl } } = supabase.storage.from("avatars").getPublicUrl(path);
+  // Cache-bust so browsers don't serve a stale avatar after re-upload
+  const avatarUrl = `${publicUrl}?t=${Date.now()}`;
 
-  await supabase.from("balances").update({ avatar_url: publicUrl }).eq("user_id", user.userId);
+  await supabase.from("balances").update({ avatar_url: avatarUrl }).eq("user_id", user.userId);
 
-  return NextResponse.json({ avatar_url: publicUrl });
+  return NextResponse.json({ avatar_url: avatarUrl });
 }

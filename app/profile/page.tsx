@@ -56,9 +56,25 @@ export default function ProfilePage() {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploadingAvatar(true);
+    // Compress + resize to 400px JPEG before upload
+    const blob = await new Promise<Blob>((resolve) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        const MAX = 400;
+        const scale = Math.min(MAX / img.width, MAX / img.height, 1);
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob((b) => resolve(b!), "image/jpeg", 0.82);
+      };
+      img.src = url;
+    });
     const token = await getAccessToken();
     const form = new FormData();
-    form.append("file", file);
+    form.append("file", blob, "avatar.jpg");
     const res = await fetch("/api/v1/me/avatar", {
       method: "POST",
       headers: { Authorization: `Bearer ${token}` },
