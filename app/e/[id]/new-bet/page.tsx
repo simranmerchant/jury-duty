@@ -67,8 +67,7 @@ export default function NewBetPage() {
     question.trim().length > 0 &&
     question.trim().length <= 200 &&
     options.filter((o) => o.trim()).length >= 2 &&
-    options.every((o) => o.trim().length <= 100) &&
-    (visibility === "public" || invitedIds.length > 0);
+    options.every((o) => o.trim().length <= 100);
 
   async function submit() {
     if (!canSubmit || submitting) return;
@@ -225,7 +224,7 @@ export default function NewBetPage() {
               )}
               {!loadingGuests && guests.length === 0 && (
                 <p className="text-[13px]" style={{ color: "var(--dimmer)" }}>
-                  no other guests yet — share the event invite link first
+                  no other guests yet — you can add people to this bet later
                 </p>
               )}
               {guests.map((g) => {
@@ -254,7 +253,7 @@ export default function NewBetPage() {
                 );
               })}
               {invitedIds.length === 0 && guests.length > 0 && (
-                <p className="text-[11px]" style={{ color: "var(--accent)" }}>select at least one person</p>
+                <p className="text-[11px]" style={{ color: "var(--dimmer)" }}>you can add people now or after creating</p>
               )}
             </div>
           )}

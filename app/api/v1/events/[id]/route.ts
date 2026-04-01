@@ -74,7 +74,7 @@ export async function GET(
     .from("events")
     .select(`
       id, name, ends_at, host_id, invite_token,
-      event_guests(user_id),
+      event_guests(user_id, balances(display_name, avatar_url)),
       bets(
         id, question, deadline, visibility, status, winning_option_id, creator_id, created_at,
         bet_options!bet_options_bet_id_fkey(id, label),
