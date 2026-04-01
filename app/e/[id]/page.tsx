@@ -266,6 +266,10 @@ function BetCard({
   const [submittingResolve, setSubmittingResolve] = useState(false);
   const [resolveError, setResolveError] = useState<string | null>(null);
 
+  // Delete state
+  const [confirmDeleteBet, setConfirmDeleteBet] = useState(false);
+  const [deletingBet, setDeletingBet] = useState(false);
+
   const myEntry = bet.bet_entries.find((e) => e.user_id === userId);
   const totalPot = bet.bet_entries.reduce((s, e) => s + e.points_staked, 0);
   const isOpen = bet.status === "open";
@@ -287,6 +291,17 @@ function BetCard({
     setPlacing(false);
     setSelectedOption(null);
     if (res.ok) onUpdate();
+  }
+
+  async function deleteBet() {
+    setDeletingBet(true);
+    const token = await getAccessToken();
+    const res = await fetch(`/api/v1/bets/${bet.id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.ok) onUpdate();
+    else setDeletingBet(false);
   }
 
   async function submitResolve() {
@@ -520,15 +535,35 @@ function BetCard({
         </div>
       )}
 
-      {/* Resolve trigger */}
-      {canResolve && !resolving && (
-        <button
-          onClick={() => setResolving(true)}
-          className="mt-4 text-[12px] font-bold"
-          style={{ color: "var(--dimmer)" }}
-        >
-          resolve bet →
-        </button>
+      {/* Resolve trigger + delete */}
+      {!resolving && (canResolve || isHost || bet.creator_id === userId) && (
+        <div className="mt-4 flex items-center gap-4">
+          {canResolve && (
+            <button onClick={() => setResolving(true)} className="text-[12px] font-bold" style={{ color: "var(--dimmer)" }}>
+              resolve bet →
+            </button>
+          )}
+          {(isHost || bet.creator_id === userId) && (
+            confirmDeleteBet ? (
+              <button
+                onClick={deleteBet}
+                disabled={deletingBet}
+                className="text-[12px] font-bold"
+                style={{ color: "#ff3c3c" }}
+              >
+                {deletingBet ? "deleting..." : "confirm delete"}
+              </button>
+            ) : (
+              <button
+                onClick={() => setConfirmDeleteBet(true)}
+                className="text-[12px] font-bold"
+                style={{ color: "var(--dimmer)" }}
+              >
+                delete
+              </button>
+            )
+          )}
+        </div>
       )}
     </div>
   );
