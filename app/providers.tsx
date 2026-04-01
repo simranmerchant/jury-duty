@@ -7,11 +7,11 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     <PrivyProvider
       appId={process.env.NEXT_PUBLIC_PRIVY_APP_ID!}
       config={{
-        loginMethods: ["sms", "email"],
+        loginMethods: ["sms"],
         appearance: {
           theme: "dark",
           accentColor: "#ff5e80",
-          logo: "",
+          logo: undefined,
         },
         embeddedWallets: {
           createOnLogin: "users-without-wallets",
