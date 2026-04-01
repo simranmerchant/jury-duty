@@ -28,6 +28,8 @@ export default function ProfilePage() {
   const router = useRouter();
 
   const [points, setPoints] = useState<number | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [displayName, setDisplayName] = useState<string>("");
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState("");
@@ -44,10 +46,29 @@ export default function ProfilePage() {
     const data = await res.json();
     setPoints(data.points);
     setDisplayName(data.display_name ?? "");
+    setAvatarUrl(data.avatar_url ?? null);
     setHistory(data.history ?? []);
     setStats(data.stats ?? null);
     setLoading(false);
   }, [getAccessToken]);
+
+  async function uploadAvatar(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingAvatar(true);
+    const token = await getAccessToken();
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch("/api/v1/me/avatar", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+    });
+    const data = await res.json();
+    if (res.ok) setAvatarUrl(data.avatar_url);
+    setUploadingAvatar(false);
+    e.target.value = "";
+  }
 
   async function saveName() {
     const trimmed = nameInput.trim();
@@ -88,6 +109,21 @@ export default function ProfilePage() {
         >
           ← events
         </button>
+        {/* Avatar */}
+        <label className="relative w-20 h-20 rounded-full cursor-pointer block mb-3">
+          {avatarUrl ? (
+            <img src={avatarUrl} alt="avatar" className="w-20 h-20 rounded-full object-cover" />
+          ) : (
+            <div className="w-20 h-20 rounded-full flex items-center justify-center text-[28px] font-black" style={{ background: "var(--accent-dim)", color: "var(--accent)", fontFamily: "var(--font-nunito)" }}>
+              {displayName?.[0]?.toUpperCase() ?? "?"}
+            </div>
+          )}
+          <div className="absolute inset-0 rounded-full flex items-center justify-center" style={{ background: uploadingAvatar ? "rgba(0,0,0,0.5)" : "rgba(0,0,0,0)" }}>
+            {uploadingAvatar && <span className="text-white text-[11px] font-bold">uploading...</span>}
+          </div>
+          <input type="file" accept="image/*" className="hidden" onChange={uploadAvatar} disabled={uploadingAvatar} />
+        </label>
+
         <div className="flex items-center justify-between">
           {editingName ? (
             <div className="flex items-center gap-2 flex-1">

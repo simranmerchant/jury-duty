@@ -20,6 +20,8 @@ export default function EventsPage() {
   const [events, setEvents] = useState<Event[]>([]);
   const [points, setPoints] = useState<number | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [showJoin, setShowJoin] = useState(false);
+  const [joinInput, setJoinInput] = useState("");
   const [name, setName] = useState("");
   const [endsAt, setEndsAt] = useState("");
   const [creating, setCreating] = useState(false);
@@ -122,14 +124,24 @@ export default function EventsPage() {
           );
         })}
 
-        <button
-          onClick={() => setShowCreate(true)}
-          className="w-full text-left rounded-2xl px-4 py-3.5 flex items-center gap-3"
-          style={{ border: "1px dashed var(--border)", color: "var(--dimmer)" }}
-        >
-          <span className="w-7 h-7 rounded-full flex items-center justify-center text-lg font-bold flex-shrink-0" style={{ background: "var(--accent-dim)", color: "var(--accent)" }}>+</span>
-          <span className="text-sm">create or join an event</span>
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowCreate(true)}
+            className="flex-1 rounded-2xl px-4 py-3.5 flex items-center gap-2"
+            style={{ border: "1px dashed var(--border)", color: "var(--dimmer)" }}
+          >
+            <span className="w-6 h-6 rounded-full flex items-center justify-center text-base font-bold flex-shrink-0" style={{ background: "var(--accent-dim)", color: "var(--accent)" }}>+</span>
+            <span className="text-sm">new event</span>
+          </button>
+          <button
+            onClick={() => setShowJoin(true)}
+            className="flex-1 rounded-2xl px-4 py-3.5 flex items-center gap-2"
+            style={{ border: "1px dashed var(--border)", color: "var(--dimmer)" }}
+          >
+            <span className="w-6 h-6 rounded-full flex items-center justify-center text-base font-bold flex-shrink-0" style={{ background: "rgba(255,255,255,0.06)", color: "var(--muted)" }}>→</span>
+            <span className="text-sm">join event</span>
+          </button>
+        </div>
       </div>
 
       {showCreate && (
@@ -164,6 +176,46 @@ export default function EventsPage() {
               </button>
               <button onClick={createEvent} disabled={creating || !name.trim() || !endsAt} className="flex-1 py-3.5 rounded-2xl font-bold text-[15px] text-white disabled:opacity-40" style={{ background: "var(--accent)", fontFamily: "var(--font-nunito)" }}>
                 {creating ? "Creating..." : "Create"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showJoin && (
+        <div className="fixed inset-0 z-50 flex flex-col justify-end" style={{ background: "rgba(0,0,0,0.6)" }}>
+          <div className="rounded-t-3xl p-6 flex flex-col gap-4" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
+            <div className="w-9 h-1 rounded-full mx-auto mb-1" style={{ background: "var(--border)" }} />
+            <h2 className="text-xl font-black" style={{ fontFamily: "var(--font-nunito)" }}>Join an Event</h2>
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--muted)" }}>Paste invite link</label>
+              <input
+                className="rounded-2xl px-4 py-3 text-[15px] outline-none"
+                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--accent-border)", color: "var(--text)" }}
+                placeholder="betsygal.vercel.app/join/..."
+                value={joinInput}
+                onChange={(e) => setJoinInput(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <div className="flex gap-3 mt-1">
+              <button onClick={() => { setShowJoin(false); setJoinInput(""); }} className="flex-1 py-3.5 rounded-2xl font-bold text-[15px]" style={{ background: "rgba(255,255,255,0.06)", color: "var(--muted)" }}>
+                Cancel
+              </button>
+              <button
+                disabled={!joinInput.trim()}
+                onClick={() => {
+                  const input = joinInput.trim();
+                  const match = input.match(/\/join\/([^/?#]+)/);
+                  const token = match ? match[1] : input;
+                  setShowJoin(false);
+                  setJoinInput("");
+                  router.push(`/join/${token}`);
+                }}
+                className="flex-1 py-3.5 rounded-2xl font-bold text-[15px] text-white disabled:opacity-40"
+                style={{ background: "var(--accent)", fontFamily: "var(--font-nunito)" }}
+              >
+                Join
               </button>
             </div>
           </div>

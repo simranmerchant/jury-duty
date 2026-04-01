@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
   const [{ data: balance }, { data: entries }] = await Promise.all([
     supabase
       .from("balances")
-      .select("points, display_name")
+      .select("points, display_name, avatar_url")
       .eq("user_id", user.userId)
       .single(),
 
@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
     pending: history.filter((h) => h.outcome === "pending").length,
   };
 
-  return NextResponse.json({ points: balance?.points ?? 0, display_name: balance?.display_name ?? null, history, stats });
+  return NextResponse.json({ points: balance?.points ?? 0, display_name: balance?.display_name ?? null, avatar_url: balance?.avatar_url ?? null, history, stats });
 }
 
 export async function PATCH(req: NextRequest) {

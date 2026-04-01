@@ -5,7 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
 
 type BetOption = { id: string; label: string };
-type BetEntry = { id: string; user_id: string; option_id: string; points_staked: number };
+type BetEntry = { id: string; user_id: string; option_id: string; points_staked: number; balances?: { display_name: string | null; avatar_url: string | null } };
 type Bet = {
   id: string;
   question: string;
@@ -367,22 +367,40 @@ function BetCard({
                   }}
                 />
               )}
-              <div className="relative flex items-center justify-between">
+              <div className="relative flex items-center justify-between gap-2">
                 <span className="text-[14px] font-bold">
                   {opt.label}
-                  {myPick && !resolving && (
-                    <span className="ml-2 text-[11px] font-bold" style={{ color: "var(--accent)" }}>you</span>
-                  )}
                   {isWinner && (
                     <span className="ml-2 text-[11px] font-bold" style={{ color: "var(--win)" }}>won</span>
                   )}
                 </span>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
                   {resolving && isSelectedForResolve && (
                     <span className="text-[11px] font-bold" style={{ color: "var(--win)" }}>
                       {winnerCount > 0 ? `${payoutEach.toLocaleString()} ea` : "pick"}
                     </span>
                   )}
+                  {/* Avatar stack for who picked this option */}
+                  {!resolving && (() => {
+                    const pickers = bet.bet_entries.filter((e) => e.option_id === opt.id);
+                    return pickers.length > 0 ? (
+                      <div className="flex items-center" style={{ gap: -4 }}>
+                        {pickers.slice(0, 4).map((e, i) => {
+                          const name = e.balances?.display_name;
+                          const avatar = e.balances?.avatar_url;
+                          const isMe = e.user_id === userId;
+                          return avatar ? (
+                            <img key={e.id} src={avatar} alt={name ?? ""} className="w-5 h-5 rounded-full object-cover border border-[var(--card)]" style={{ marginLeft: i === 0 ? 0 : -6, zIndex: pickers.length - i }} />
+                          ) : (
+                            <div key={e.id} className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black border border-[var(--card)]" style={{ marginLeft: i === 0 ? 0 : -6, zIndex: pickers.length - i, background: isMe ? "var(--accent)" : "var(--muted)", color: "#fff" }}>
+                              {isMe ? "me" : (name?.[0]?.toUpperCase() ?? "?")}
+                            </div>
+                          );
+                        })}
+                        {pickers.length > 4 && <span className="text-[10px] ml-1" style={{ color: "var(--muted)" }}>+{pickers.length - 4}</span>}
+                      </div>
+                    ) : null;
+                  })()}
                   {totalPot > 0 && !resolving && (
                     <span className="text-[12px]" style={{ color: "var(--muted)" }}>{pct}%</span>
                   )}
