@@ -19,6 +19,8 @@ export default function EventsPage() {
   const router = useRouter();
   const [events, setEvents] = useState<Event[]>([]);
   const [points, setPoints] = useState<number | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [displayName, setDisplayName] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [showJoin, setShowJoin] = useState(false);
   const [joinInput, setJoinInput] = useState("");
@@ -36,6 +38,8 @@ export default function EventsPage() {
     const meData = await meRes.json();
     setEvents(eventsData.events ?? []);
     setPoints(meData.points ?? null);
+    setAvatarUrl(meData.avatar_url ?? null);
+    setDisplayName(meData.display_name ?? null);
   }, [getAccessToken]);
 
   useEffect(() => {
@@ -72,17 +76,20 @@ export default function EventsPage() {
             your events · {openCount} active
           </p>
         </div>
-        {points !== null && (
-          <button
-            onClick={() => router.push("/profile")}
-            className="mt-1 flex flex-col items-end gap-0.5"
-          >
-            <span className="text-[20px] font-black leading-none" style={{ fontFamily: "var(--font-nunito)", color: "var(--accent)" }}>
-              {points.toLocaleString()}
+        <button onClick={() => router.push("/profile")} className="flex flex-col items-center gap-1 mt-1">
+          {avatarUrl ? (
+            <img src={avatarUrl} alt="profile" className="w-10 h-10 rounded-full object-cover" />
+          ) : (
+            <div className="w-10 h-10 rounded-full flex items-center justify-center text-[15px] font-black" style={{ background: "var(--accent-dim)", color: "var(--accent)", fontFamily: "var(--font-nunito)" }}>
+              {displayName?.[0]?.toUpperCase() ?? "?"}
+            </div>
+          )}
+          {points !== null && (
+            <span className="text-[11px] font-bold" style={{ color: "var(--dimmer)" }}>
+              {points.toLocaleString()} pts
             </span>
-            <span className="text-[11px]" style={{ color: "var(--dimmer)" }}>pts</span>
-          </button>
-        )}
+          )}
+        </button>
       </div>
 
       <div className="px-3 pt-2 pb-32 flex flex-col gap-3">
