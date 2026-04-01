@@ -9,7 +9,7 @@ create table balances (
 create table events (
   id uuid primary key default gen_random_uuid(),
   name text not null,
-  date timestamptz not null,
+  ends_at timestamptz not null,
   host_id text not null references balances(user_id),
   invite_token text not null unique,
   source text,                -- 'partiful' | 'luma' | 'groupme' | null (native)

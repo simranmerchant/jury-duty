@@ -8,7 +8,7 @@ type Bet = { id: string; status: string; visibility: string };
 type Event = {
   id: string;
   name: string;
-  date: string;
+  ends_at: string;
   host_id: string;
   invite_token: string;
   bets: Bet[];
@@ -18,18 +18,22 @@ export default function EventsPage() {
   const { ready, authenticated, getAccessToken } = usePrivy();
   const router = useRouter();
   const [events, setEvents] = useState<Event[]>([]);
+  const [points, setPoints] = useState<number | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [name, setName] = useState("");
-  const [date, setDate] = useState("");
+  const [endsAt, setEndsAt] = useState("");
   const [creating, setCreating] = useState(false);
 
   const fetchEvents = useCallback(async () => {
     const token = await getAccessToken();
-    const res = await fetch("/api/v1/events", {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const data = await res.json();
-    setEvents(data.events ?? []);
+    const [eventsRes, meRes] = await Promise.all([
+      fetch("/api/v1/events", { headers: { Authorization: `Bearer ${token}` } }),
+      fetch("/api/v1/me", { headers: { Authorization: `Bearer ${token}` } }),
+    ]);
+    const eventsData = await eventsRes.json();
+    const meData = await meRes.json();
+    setEvents(eventsData.events ?? []);
+    setPoints(meData.points ?? null);
   }, [getAccessToken]);
 
   useEffect(() => {
@@ -39,38 +43,51 @@ export default function EventsPage() {
   }, [ready, authenticated, router, fetchEvents]);
 
   async function createEvent() {
-    if (!name.trim() || !date) return;
+    if (!name.trim() || !endsAt) return;
     setCreating(true);
     const token = await getAccessToken();
     await fetch("/api/v1/events", {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ name, date }),
+      body: JSON.stringify({ name, ends_at: endsAt }),
     });
-    setName(""); setDate(""); setShowCreate(false); setCreating(false);
+    setName(""); setEndsAt(""); setShowCreate(false); setCreating(false);
     fetchEvents();
   }
 
   if (!ready) return null;
 
-  const openCount = events.filter((e) => new Date(e.date) >= new Date()).length;
+  const openCount = events.filter((e) => new Date(e.ends_at) >= new Date()).length;
 
   return (
     <div className="min-h-screen" style={{ background: "var(--bg)", color: "var(--text)" }}>
-      <div className="px-5 pt-14 pb-2">
-        <h1 className="text-[32px] font-black tracking-tight" style={{ fontFamily: "var(--font-nunito)" }}>
-          betsy<span style={{ color: "var(--accent)" }}>gal</span>
-        </h1>
-        <p className="text-sm mt-0.5" style={{ color: "var(--dimmer)" }}>
-          your events · {openCount} active
-        </p>
+      <div className="px-5 pt-14 pb-2 flex items-start justify-between">
+        <div>
+          <h1 className="text-[32px] font-black tracking-tight" style={{ fontFamily: "var(--font-nunito)" }}>
+            betsy<span style={{ color: "var(--accent)" }}>gal</span>
+          </h1>
+          <p className="text-sm mt-0.5" style={{ color: "var(--dimmer)" }}>
+            your events · {openCount} active
+          </p>
+        </div>
+        {points !== null && (
+          <button
+            onClick={() => router.push("/profile")}
+            className="mt-1 flex flex-col items-end gap-0.5"
+          >
+            <span className="text-[20px] font-black leading-none" style={{ fontFamily: "var(--font-nunito)", color: "var(--accent)" }}>
+              {points.toLocaleString()}
+            </span>
+            <span className="text-[11px]" style={{ color: "var(--dimmer)" }}>pts</span>
+          </button>
+        )}
       </div>
 
       <div className="px-3 pt-2 pb-32 flex flex-col gap-3">
         {events.map((event) => {
           const publicBets = event.bets?.filter((b) => b.visibility === "public").length ?? 0;
           const privateBets = event.bets?.filter((b) => b.visibility === "private").length ?? 0;
-          const isPast = new Date(event.date) < new Date();
+          const isPast = new Date(event.ends_at) < new Date();
           return (
             <button
               key={event.id}
@@ -82,7 +99,7 @@ export default function EventsPage() {
                 {event.name}
               </div>
               <div className="text-[13px] mb-3" style={{ color: "var(--muted)" }}>
-                {new Date(event.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                closes {new Date(event.ends_at).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
               </div>
               <div className="flex gap-2 flex-wrap">
                 {publicBets > 0 && (
@@ -132,20 +149,20 @@ export default function EventsPage() {
               />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--muted)" }}>Date</label>
+              <label className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--muted)" }}>Closes at</label>
               <input
                 type="datetime-local"
                 className="rounded-2xl px-4 py-3 text-[15px] outline-none"
                 style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-soft)", color: "var(--text)" }}
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
+                value={endsAt}
+                onChange={(e) => setEndsAt(e.target.value)}
               />
             </div>
             <div className="flex gap-3 mt-1">
               <button onClick={() => setShowCreate(false)} className="flex-1 py-3.5 rounded-2xl font-bold text-[15px]" style={{ background: "rgba(255,255,255,0.06)", color: "var(--muted)" }}>
                 Cancel
               </button>
-              <button onClick={createEvent} disabled={creating || !name.trim() || !date} className="flex-1 py-3.5 rounded-2xl font-bold text-[15px] text-white disabled:opacity-40" style={{ background: "var(--accent)", fontFamily: "var(--font-nunito)" }}>
+              <button onClick={createEvent} disabled={creating || !name.trim() || !endsAt} className="flex-1 py-3.5 rounded-2xl font-bold text-[15px] text-white disabled:opacity-40" style={{ background: "var(--accent)", fontFamily: "var(--font-nunito)" }}>
                 {creating ? "Creating..." : "Create"}
               </button>
             </div>

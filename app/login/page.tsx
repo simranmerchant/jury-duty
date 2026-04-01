@@ -1,24 +1,27 @@
 "use client";
 
 import { usePrivy } from "@privy-io/react-auth";
-import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, Suspense } from "react";
 
-export default function LoginPage() {
+function LoginInner() {
   const { ready, authenticated, login, getAccessToken } = usePrivy();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   useEffect(() => {
     if (!ready || !authenticated) return;
 
-    // User just logged in — ensure their balance row exists, then redirect
     getAccessToken().then((token) => {
       fetch("/api/v1/auth/init", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
-      }).then(() => router.replace("/events"));
+      }).then(() => {
+        const redirect = searchParams.get("redirect");
+        router.replace(redirect ?? "/events");
+      });
     });
-  }, [ready, authenticated, getAccessToken, router]);
+  }, [ready, authenticated, getAccessToken, router, searchParams]);
 
   if (!ready) return null;
 
@@ -46,5 +49,13 @@ export default function LoginPage() {
         </button>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginInner />
+    </Suspense>
   );
 }
