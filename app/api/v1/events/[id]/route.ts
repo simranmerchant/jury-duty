@@ -51,7 +51,8 @@ export async function GET(
       bets(
         id, question, deadline, visibility, status, winning_option_id, creator_id, created_at,
         bet_options!bet_options_bet_id_fkey(id, label),
-        bet_entries(id, user_id, option_id, points_staked)
+        bet_entries(id, user_id, option_id, points_staked),
+        bet_invites(user_id)
       )
     `)
     .eq("id", id)
@@ -59,13 +60,11 @@ export async function GET(
 
   if (error || !event) return NextResponse.json({ error: "not found" }, { status: 404 });
 
-  // Only show private bets if user is the creator
-  const filteredBets = event.bets?.map((bet: any) => {
-    if (bet.visibility === "private" && bet.creator_id !== user.userId) {
-      // Still show it exists but hide entries
-      return { ...bet, bet_entries: [] };
-    }
-    return bet;
+  // Filter private bets — only show to creator or invited users
+  const filteredBets = event.bets?.filter((bet: any) => {
+    if (bet.visibility !== "private") return true;
+    if (bet.creator_id === user.userId) return true;
+    return bet.bet_invites?.some((inv: any) => inv.user_id === user.userId);
   });
 
   return NextResponse.json({ event: { ...event, bets: filteredBets }, userId: user.userId });

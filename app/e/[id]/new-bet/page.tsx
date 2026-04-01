@@ -2,7 +2,9 @@
 
 import { usePrivy } from "@privy-io/react-auth";
 import { useRouter, useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+
+type Guest = { userId: string; label: string };
 
 export default function NewBetPage() {
   const { ready, authenticated, getAccessToken } = usePrivy();
@@ -13,6 +15,9 @@ export default function NewBetPage() {
   const [question, setQuestion] = useState("");
   const [options, setOptions] = useState(["", ""]);
   const [visibility, setVisibility] = useState<"public" | "private">("public");
+  const [guests, setGuests] = useState<Guest[]>([]);
+  const [invitedIds, setInvitedIds] = useState<string[]>([]);
+  const [loadingGuests, setLoadingGuests] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -20,6 +25,29 @@ export default function NewBetPage() {
     if (!ready) return;
     if (!authenticated) router.replace("/login");
   }, [ready, authenticated, router]);
+
+  const fetchGuests = useCallback(async () => {
+    setLoadingGuests(true);
+    const token = await getAccessToken();
+    const res = await fetch(`/api/v1/events/${eventId}/guests`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await res.json();
+    setGuests(data.guests ?? []);
+    setLoadingGuests(false);
+  }, [eventId, getAccessToken]);
+
+  function toggleVisibility(v: "public" | "private") {
+    setVisibility(v);
+    if (v === "private" && guests.length === 0) fetchGuests();
+    if (v === "public") setInvitedIds([]);
+  }
+
+  function toggleInvite(userId: string) {
+    setInvitedIds((prev) =>
+      prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
+    );
+  }
 
   function updateOption(i: number, val: string) {
     setOptions((prev) => prev.map((o, idx) => (idx === i ? val : o)));
@@ -39,7 +67,8 @@ export default function NewBetPage() {
     question.trim().length > 0 &&
     question.trim().length <= 200 &&
     options.filter((o) => o.trim()).length >= 2 &&
-    options.every((o) => o.trim().length <= 100);
+    options.every((o) => o.trim().length <= 100) &&
+    (visibility === "public" || invitedIds.length > 0);
 
   async function submit() {
     if (!canSubmit || submitting) return;
@@ -54,6 +83,7 @@ export default function NewBetPage() {
         question: question.trim(),
         options: options.filter((o) => o.trim()),
         visibility,
+        invitedUserIds: visibility === "private" ? invitedIds : [],
       }),
     });
 
@@ -90,10 +120,7 @@ export default function NewBetPage() {
       <div className="px-5 pt-4 pb-32 flex flex-col gap-6">
         {/* Question */}
         <div className="flex flex-col gap-1.5">
-          <label
-            className="text-[11px] font-bold uppercase tracking-wider"
-            style={{ color: "var(--muted)" }}
-          >
+          <label className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--muted)" }}>
             question
           </label>
           <textarea
@@ -110,20 +137,14 @@ export default function NewBetPage() {
             onChange={(e) => setQuestion(e.target.value)}
             autoFocus
           />
-          <p
-            className="text-[11px] text-right"
-            style={{ color: question.length > 180 ? "var(--accent)" : "var(--dimmer)" }}
-          >
+          <p className="text-[11px] text-right" style={{ color: question.length > 180 ? "var(--accent)" : "var(--dimmer)" }}>
             {question.length}/200
           </p>
         </div>
 
         {/* Options */}
         <div className="flex flex-col gap-1.5">
-          <label
-            className="text-[11px] font-bold uppercase tracking-wider"
-            style={{ color: "var(--muted)" }}
-          >
+          <label className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--muted)" }}>
             options
           </label>
           <div className="flex flex-col gap-2">
@@ -157,11 +178,7 @@ export default function NewBetPage() {
             <button
               onClick={addOption}
               className="mt-1 self-start text-[13px] font-bold px-3 py-1.5 rounded-full"
-              style={{
-                background: "var(--accent-dim)",
-                color: "var(--accent)",
-                border: "1px solid var(--accent-border)",
-              }}
+              style={{ background: "var(--accent-dim)", color: "var(--accent)", border: "1px solid var(--accent-border)" }}
             >
               + add option
             </button>
@@ -170,15 +187,12 @@ export default function NewBetPage() {
 
         {/* Visibility */}
         <div className="flex flex-col gap-1.5">
-          <label
-            className="text-[11px] font-bold uppercase tracking-wider"
-            style={{ color: "var(--muted)" }}
-          >
+          <label className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--muted)" }}>
             who can see this
           </label>
           <div className="flex gap-2">
             <button
-              onClick={() => setVisibility("public")}
+              onClick={() => toggleVisibility("public")}
               className="flex-1 py-3 rounded-2xl font-bold text-[14px]"
               style={{
                 background: visibility === "public" ? "var(--accent-dim)" : "rgba(255,255,255,0.04)",
@@ -189,7 +203,7 @@ export default function NewBetPage() {
               all guests
             </button>
             <button
-              onClick={() => setVisibility("private")}
+              onClick={() => toggleVisibility("private")}
               className="flex-1 py-3 rounded-2xl font-bold text-[14px]"
               style={{
                 background: visibility === "private" ? "var(--purple-dim)" : "rgba(255,255,255,0.04)",
@@ -197,14 +211,59 @@ export default function NewBetPage() {
                 color: visibility === "private" ? "var(--purple)" : "var(--muted)",
               }}
             >
-              only me
+              invite only
             </button>
           </div>
-          <p className="text-[11px]" style={{ color: "var(--dimmer)" }}>
-            {visibility === "private"
-              ? "only you see entries — results visible after resolve"
-              : "all guests can see and join this bet"}
-          </p>
+
+          {visibility === "private" && (
+            <div className="mt-2 flex flex-col gap-2">
+              <p className="text-[11px]" style={{ color: "var(--dimmer)" }}>
+                select who can see and join this bet
+              </p>
+              {loadingGuests && (
+                <p className="text-[13px]" style={{ color: "var(--dimmer)" }}>loading guests...</p>
+              )}
+              {!loadingGuests && guests.length === 0 && (
+                <p className="text-[13px]" style={{ color: "var(--dimmer)" }}>
+                  no other guests yet — share the event invite link first
+                </p>
+              )}
+              {guests.map((g) => {
+                const selected = invitedIds.includes(g.userId);
+                return (
+                  <button
+                    key={g.userId}
+                    onClick={() => toggleInvite(g.userId)}
+                    className="flex items-center gap-3 px-4 py-3 rounded-2xl text-left"
+                    style={{
+                      background: selected ? "var(--purple-dim)" : "rgba(255,255,255,0.04)",
+                      border: `1px solid ${selected ? "var(--purple-border)" : "var(--border-soft)"}`,
+                    }}
+                  >
+                    <span
+                      className="w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0"
+                      style={{
+                        background: selected ? "var(--purple)" : "rgba(255,255,255,0.1)",
+                        color: selected ? "#fff" : "var(--dimmer)",
+                      }}
+                    >
+                      {selected ? "✓" : ""}
+                    </span>
+                    <span className="text-[14px] font-bold">{g.label}</span>
+                  </button>
+                );
+              })}
+              {invitedIds.length === 0 && guests.length > 0 && (
+                <p className="text-[11px]" style={{ color: "var(--accent)" }}>select at least one person</p>
+              )}
+            </div>
+          )}
+
+          {visibility === "public" && (
+            <p className="text-[11px]" style={{ color: "var(--dimmer)" }}>
+              all guests can see and join this bet
+            </p>
+          )}
         </div>
 
         {/* Error */}

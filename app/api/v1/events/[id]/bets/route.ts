@@ -36,7 +36,7 @@ export async function POST(
     return NextResponse.json({ error: "event is closed" }, { status: 422 });
   }
 
-  const { question, options, visibility } = await req.json();
+  const { question, options, visibility, invitedUserIds } = await req.json();
 
   if (!question?.trim() || question.trim().length > 200) {
     return NextResponse.json({ error: "question required (max 200 chars)" }, { status: 400 });
@@ -72,6 +72,15 @@ export async function POST(
     .insert(options.map((label: string) => ({ bet_id: bet.id, label: label.trim() })));
 
   if (optError) return NextResponse.json({ error: optError.message }, { status: 500 });
+
+  // Insert invites for private bets (always include creator)
+  if (visibility === "private" && Array.isArray(invitedUserIds) && invitedUserIds.length > 0) {
+    const inviteRows = [...new Set([user.userId, ...invitedUserIds])].map((uid) => ({
+      bet_id: bet.id,
+      user_id: uid,
+    }));
+    await supabase.from("bet_invites").insert(inviteRows);
+  }
 
   return NextResponse.json({ betId: bet.id }, { status: 201 });
 }
