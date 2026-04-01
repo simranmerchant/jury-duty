@@ -12,7 +12,6 @@ export default function NewBetPage() {
 
   const [question, setQuestion] = useState("");
   const [options, setOptions] = useState(["", ""]);
-  const [deadline, setDeadline] = useState("");
   const [visibility, setVisibility] = useState<"public" | "private">("public");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,8 +39,7 @@ export default function NewBetPage() {
     question.trim().length > 0 &&
     question.trim().length <= 200 &&
     options.filter((o) => o.trim()).length >= 2 &&
-    options.every((o) => o.trim().length <= 100) &&
-    deadline !== "";
+    options.every((o) => o.trim().length <= 100);
 
   async function submit() {
     if (!canSubmit || submitting) return;
@@ -55,7 +53,6 @@ export default function NewBetPage() {
       body: JSON.stringify({
         question: question.trim(),
         options: options.filter((o) => o.trim()),
-        deadline,
         visibility,
       }),
     });
@@ -86,7 +83,7 @@ export default function NewBetPage() {
           className="text-[28px] font-black tracking-tight"
           style={{ fontFamily: "var(--font-nunito)" }}
         >
-          new bet
+          add a bet
         </h1>
       </div>
 
@@ -171,27 +168,6 @@ export default function NewBetPage() {
           )}
         </div>
 
-        {/* Deadline */}
-        <div className="flex flex-col gap-1.5">
-          <label
-            className="text-[11px] font-bold uppercase tracking-wider"
-            style={{ color: "var(--muted)" }}
-          >
-            deadline
-          </label>
-          <input
-            type="datetime-local"
-            className="rounded-2xl px-4 py-3 text-[15px] outline-none"
-            style={{
-              background: "rgba(255,255,255,0.04)",
-              border: "1px solid var(--border-soft)",
-              color: "var(--text)",
-            }}
-            value={deadline}
-            onChange={(e) => setDeadline(e.target.value)}
-          />
-        </div>
-
         {/* Visibility */}
         <div className="flex flex-col gap-1.5">
           <label
@@ -210,7 +186,7 @@ export default function NewBetPage() {
                 color: visibility === "public" ? "var(--accent)" : "var(--muted)",
               }}
             >
-              everyone
+              all guests
             </button>
             <button
               onClick={() => setVisibility("private")}
@@ -221,7 +197,7 @@ export default function NewBetPage() {
                 color: visibility === "private" ? "var(--purple)" : "var(--muted)",
               }}
             >
-              just me
+              only me
             </button>
           </div>
           <p className="text-[11px]" style={{ color: "var(--dimmer)" }}>

@@ -36,7 +36,7 @@ export async function POST(
     return NextResponse.json({ error: "event is closed" }, { status: 422 });
   }
 
-  const { question, options, deadline, visibility } = await req.json();
+  const { question, options, visibility } = await req.json();
 
   if (!question?.trim() || question.trim().length > 200) {
     return NextResponse.json({ error: "question required (max 200 chars)" }, { status: 400 });
@@ -47,22 +47,18 @@ export async function POST(
   if (options.some((o: string) => !o?.trim() || o.trim().length > 100)) {
     return NextResponse.json({ error: "each option must be 1-100 chars" }, { status: 400 });
   }
-  if (!deadline) return NextResponse.json({ error: "deadline required" }, { status: 400 });
-  if (new Date(deadline) <= new Date()) {
-    return NextResponse.json({ error: "deadline must be in the future" }, { status: 400 });
-  }
   if (visibility && !["public", "private"].includes(visibility)) {
     return NextResponse.json({ error: "invalid visibility" }, { status: 400 });
   }
 
-  // Insert bet
+  // Insert bet — deadline inherits from event's ends_at
   const { data: bet, error: betError } = await supabase
     .from("bets")
     .insert({
       event_id: eventId,
       creator_id: user.userId,
       question: question.trim(),
-      deadline,
+      deadline: event.ends_at,
       visibility: visibility ?? "public",
     })
     .select("id")
