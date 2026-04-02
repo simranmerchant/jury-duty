@@ -644,7 +644,7 @@ function BetCard({
       style={{
         background: "var(--card)",
         border: "1px solid var(--border-soft)",
-        opacity: bet.status === "resolved" ? 0.75 : 1,
+        opacity: bet.status === "resolved" || isPast ? 0.45 : 1,
       }}
     >
       {/* Blur overlay for private bets */}
