@@ -1001,7 +1001,7 @@ function BetCard({
               resolve bet →
             </button>
           )}
-          {isOpen && !isPast && (isHost || bet.creator_id === userId) && (
+          {isGroup && isOpen && !isPast && (isHost || bet.creator_id === userId) && (
             <button onClick={() => { setDeadlineInput(new Date(bet.deadline).toISOString().slice(0,16)); setEditingDeadline(true); }} className="text-[12px] font-bold" style={{ color: "var(--dimmer)" }}>
               edit deadline
             </button>
