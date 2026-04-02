@@ -49,6 +49,36 @@ export default function EventPage() {
   const [coverUploading, setCoverUploading] = useState(false);
   const coverInputRef = useRef<HTMLInputElement>(null);
 
+  // Add people to event
+  const [showAddGuests, setShowAddGuests] = useState(false);
+  const [contacts, setContacts] = useState<{ userId: string; displayName: string | null; avatarUrl: string | null }[]>([]);
+  const [addSelected, setAddSelected] = useState<string[]>([]);
+  const [addingGuests, setAddingGuests] = useState(false);
+
+  async function openAddGuests() {
+    setShowAddGuests(true);
+    if (contacts.length > 0) return;
+    const token = await getAccessToken();
+    const res = await fetch("/api/v1/me/contacts", { headers: { Authorization: `Bearer ${token}` } });
+    const data = await res.json();
+    setContacts(data.contacts ?? []);
+  }
+
+  async function submitAddGuests() {
+    if (addSelected.length === 0 || addingGuests) return;
+    setAddingGuests(true);
+    const token = await getAccessToken();
+    await fetch(`/api/v1/events/${eventId}/guests`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ userIds: addSelected }),
+    });
+    setAddingGuests(false);
+    setShowAddGuests(false);
+    setAddSelected([]);
+    fetchEvent();
+  }
+
   const fetchEvent = useCallback(async () => {
     try {
       const token = await getAccessToken();
@@ -150,6 +180,61 @@ export default function EventPage() {
 
   return (
     <div className="min-h-screen" style={{ background: "var(--bg)", color: "var(--text)" }}>
+      {/* Add guests modal */}
+      {showAddGuests && (() => {
+        const currentGuestIds = new Set(event.event_guests.map((g) => g.user_id));
+        const available = contacts.filter((c) => !currentGuestIds.has(c.userId));
+        return (
+          <div
+            className="fixed inset-0 z-50 flex items-end justify-center"
+            style={{ background: "rgba(0,0,0,0.6)" }}
+            onClick={(e) => { if (e.target === e.currentTarget) { setShowAddGuests(false); setAddSelected([]); } }}
+          >
+            <div className="w-full max-w-lg rounded-t-3xl p-6 flex flex-col gap-4" style={{ background: "var(--card)", border: "1px solid var(--border-soft)" }}>
+              <p className="font-extrabold text-[16px]" style={{ fontFamily: "var(--font-nunito)" }}>add people</p>
+              {contacts.length === 0 ? (
+                <p className="text-[13px]" style={{ color: "var(--muted)" }}>no contacts yet — they'll appear once you share events with friends</p>
+              ) : available.length === 0 ? (
+                <p className="text-[13px]" style={{ color: "var(--muted)" }}>everyone you know is already here</p>
+              ) : (
+                <div className="flex flex-col gap-2 max-h-64 overflow-y-auto">
+                  {available.map((c) => {
+                    const selected = addSelected.includes(c.userId);
+                    const name = c.displayName ?? "unknown";
+                    return (
+                      <button
+                        key={c.userId}
+                        onClick={() => setAddSelected(selected ? addSelected.filter((id) => id !== c.userId) : [...addSelected, c.userId])}
+                        className="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-left"
+                        style={{ background: selected ? "var(--accent-dim)" : "rgba(255,255,255,0.04)", border: `1px solid ${selected ? "var(--accent-border)" : "transparent"}` }}
+                      >
+                        {c.avatarUrl ? (
+                          <img src={c.avatarUrl} alt={name} className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-black flex-shrink-0" style={{ background: "rgba(255,255,255,0.08)", color: "var(--muted)" }}>
+                            {name[0]?.toUpperCase() ?? "?"}
+                          </div>
+                        )}
+                        <span className="text-[14px] font-bold flex-1">{name}</span>
+                        {selected && <span style={{ color: "var(--accent)" }}>✓</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              <div className="flex gap-2">
+                <button onClick={() => { setShowAddGuests(false); setAddSelected([]); }} className="flex-1 py-2.5 rounded-2xl font-bold text-[14px]" style={{ background: "rgba(255,255,255,0.05)", color: "var(--muted)" }}>cancel</button>
+                {available.length > 0 && (
+                  <button onClick={submitAddGuests} disabled={addSelected.length === 0 || addingGuests} className="flex-1 py-2.5 rounded-2xl font-bold text-[14px] text-white disabled:opacity-40" style={{ background: "var(--accent)", fontFamily: "var(--font-nunito)" }}>
+                    {addingGuests ? "adding..." : `add${addSelected.length > 0 ? ` ${addSelected.length}` : ""}`}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Cover photo */}
       <div className="relative w-full overflow-hidden" style={{ height: 240 }}>
         {event.cover_url ? (
@@ -253,13 +338,12 @@ export default function EventPage() {
       </div>
 
       {/* Guest list */}
-      {event.event_guests.length > 0 && (
-        <div className="px-5 pb-3">
-          <p className="text-[11px] font-bold uppercase tracking-wider mb-2" style={{ color: "var(--dimmer)" }}>
-            guests
-          </p>
-          <div className="flex gap-3 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
-            {event.event_guests.map((g) => {
+      <div className="px-5 pb-3">
+        <p className="text-[11px] font-bold uppercase tracking-wider mb-2" style={{ color: "var(--dimmer)" }}>
+          guests
+        </p>
+        <div className="flex gap-3 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+          {event.event_guests.map((g) => {
               const name = g.balances?.display_name;
               const avatar = g.balances?.avatar_url;
               const isMe = g.user_id === userId;
@@ -282,9 +366,18 @@ export default function EventPage() {
                 </div>
               );
             })}
+            {/* Add people button */}
+            <button onClick={openAddGuests} className="flex flex-col items-center gap-1 flex-shrink-0">
+              <div
+                className="w-9 h-9 rounded-full flex items-center justify-center text-[18px]"
+                style={{ background: "rgba(255,255,255,0.06)", border: "1px dashed var(--border)", color: "var(--dimmer)" }}
+              >
+                +
+              </div>
+              <span className="text-[10px]" style={{ color: "var(--dimmer)" }}>add</span>
+            </button>
           </div>
         </div>
-      )}
 
       {/* Bets list */}
       <div className="px-3 pb-32 flex flex-col gap-3">
