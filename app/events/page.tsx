@@ -80,7 +80,11 @@ export default function EventsPage() {
       <button
         onClick={() => router.push(`/e/${event.id}`)}
         className="w-full text-left rounded-3xl overflow-hidden"
-        style={{ background: "var(--card)", border: "1px solid var(--border-soft)", opacity: isPast ? 0.45 : 1 }}
+        style={{
+          background: isGroup ? "rgba(147,51,234,0.06)" : "var(--card)",
+          border: `1px solid ${isGroup ? "var(--purple-border)" : "var(--border-soft)"}`,
+          opacity: isPast ? 0.45 : 1,
+        }}
       >
         {event.cover_url && (
           <div className="relative w-full" style={{ height: 110 }}>
@@ -89,19 +93,23 @@ export default function EventsPage() {
           </div>
         )}
         <div className="p-5">
-          <div className="font-extrabold text-[17px] mb-0.5" style={{ fontFamily: "var(--font-nunito)" }}>
-            {event.name}
-          </div>
-          <div className="text-[13px] mb-3" style={{ color: "var(--muted)" }}>
-            {isGroup
-              ? "group · ongoing"
-              : event.ends_at
-                ? `closes ${new Date(event.ends_at).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}`
-                : ""}
+          <div className="flex items-start justify-between gap-2 mb-2">
+            <div className="font-extrabold text-[17px] leading-snug flex-1" style={{ fontFamily: "var(--font-nunito)" }}>
+              {event.name}
+            </div>
+            {isGroup ? (
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 mt-0.5" style={{ background: "var(--purple-dim)", color: "var(--purple)", border: "1px solid var(--purple-border)" }}>
+                ongoing
+              </span>
+            ) : event.ends_at && !isPast ? (
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 mt-0.5" style={{ background: "var(--accent-dim)", color: "var(--accent)", border: "1px solid var(--accent-border)" }}>
+                {new Date(event.ends_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+              </span>
+            ) : null}
           </div>
           <div className="flex gap-2 flex-wrap">
             {publicBets > 0 && (
-              <span className="text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: "var(--accent-dim)", color: "var(--accent)", border: "1px solid var(--accent-border)" }}>
+              <span className="text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: "rgba(255,255,255,0.06)", color: "var(--muted)" }}>
                 {publicBets} public {publicBets === 1 ? "bet" : "bets"}
               </span>
             )}
