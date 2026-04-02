@@ -2,7 +2,7 @@
 
 import { usePrivy } from "@privy-io/react-auth";
 import { useRouter, useParams } from "next/navigation";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 
 type BetOption = { id: string; label: string };
 type BetEntry = { id: string; user_id: string; option_id: string; points_staked: number; is_anonymous: boolean; balances?: { display_name: string | null; avatar_url: string | null } };
@@ -28,6 +28,7 @@ type Event = {
   type: "event" | "group";
   host_id: string;
   invite_token: string;
+  cover_url: string | null;
   event_guests: Guest[];
   bets: Bet[];
 };
@@ -45,6 +46,8 @@ export default function EventPage() {
   const [copied, setCopied] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [coverUploading, setCoverUploading] = useState(false);
+  const coverInputRef = useRef<HTMLInputElement>(null);
 
   const fetchEvent = useCallback(async () => {
     try {
@@ -100,6 +103,34 @@ export default function EventPage() {
     }
   }
 
+  async function uploadCover(file: File) {
+    if (!file.type.startsWith("image/")) return;
+    setCoverUploading(true);
+    const img = new Image();
+    const objUrl = URL.createObjectURL(file);
+    img.src = objUrl;
+    await new Promise<void>((r) => { img.onload = () => r(); });
+    URL.revokeObjectURL(objUrl);
+    const MAX = 1400;
+    let { width, height } = img;
+    if (width > MAX) { height = Math.round(height * MAX / width); width = MAX; }
+    if (height > MAX) { width = Math.round(width * MAX / height); height = MAX; }
+    const canvas = document.createElement("canvas");
+    canvas.width = width; canvas.height = height;
+    canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
+    const blob = await new Promise<Blob>((r) => canvas.toBlob((b) => r(b!), "image/jpeg", 0.85));
+    const formData = new FormData();
+    formData.append("file", blob, "cover.jpg");
+    const token = await getAccessToken();
+    await fetch(`/api/v1/events/${eventId}/cover`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    });
+    setCoverUploading(false);
+    fetchEvent();
+  }
+
   if (!ready || loading) return null;
   if (fetchError) return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-3 px-6" style={{ background: "var(--bg)", color: "var(--text)" }}>
@@ -119,15 +150,43 @@ export default function EventPage() {
 
   return (
     <div className="min-h-screen" style={{ background: "var(--bg)", color: "var(--text)" }}>
-      {/* Header */}
-      <div className="px-5 pt-14 pb-4">
+      {/* Cover photo */}
+      <div className="relative w-full overflow-hidden" style={{ height: 240 }}>
+        {event.cover_url ? (
+          <img src={event.cover_url} alt="" className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full" style={{ background: "linear-gradient(135deg, rgba(255,94,128,0.18) 0%, rgba(255,94,128,0.04) 100%)" }} />
+        )}
+        <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.55) 100%)" }} />
         <button
           onClick={() => router.push("/events")}
-          className="text-sm mb-4 flex items-center gap-1"
-          style={{ color: "var(--muted)" }}
+          className="absolute text-sm flex items-center gap-1"
+          style={{ top: 56, left: 20, color: "rgba(255,255,255,0.9)" }}
         >
           ← events
         </button>
+        {isHost && (
+          <>
+            <input
+              ref={coverInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadCover(f); e.target.value = ""; }}
+            />
+            <button
+              onClick={() => coverInputRef.current?.click()}
+              className="absolute text-[11px] font-bold px-2.5 py-1.5 rounded-full"
+              style={{ bottom: 12, right: 16, background: "rgba(0,0,0,0.45)", color: "rgba(255,255,255,0.85)", border: "1px solid rgba(255,255,255,0.2)", backdropFilter: "blur(6px)" }}
+            >
+              {coverUploading ? "uploading..." : event.cover_url ? "change photo" : "+ add photo"}
+            </button>
+          </>
+        )}
+      </div>
+
+      {/* Header */}
+      <div className="px-5 pt-5 pb-4">
         <h1
           className="text-[28px] font-black tracking-tight leading-tight"
           style={{ fontFamily: "var(--font-nunito)" }}

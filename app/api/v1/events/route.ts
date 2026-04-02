@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
   const { data: events, error } = await supabase
     .from("events")
     .select(`
-      id, name, ends_at, type, host_id, invite_token,
+      id, name, ends_at, type, host_id, invite_token, cover_url,
       event_guests!inner(user_id),
       bets(id, status, visibility)
     `)

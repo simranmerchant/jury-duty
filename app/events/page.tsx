@@ -12,6 +12,7 @@ type Event = {
   type: "event" | "group";
   host_id: string;
   invite_token: string;
+  cover_url: string | null;
   bets: Bet[];
 };
 
@@ -78,35 +79,43 @@ export default function EventsPage() {
     return (
       <button
         onClick={() => router.push(`/e/${event.id}`)}
-        className="w-full text-left rounded-3xl p-5"
+        className="w-full text-left rounded-3xl overflow-hidden"
         style={{ background: "var(--card)", border: "1px solid var(--border-soft)", opacity: isPast ? 0.45 : 1 }}
       >
-        <div className="font-extrabold text-[17px] mb-0.5" style={{ fontFamily: "var(--font-nunito)" }}>
-          {event.name}
-        </div>
-        <div className="text-[13px] mb-3" style={{ color: "var(--muted)" }}>
-          {isGroup
-            ? "group · ongoing"
-            : event.ends_at
-              ? `closes ${new Date(event.ends_at).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}`
-              : ""}
-        </div>
-        <div className="flex gap-2 flex-wrap">
-          {publicBets > 0 && (
-            <span className="text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: "var(--accent-dim)", color: "var(--accent)", border: "1px solid var(--accent-border)" }}>
-              {publicBets} public {publicBets === 1 ? "bet" : "bets"}
-            </span>
-          )}
-          {privateBets > 0 && (
-            <span className="text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: "var(--purple-dim)", color: "var(--purple)", border: "1px solid var(--purple-border)" }}>
-              {privateBets} private
-            </span>
-          )}
-          {publicBets === 0 && privateBets === 0 && (
-            <span className="text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: "rgba(255,255,255,0.05)", color: "var(--dimmer)" }}>
-              no bets yet
-            </span>
-          )}
+        {event.cover_url && (
+          <div className="relative w-full" style={{ height: 110 }}>
+            <img src={event.cover_url} alt="" className="w-full h-full object-cover" />
+            <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.4) 100%)" }} />
+          </div>
+        )}
+        <div className="p-5">
+          <div className="font-extrabold text-[17px] mb-0.5" style={{ fontFamily: "var(--font-nunito)" }}>
+            {event.name}
+          </div>
+          <div className="text-[13px] mb-3" style={{ color: "var(--muted)" }}>
+            {isGroup
+              ? "group · ongoing"
+              : event.ends_at
+                ? `closes ${new Date(event.ends_at).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}`
+                : ""}
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            {publicBets > 0 && (
+              <span className="text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: "var(--accent-dim)", color: "var(--accent)", border: "1px solid var(--accent-border)" }}>
+                {publicBets} public {publicBets === 1 ? "bet" : "bets"}
+              </span>
+            )}
+            {privateBets > 0 && (
+              <span className="text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: "var(--purple-dim)", color: "var(--purple)", border: "1px solid var(--purple-border)" }}>
+                {privateBets} private
+              </span>
+            )}
+            {publicBets === 0 && privateBets === 0 && (
+              <span className="text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: "rgba(255,255,255,0.05)", color: "var(--dimmer)" }}>
+                no bets yet
+              </span>
+            )}
+          </div>
         </div>
       </button>
     );
