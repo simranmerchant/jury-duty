@@ -83,7 +83,6 @@ export default function EventsPage() {
         style={{
           background: isGroup ? "rgba(147,51,234,0.06)" : "var(--card)",
           border: `1px solid ${isGroup ? "var(--purple-border)" : "var(--border-soft)"}`,
-          opacity: isPast ? 0.45 : 1,
         }}
       >
         {event.cover_url && (
