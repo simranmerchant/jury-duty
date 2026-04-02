@@ -41,6 +41,7 @@ export default function EventPage() {
 
   const [event, setEvent] = useState<Event | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const [userPoints, setUserPoints] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -102,14 +103,17 @@ export default function EventPage() {
   const fetchEvent = useCallback(async () => {
     try {
       const token = await getAccessToken();
-      const res = await fetch(`/api/v1/events/${eventId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const [res, meRes] = await Promise.all([
+        fetch(`/api/v1/events/${eventId}`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch("/api/v1/me", { headers: { Authorization: `Bearer ${token}` } }),
+      ]);
       if (res.status === 404) { router.replace("/events"); return; }
       const data = await res.json();
+      const meData = await meRes.json();
       if (!res.ok) { setFetchError(data.error ?? `error ${res.status}`); setLoading(false); return; }
       setEvent(data.event);
       setUserId(data.userId);
+      setUserPoints(meData.points ?? null);
       setLoading(false);
     } catch (e) {
       setFetchError(String(e));
@@ -469,6 +473,7 @@ export default function EventPage() {
                 isGroup={isGroup}
                 eventGuests={event.event_guests}
                 eventInviteToken={event.invite_token}
+                userPoints={userPoints}
                 onUpdate={fetchEvent}
               />
             ))}
@@ -489,6 +494,7 @@ export default function EventPage() {
                 isGroup={isGroup}
                 eventGuests={event.event_guests}
                 eventInviteToken={event.invite_token}
+                userPoints={userPoints}
                 onUpdate={fetchEvent}
               />
             ))}
@@ -516,6 +522,7 @@ function BetCard({
   isGroup,
   eventGuests,
   eventInviteToken,
+  userPoints,
   onUpdate,
 }: {
   bet: Bet;
@@ -524,6 +531,7 @@ function BetCard({
   isGroup: boolean;
   eventGuests: Guest[];
   eventInviteToken: string;
+  userPoints: number | null;
   onUpdate: () => void;
 }) {
   const { getAccessToken } = usePrivy();
@@ -535,6 +543,7 @@ function BetCard({
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [stakeInput, setStakeInput] = useState("100");
   const [placing, setPlacing] = useState(false);
+  const [placeError, setPlaceError] = useState<string | null>(null);
   const [isAnonymous, setIsAnonymous] = useState(false);
 
   // Resolve state
@@ -623,16 +632,26 @@ function BetCard({
     if (!selectedOption || placing) return;
     const stake = parseInt(stakeInput, 10);
     if (!stake || stake <= 0) return;
+    if (userPoints !== null && stake > userPoints) {
+      setPlaceError(`not enough points — you have ${userPoints.toLocaleString()} available`);
+      return;
+    }
     setPlacing(true);
+    setPlaceError(null);
     const token = await getAccessToken();
     const res = await fetch("/api/v1/bets/place", {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       body: JSON.stringify({ bet_id: bet.id, option_id: selectedOption, points: stake, is_anonymous: isAnonymous }),
     });
+    const data = await res.json();
     setPlacing(false);
+    if (!res.ok) {
+      setPlaceError(data.error ?? "something went wrong");
+      return;
+    }
     setSelectedOption(null);
-    if (res.ok) onUpdate();
+    onUpdate();
   }
 
   async function deleteBet() {
@@ -912,6 +931,9 @@ function BetCard({
               {placing ? "..." : "bet"}
             </button>
           </div>
+          {placeError && (
+            <p className="text-[12px] font-bold" style={{ color: "var(--accent)" }}>{placeError}</p>
+          )}
           <button
             onClick={() => setIsAnonymous((a) => !a)}
             className="flex items-center gap-1.5 self-start text-[12px] font-bold px-3 py-1.5 rounded-full"
