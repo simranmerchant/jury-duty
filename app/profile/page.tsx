@@ -115,6 +115,10 @@ export default function ProfilePage() {
     ? Math.round((stats.won / (stats.total - stats.pending)) * 100)
     : null;
 
+  const staked = history
+    .filter((h) => h.outcome === "pending")
+    .reduce((sum, h) => sum + h.points_staked, 0);
+
   return (
     <div className="min-h-screen" style={{ background: "var(--bg)", color: "var(--text)" }}>
       <div className="px-5 pt-14 pb-4">
@@ -200,7 +204,12 @@ export default function ProfilePage() {
           >
             {points?.toLocaleString() ?? "—"}
           </p>
-          <p className="text-[13px]" style={{ color: "var(--dimmer)" }}>points</p>
+          <p className="text-[13px]" style={{ color: "var(--dimmer)" }}>points available</p>
+          {staked > 0 && (
+            <p className="text-[12px] mt-1" style={{ color: "var(--muted)" }}>
+              + {staked.toLocaleString()} pts staked in {stats?.pending} open {stats?.pending === 1 ? "bet" : "bets"}
+            </p>
+          )}
         </div>
 
         {/* Stats row */}
