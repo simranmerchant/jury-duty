@@ -119,7 +119,7 @@ export default function EventPage() {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: `Join "${event!.name}" on betsygal`,
+          title: `Join "${event!.name}" on jury duty`,
           text: "Make bets with your friends 🎉",
           url,
         });

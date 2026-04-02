@@ -141,7 +141,7 @@ export default function EventsPage() {
       <div className="px-5 pt-14 pb-2 flex items-start justify-between">
         <div>
           <h1 className="text-[32px] font-black tracking-tight" style={{ fontFamily: "var(--font-nunito)" }}>
-            betsy<span style={{ color: "var(--accent)" }}>gal</span>
+            jury<span style={{ color: "var(--accent)" }}>duty</span>
           </h1>
           <p className="text-sm mt-0.5" style={{ color: "var(--dimmer)" }}>
             {groups.length > 0 ? `${groups.length} group${groups.length !== 1 ? "s" : ""} · ` : ""}{activeEvents} active event{activeEvents !== 1 ? "s" : ""}
@@ -288,7 +288,7 @@ export default function EventsPage() {
               <input
                 className="rounded-2xl px-4 py-3 text-[15px] outline-none"
                 style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--accent-border)", color: "var(--text)" }}
-                placeholder="betsygal.vercel.app/join/..."
+                placeholder="juryduty.app/join/..."
                 value={joinInput}
                 onChange={(e) => setJoinInput(e.target.value)}
                 autoFocus

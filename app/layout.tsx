@@ -16,7 +16,7 @@ const dmSans = DM_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "betsygal",
+  title: "jury duty",
   description: "make bets with your friends",
 };
 
