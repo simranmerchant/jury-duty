@@ -68,8 +68,15 @@ export default function EventsPage() {
   if (!ready) return null;
 
   const groups = events.filter((e) => e.type === "group");
-  const eventsList = events.filter((e) => e.type !== "group");
-  const activeEvents = eventsList.filter((e) => e.ends_at && new Date(e.ends_at) >= new Date()).length;
+  const now = new Date();
+  const activeEventsList = events
+    .filter((e) => e.type !== "group" && e.ends_at && new Date(e.ends_at) >= now)
+    .sort((a, b) => new Date(a.ends_at!).getTime() - new Date(b.ends_at!).getTime());
+  const pastEventsList = events
+    .filter((e) => e.type !== "group" && (!e.ends_at || new Date(e.ends_at) < now))
+    .sort((a, b) => new Date(b.ends_at ?? 0).getTime() - new Date(a.ends_at ?? 0).getTime());
+  const eventsList = [...activeEventsList, ...pastEventsList];
+  const activeEvents = activeEventsList.length;
 
   function EventCard({ event }: { event: Event }) {
     const publicBets = event.bets?.filter((b) => b.visibility === "public").length ?? 0;
