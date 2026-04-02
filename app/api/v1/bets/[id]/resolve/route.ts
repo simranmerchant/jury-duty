@@ -29,5 +29,31 @@ export async function POST(
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 
+  // Send notifications to all participants
+  const { data: bet } = await supabase
+    .from("bets")
+    .select("title, winning_option_id, bet_entries(user_id, option_id)")
+    .eq("id", betId)
+    .single();
+
+  if (bet) {
+    const isRefund = !winning_option_id;
+    const notifications = (bet.bet_entries as { user_id: string; option_id: string }[]).map((entry) => {
+      const won = !isRefund && entry.option_id === bet.winning_option_id;
+      const type = isRefund ? "bet_resolved_refunded" : won ? "bet_resolved_won" : "bet_resolved_lost";
+      const title = isRefund ? "case dismissed" : won ? "jury's in — you won 🎉" : "jury's in — you lost 💀";
+      const body = isRefund
+        ? `"${bet.title}" was called off. your points have been refunded.`
+        : won
+        ? `you called it on "${bet.title}". points incoming.`
+        : `you were wrong about "${bet.title}". the jury has spoken.`;
+      return { user_id: entry.user_id, type, title, body, data: { bet_id: betId } };
+    });
+
+    if (notifications.length > 0) {
+      await supabase.from("notifications").insert(notifications);
+    }
+  }
+
   return NextResponse.json({ ok: true });
 }

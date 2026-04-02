@@ -25,6 +25,9 @@ export default function EventsPage() {
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [showJoin, setShowJoin] = useState(false);
+  const [showNotifs, setShowNotifs] = useState(false);
+  const [notifications, setNotifications] = useState<{ id: string; type: string; title: string; body: string; read: boolean; created_at: string }[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [joinInput, setJoinInput] = useState("");
   const [name, setName] = useState("");
   const [endsAt, setEndsAt] = useState("");
@@ -43,6 +46,11 @@ export default function EventsPage() {
     setPoints(meData.points ?? null);
     setAvatarUrl(meData.avatar_url ?? null);
     setDisplayName(meData.display_name ?? null);
+
+    const notifsRes = await fetch("/api/v1/me/notifications", { headers: { Authorization: `Bearer ${token}` } });
+    const notifsData = await notifsRes.json();
+    setNotifications(notifsData.notifications ?? []);
+    setUnreadCount(notifsData.unreadCount ?? 0);
   }, [getAccessToken]);
 
   useEffect(() => {
@@ -63,6 +71,16 @@ export default function EventsPage() {
     });
     setName(""); setEndsAt(""); setShowCreate(false); setCreating(false); setCreateType("event");
     fetchEvents();
+  }
+
+  async function openNotifs() {
+    setShowNotifs(true);
+    if (unreadCount > 0) {
+      const token = await getAccessToken();
+      await fetch("/api/v1/me/notifications", { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+      setUnreadCount(0);
+      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    }
   }
 
   if (!ready) return null;
@@ -147,7 +165,19 @@ export default function EventsPage() {
             {groups.length > 0 ? `${groups.length} group${groups.length !== 1 ? "s" : ""} · ` : ""}{activeEvents} active event{activeEvents !== 1 ? "s" : ""}
           </p>
         </div>
-        <button onClick={() => router.push("/profile")} className="flex flex-col items-center gap-1 mt-1">
+        <div className="flex items-center gap-3 mt-1">
+        <button onClick={openNotifs} className="relative w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "var(--card)", border: "1px solid var(--border-soft)" }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--muted)" }}>
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+            <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+          </svg>
+          {unreadCount > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 rounded-full flex items-center justify-center text-[10px] font-black text-white px-1" style={{ background: "var(--accent)" }}>
+              {unreadCount > 9 ? "9+" : unreadCount}
+            </span>
+          )}
+        </button>
+        <button onClick={() => router.push("/profile")} className="flex flex-col items-center gap-1">
           {avatarUrl ? (
             <img src={avatarUrl} alt="profile" className="w-10 h-10 rounded-full object-cover" />
           ) : (
@@ -161,6 +191,7 @@ export default function EventsPage() {
             </span>
           )}
         </button>
+        </div>
       </div>
 
       <div className="px-3 pt-2 pb-32 flex flex-col gap-3">
@@ -312,6 +343,41 @@ export default function EventsPage() {
               >
                 Join
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Notifications panel */}
+      {showNotifs && (
+        <div className="fixed inset-0 z-50 flex flex-col justify-end" style={{ background: "rgba(0,0,0,0.6)" }} onClick={() => setShowNotifs(false)}>
+          <div className="rounded-t-3xl flex flex-col max-h-[80vh]" style={{ background: "var(--card)", border: "1px solid var(--border)" }} onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 pt-5 pb-4 flex items-center justify-between border-b" style={{ borderColor: "var(--border-soft)" }}>
+              <div className="w-9 h-1 rounded-full absolute left-1/2 -translate-x-1/2 top-3" style={{ background: "var(--border)" }} />
+              <h2 className="text-lg font-black mt-2" style={{ fontFamily: "var(--font-nunito)" }}>notifications</h2>
+              <button onClick={() => setShowNotifs(false)} className="text-[20px] mt-2" style={{ color: "var(--muted)" }}>×</button>
+            </div>
+            <div className="overflow-y-auto flex-1">
+              {notifications.length === 0 ? (
+                <p className="text-center py-12 text-[14px]" style={{ color: "var(--dimmer)" }}>no notifications yet</p>
+              ) : (
+                <div className="flex flex-col divide-y" style={{ borderColor: "var(--border-soft)" }}>
+                  {notifications.map((n) => (
+                    <div key={n.id} className="px-6 py-4 flex gap-3 items-start" style={{ opacity: n.read ? 0.6 : 1 }}>
+                      <span className="text-[22px] flex-shrink-0 mt-0.5">
+                        {n.type === "bet_resolved_won" ? "🎉" : n.type === "bet_resolved_lost" ? "😬" : n.type === "bet_resolved_refunded" ? "↩️" : "⏰"}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-[14px] leading-snug">{n.title}</p>
+                        <p className="text-[13px] mt-0.5 leading-snug" style={{ color: "var(--muted)" }}>{n.body}</p>
+                        <p className="text-[11px] mt-1" style={{ color: "var(--dimmer)" }}>
+                          {new Date(n.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+                        </p>
+                      </div>
+                      {!n.read && <div className="w-2 h-2 rounded-full flex-shrink-0 mt-1.5" style={{ background: "var(--accent)" }} />}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
