@@ -364,7 +364,7 @@ export default function EventsPage() {
                   {notifications.map((n) => (
                     <div key={n.id} className="px-6 py-4 flex gap-3 items-start" style={{ opacity: n.read ? 0.6 : 1 }}>
                       <span className="text-[22px] flex-shrink-0 mt-0.5">
-                        {n.type === "bet_resolved_won" ? "🎉" : n.type === "bet_resolved_lost" ? "😬" : n.type === "bet_resolved_refunded" ? "↩️" : "⏰"}
+                        {n.type === "bet_resolved_won" ? "🎉" : n.type === "bet_resolved_lost" ? "😬" : n.type === "bet_resolved_refunded" ? "↩️" : n.type === "points_earned" ? "🪙" : "⏰"}
                       </span>
                       <div className="flex-1 min-w-0">
                         <p className="font-bold text-[14px] leading-snug">{n.title}</p>

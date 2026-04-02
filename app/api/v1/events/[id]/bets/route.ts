@@ -88,5 +88,14 @@ export async function POST(
     await supabase.from("bet_invites").insert(inviteRows);
   }
 
+  await supabase.rpc("increment_balance", { p_user_id: user.userId, p_amount: 100 });
+  await supabase.from("notifications").insert({
+    user_id: user.userId,
+    type: "points_earned",
+    title: "+100 pts",
+    body: `you earned 100 points for creating a bet. keep the jury busy.`,
+    data: { bet_id: bet.id },
+  });
+
   return NextResponse.json({ betId: bet.id }, { status: 201 });
 }
