@@ -16,6 +16,7 @@ type Bet = {
   winning_option_id: string | null;
   creator_id: string;
   created_at: string;
+  isNew: boolean;
   bet_options: BetOption[];
   bet_entries: BetEntry[];
   bet_invites: BetInvite[];
@@ -797,8 +798,9 @@ function BetCard({
 
       {/* Question + private badge */}
       <div className="flex items-start justify-between gap-2 mb-3">
-        <p className="font-extrabold text-[16px] leading-snug flex-1" style={{ fontFamily: "var(--font-nunito)" }}>
+        <p className="font-extrabold text-[16px] leading-snug flex-1 flex items-center gap-2" style={{ fontFamily: "var(--font-nunito)" }}>
           {bet.question}
+          {bet.isNew && <span className="w-2 h-2 rounded-full flex-shrink-0 inline-block" style={{ background: "var(--accent)" }} />}
         </p>
         {bet.visibility === "private" && (
           <button

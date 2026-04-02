@@ -143,12 +143,27 @@ export async function GET(
 
   if (error || !event) return NextResponse.json({ error: "not found" }, { status: 404 });
 
+  const { data: lastSeen } = await supabase
+    .from("event_last_seen")
+    .select("seen_at")
+    .eq("user_id", user.userId)
+    .eq("event_id", id)
+    .single();
+
+  const seenAt = lastSeen?.seen_at ?? null;
+
   // Filter private bets — only show to creator or invited users
-  const filteredBets = event.bets?.filter((bet: any) => {
-    if (bet.visibility !== "private") return true;
-    if (bet.creator_id === user.userId) return true;
-    return bet.bet_invites?.some((inv: any) => inv.user_id === user.userId);
-  });
+  // Also tag each bet with isNew (created after last seen, and not by this user)
+  const filteredBets = event.bets
+    ?.filter((bet: any) => {
+      if (bet.visibility !== "private") return true;
+      if (bet.creator_id === user.userId) return true;
+      return bet.bet_invites?.some((inv: any) => inv.user_id === user.userId);
+    })
+    .map((bet: any) => ({
+      ...bet,
+      isNew: bet.creator_id !== user.userId && (!seenAt || new Date(bet.created_at) > new Date(seenAt)),
+    }));
 
   return NextResponse.json({ event: { ...event, bets: filteredBets }, userId: user.userId });
 }
