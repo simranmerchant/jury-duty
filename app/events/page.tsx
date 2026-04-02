@@ -33,6 +33,7 @@ export default function EventsPage() {
   const [endsAt, setEndsAt] = useState("");
   const [createType, setCreateType] = useState<"event" | "group">("event");
   const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   const fetchEvents = useCallback(async () => {
     const token = await getAccessToken();
@@ -62,14 +63,25 @@ export default function EventsPage() {
   async function createEvent() {
     if (!name.trim()) return;
     if (createType === "event" && !endsAt) return;
+    if (createType === "event" && new Date(endsAt) <= new Date()) {
+      setCreateError("end date must be in the future");
+      return;
+    }
+    setCreateError(null);
     setCreating(true);
     const token = await getAccessToken();
-    await fetch("/api/v1/events", {
+    const res = await fetch("/api/v1/events", {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       body: JSON.stringify({ name, type: createType, ...(createType === "event" ? { ends_at: new Date(endsAt).toISOString() } : {}) }),
     });
-    setName(""); setEndsAt(""); setShowCreate(false); setCreating(false); setCreateType("event");
+    if (!res.ok) {
+      const data = await res.json();
+      setCreateError(data.error ?? "something went wrong");
+      setCreating(false);
+      return;
+    }
+    setName(""); setEndsAt(""); setShowCreate(false); setCreating(false); setCreateType("event"); setCreateError(null);
     fetchEvents();
   }
 
@@ -292,8 +304,11 @@ export default function EventsPage() {
               </div>
             )}
 
+            {createError && (
+              <p className="text-[13px] font-bold" style={{ color: "var(--accent)" }}>{createError}</p>
+            )}
             <div className="flex gap-3 mt-1">
-              <button onClick={() => { setShowCreate(false); setCreateType("event"); }} className="flex-1 py-3.5 rounded-2xl font-bold text-[15px]" style={{ background: "rgba(255,255,255,0.06)", color: "var(--muted)" }}>
+              <button onClick={() => { setShowCreate(false); setCreateType("event"); setCreateError(null); }} className="flex-1 py-3.5 rounded-2xl font-bold text-[15px]" style={{ background: "rgba(255,255,255,0.06)", color: "var(--muted)" }}>
                 Cancel
               </button>
               <button
