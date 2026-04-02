@@ -55,6 +55,7 @@ export async function POST(
   let betDeadline: string;
   if (event.type === "group") {
     if (!deadline) return NextResponse.json({ error: "deadline required for group bets" }, { status: 400 });
+    if (new Date(deadline) <= new Date()) return NextResponse.json({ error: "deadline must be in the future" }, { status: 400 });
     betDeadline = deadline;
   } else {
     betDeadline = event.ends_at!;
