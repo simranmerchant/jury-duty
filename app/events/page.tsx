@@ -67,7 +67,7 @@ export default function EventsPage() {
     await fetch("/api/v1/events", {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ name, type: createType, ...(createType === "event" ? { ends_at: endsAt } : {}) }),
+      body: JSON.stringify({ name, type: createType, ...(createType === "event" ? { ends_at: new Date(endsAt).toISOString() } : {}) }),
     });
     setName(""); setEndsAt(""); setShowCreate(false); setCreating(false); setCreateType("event");
     fetchEvents();
@@ -285,6 +285,7 @@ export default function EventsPage() {
                   type="datetime-local"
                   className="rounded-2xl px-4 py-3 text-[15px] outline-none"
                   style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-soft)", color: "var(--text)" }}
+                  min={new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}
                   value={endsAt}
                   onChange={(e) => setEndsAt(e.target.value)}
                 />
