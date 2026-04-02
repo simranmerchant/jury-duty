@@ -556,6 +556,34 @@ function BetCard({
   const [confirmDeleteBet, setConfirmDeleteBet] = useState(false);
   const [deletingBet, setDeletingBet] = useState(false);
 
+  // Double down
+  const [doubling, setDoubling] = useState(false);
+  const [doubleInput, setDoubleInput] = useState("100");
+  const [doubleError, setDoubleError] = useState<string | null>(null);
+  const [doublingDown, setDoublingDown] = useState(false);
+
+  async function submitDoubleDown() {
+    const pts = parseInt(doubleInput, 10);
+    if (!pts || pts <= 0 || doublingDown) return;
+    if (userPoints !== null && pts > userPoints) {
+      setDoubleError(`not enough points — you have ${userPoints.toLocaleString()} available`);
+      return;
+    }
+    setDoublingDown(true);
+    setDoubleError(null);
+    const token = await getAccessToken();
+    const res = await fetch(`/api/v1/bets/${bet.id}/double-down`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ points: pts }),
+    });
+    const data = await res.json();
+    setDoublingDown(false);
+    if (!res.ok) { setDoubleError(data.error ?? "something went wrong"); return; }
+    setDoubling(false);
+    onUpdate();
+  }
+
   // Edit deadline
   const [editingDeadline, setEditingDeadline] = useState(false);
   const [deadlineInput, setDeadlineInput] = useState("");
@@ -948,11 +976,56 @@ function BetCard({
         </div>
       )}
 
-      {/* Already bet */}
+      {/* Already bet — show stake + double down */}
       {myEntry && isOpen && !resolving && (
-        <p className="mt-3 text-[12px]" style={{ color: "var(--muted)" }}>
-          you staked {myEntry.points_staked.toLocaleString()} pts
-        </p>
+        <div className="mt-3 flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <p className="text-[12px]" style={{ color: "var(--muted)" }}>
+              you staked {myEntry.points_staked.toLocaleString()} pts
+            </p>
+            {!isPast && !doubling && (
+              <button
+                onClick={() => setDoubling(true)}
+                className="text-[11px] font-bold px-2.5 py-1 rounded-full"
+                style={{ background: "var(--accent-dim)", color: "var(--accent)", border: "1px solid var(--accent-border)" }}
+              >
+                double down
+              </button>
+            )}
+          </div>
+          {doubling && (
+            <div className="flex flex-col gap-1.5">
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  min="1"
+                  value={doubleInput}
+                  onChange={(e) => setDoubleInput(e.target.value)}
+                  className="flex-1 rounded-2xl px-4 py-2.5 text-[15px] outline-none"
+                  style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--accent-border)", color: "var(--text)" }}
+                  placeholder="points"
+                  autoFocus
+                />
+                <button
+                  onClick={submitDoubleDown}
+                  disabled={doublingDown}
+                  className="px-5 py-2.5 rounded-2xl font-bold text-[14px] text-white disabled:opacity-40"
+                  style={{ background: "var(--accent)", fontFamily: "var(--font-nunito)" }}
+                >
+                  {doublingDown ? "..." : "add"}
+                </button>
+                <button
+                  onClick={() => { setDoubling(false); setDoubleError(null); }}
+                  className="px-3 py-2.5 rounded-2xl font-bold text-[14px]"
+                  style={{ background: "rgba(255,255,255,0.05)", color: "var(--muted)" }}
+                >
+                  ✕
+                </button>
+              </div>
+              {doubleError && <p className="text-[12px] font-bold" style={{ color: "var(--accent)" }}>{doubleError}</p>}
+            </div>
+          )}
+        </div>
       )}
 
       {/* Resolve mode footer */}
