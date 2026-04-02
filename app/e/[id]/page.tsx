@@ -49,6 +49,26 @@ export default function EventPage() {
   const [coverUploading, setCoverUploading] = useState(false);
   const coverInputRef = useRef<HTMLInputElement>(null);
 
+  // Edit event
+  const [showEditEvent, setShowEditEvent] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editEndsAt, setEditEndsAt] = useState("");
+  const [savingEvent, setSavingEvent] = useState(false);
+
+  async function saveEvent() {
+    if (savingEvent) return;
+    setSavingEvent(true);
+    const token = await getAccessToken();
+    await fetch(`/api/v1/events/${eventId}`, {
+      method: "PATCH",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ name: editName, ends_at: editEndsAt || undefined }),
+    });
+    setSavingEvent(false);
+    setShowEditEvent(false);
+    fetchEvent();
+  }
+
   // Add people to event
   const [showAddGuests, setShowAddGuests] = useState(false);
   const [contacts, setContacts] = useState<{ userId: string; displayName: string | null; avatarUrl: string | null }[]>([]);
@@ -235,6 +255,45 @@ export default function EventPage() {
         );
       })()}
 
+      {/* Edit event modal */}
+      {showEditEvent && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,0.6)" }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowEditEvent(false); }}>
+          <div className="w-full max-w-lg rounded-t-3xl p-6 flex flex-col gap-4" style={{ background: "var(--card)", border: "1px solid var(--border-soft)" }}>
+            <p className="font-extrabold text-[16px]" style={{ fontFamily: "var(--font-nunito)" }}>edit</p>
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--muted)" }}>name</label>
+              <input
+                className="rounded-2xl px-4 py-3 text-[15px] outline-none"
+                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--accent-border)", color: "var(--text)" }}
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                maxLength={80}
+                autoFocus
+              />
+            </div>
+            {!isGroup && (
+              <div className="flex flex-col gap-1">
+                <label className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--muted)" }}>closes at</label>
+                <input
+                  type="datetime-local"
+                  className="rounded-2xl px-4 py-3 text-[15px] outline-none"
+                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-soft)", color: "var(--text)" }}
+                  value={editEndsAt}
+                  onChange={(e) => setEditEndsAt(e.target.value)}
+                />
+              </div>
+            )}
+            <div className="flex gap-2">
+              <button onClick={() => setShowEditEvent(false)} className="flex-1 py-2.5 rounded-2xl font-bold text-[14px]" style={{ background: "rgba(255,255,255,0.05)", color: "var(--muted)" }}>cancel</button>
+              <button onClick={saveEvent} disabled={!editName.trim() || savingEvent} className="flex-1 py-2.5 rounded-2xl font-bold text-[14px] text-white disabled:opacity-40" style={{ background: "var(--accent)", fontFamily: "var(--font-nunito)" }}>
+                {savingEvent ? "saving..." : "save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Cover photo */}
       <div className="relative w-full overflow-hidden" style={{ height: 240 }}>
         {event.cover_url ? (
@@ -314,6 +373,15 @@ export default function EventPage() {
         >
           {copied ? "copied!" : "invite friends"}
         </button>
+        {isHost && (
+          <button
+            onClick={() => { setEditName(event.name); setEditEndsAt(event.ends_at ? new Date(event.ends_at).toISOString().slice(0,16) : ""); setShowEditEvent(true); }}
+            className="text-[12px] font-bold px-3 py-1.5 rounded-full"
+            style={{ background: "rgba(255,255,255,0.05)", color: "var(--muted)", border: "1px solid var(--border-soft)" }}
+          >
+            edit
+          </button>
+        )}
         {isHost && (
           confirmDelete ? (
             <button
@@ -478,6 +546,25 @@ function BetCard({
   // Delete state
   const [confirmDeleteBet, setConfirmDeleteBet] = useState(false);
   const [deletingBet, setDeletingBet] = useState(false);
+
+  // Edit deadline
+  const [editingDeadline, setEditingDeadline] = useState(false);
+  const [deadlineInput, setDeadlineInput] = useState("");
+  const [savingDeadline, setSavingDeadline] = useState(false);
+
+  async function saveDeadline() {
+    if (!deadlineInput || savingDeadline) return;
+    setSavingDeadline(true);
+    const token = await getAccessToken();
+    await fetch(`/api/v1/bets/${bet.id}`, {
+      method: "PATCH",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ deadline: deadlineInput }),
+    });
+    setSavingDeadline(false);
+    setEditingDeadline(false);
+    onUpdate();
+  }
 
   // Invite modal state
   const [showInvite, setShowInvite] = useState(false);
@@ -886,12 +973,37 @@ function BetCard({
         </div>
       )}
 
+      {/* Edit deadline inline */}
+      {editingDeadline && (
+        <div className="mt-3 flex items-center gap-2">
+          <input
+            type="datetime-local"
+            className="flex-1 rounded-2xl px-3 py-2 text-[13px] outline-none"
+            style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--accent-border)", color: "var(--text)" }}
+            value={deadlineInput}
+            onChange={(e) => setDeadlineInput(e.target.value)}
+            autoFocus
+          />
+          <button onClick={saveDeadline} disabled={!deadlineInput || savingDeadline} className="px-3 py-2 rounded-2xl font-bold text-[12px] text-white disabled:opacity-40" style={{ background: "var(--accent)" }}>
+            {savingDeadline ? "..." : "save"}
+          </button>
+          <button onClick={() => setEditingDeadline(false)} className="px-3 py-2 rounded-2xl font-bold text-[12px]" style={{ background: "rgba(255,255,255,0.05)", color: "var(--muted)" }}>
+            cancel
+          </button>
+        </div>
+      )}
+
       {/* Resolve trigger + delete + invite */}
       {!resolving && (canResolve || isHost || bet.creator_id === userId || (bet.visibility === "private" && isInvolved)) && (
         <div className="mt-4 flex items-center gap-4 flex-wrap">
           {canResolve && (
             <button onClick={() => setResolving(true)} className="text-[12px] font-bold" style={{ color: "var(--dimmer)" }}>
               resolve bet →
+            </button>
+          )}
+          {isOpen && !isPast && (isHost || bet.creator_id === userId) && (
+            <button onClick={() => { setDeadlineInput(new Date(bet.deadline).toISOString().slice(0,16)); setEditingDeadline(true); }} className="text-[12px] font-bold" style={{ color: "var(--dimmer)" }}>
+              edit deadline
             </button>
           )}
           {bet.visibility === "private" && isInvolved && (
