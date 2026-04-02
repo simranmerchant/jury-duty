@@ -56,6 +56,26 @@ export async function DELETE(
   if (!event) return NextResponse.json({ error: "not found" }, { status: 404 });
   if (event.host_id !== user.userId) return NextResponse.json({ error: "only the host can delete this event" }, { status: 403 });
 
+  // Refund all stakes from open bets before deleting so no one loses points
+  const { data: openEntries } = await supabase
+    .from("bet_entries")
+    .select("user_id, points_staked, bets!inner(event_id, status)")
+    .eq("bets.event_id", id)
+    .eq("bets.status", "open");
+
+  if (openEntries && openEntries.length > 0) {
+    // Group stakes by user and refund
+    const refunds: Record<string, number> = {};
+    for (const entry of openEntries) {
+      refunds[entry.user_id] = (refunds[entry.user_id] ?? 0) + entry.points_staked;
+    }
+    await Promise.all(
+      Object.entries(refunds).map(([userId, pts]) =>
+        supabase.rpc("increment_balance", { p_user_id: userId, p_amount: pts })
+      )
+    );
+  }
+
   const { error } = await supabase.from("events").delete().eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
