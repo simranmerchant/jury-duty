@@ -115,6 +115,8 @@ export default function EventPage() {
       setUserId(data.userId);
       setUserPoints(meData.points ?? null);
       setLoading(false);
+      // Mark event as seen
+      fetch(`/api/v1/events/${eventId}/seen`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
     } catch (e) {
       setFetchError(String(e));
       setLoading(false);

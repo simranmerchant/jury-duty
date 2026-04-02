@@ -14,6 +14,7 @@ type Event = {
   invite_token: string;
   cover_url: string | null;
   bets: Bet[];
+  hasNew: boolean;
 };
 
 export default function EventsPage() {
@@ -131,8 +132,11 @@ export default function EventsPage() {
         )}
         <div className="p-5">
           <div className="flex items-start justify-between gap-2 mb-2">
-            <div className="font-extrabold text-[17px] leading-snug flex-1" style={{ fontFamily: "var(--font-nunito)" }}>
+            <div className="font-extrabold text-[17px] leading-snug flex-1 flex items-center gap-2" style={{ fontFamily: "var(--font-nunito)" }}>
               {event.name}
+              {event.hasNew && !isPast && (
+                <span className="w-2 h-2 rounded-full flex-shrink-0 inline-block" style={{ background: "var(--accent)" }} />
+              )}
             </div>
             {isGroup ? (
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 mt-0.5" style={{ background: "var(--purple-dim)", color: "var(--purple)", border: "1px solid var(--purple-border)" }}>

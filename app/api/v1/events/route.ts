@@ -53,17 +53,33 @@ export async function GET(req: NextRequest) {
   const user = await requireUser(token).catch(() => null);
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  const { data: events, error } = await supabase
-    .from("events")
-    .select(`
-      id, name, ends_at, type, host_id, invite_token, cover_url,
-      event_guests!inner(user_id),
-      bets(id, status, visibility)
-    `)
-    .eq("event_guests.user_id", user.userId)
-    .order("created_at", { ascending: false });
+  const [{ data: events, error }, { data: lastSeenRows }] = await Promise.all([
+    supabase
+      .from("events")
+      .select(`
+        id, name, ends_at, type, host_id, invite_token, cover_url,
+        event_guests!inner(user_id),
+        bets(id, status, visibility, created_at)
+      `)
+      .eq("event_guests.user_id", user.userId)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("event_last_seen")
+      .select("event_id, seen_at")
+      .eq("user_id", user.userId),
+  ]);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  return NextResponse.json({ events });
+  const seenMap = new Map((lastSeenRows ?? []).map((r) => [r.event_id, r.seen_at]));
+
+  const eventsWithNew = (events ?? []).map((event) => {
+    const seenAt = seenMap.get(event.id);
+    const hasNew = (event.bets ?? []).some(
+      (b: any) => !seenAt || new Date(b.created_at) > new Date(seenAt)
+    );
+    return { ...event, hasNew };
+  });
+
+  return NextResponse.json({ events: eventsWithNew });
 }
