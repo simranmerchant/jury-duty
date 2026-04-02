@@ -95,7 +95,7 @@ export default function NewBetPage() {
         options: options.filter((o) => o.trim()),
         visibility,
         invitedUserIds: visibility === "private" ? invitedIds : [],
-        ...(isGroup ? { deadline } : {}),
+        ...(isGroup && deadline ? { deadline: new Date(deadline).toISOString() } : {}),
       }),
     });
 
@@ -207,6 +207,7 @@ export default function NewBetPage() {
               type="datetime-local"
               className="rounded-2xl px-4 py-3 text-[15px] outline-none"
               style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-soft)", color: "var(--text)" }}
+              min={new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}
               value={deadline}
               onChange={(e) => setDeadline(e.target.value)}
             />
