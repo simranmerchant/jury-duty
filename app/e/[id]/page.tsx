@@ -654,7 +654,7 @@ function BetCard({
   const isOpen = bet.status === "open";
   const isPast = new Date(bet.deadline) < new Date();
   const canBet = isOpen && !isPast && !myEntry && !resolving;
-  const canResolve = isOpen && (isHost || bet.creator_id === userId);
+  const canResolve = isOpen && bet.creator_id === userId;
 
   async function placeBet() {
     if (!selectedOption || placing) return;
