@@ -17,7 +17,7 @@ const dmSans = DM_Sans({
 
 export const metadata: Metadata = {
   title: "jury duty",
-  description: "make bets with your friends",
+  description: "you've been summoned.",
 };
 
 export default function RootLayout({
