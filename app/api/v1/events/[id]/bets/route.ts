@@ -14,7 +14,6 @@ export async function POST(
 
   const { id: eventId } = await params;
 
-  // Must be a guest of this event
   const { data: guest } = await supabase
     .from("event_guests")
     .select("user_id")
@@ -24,19 +23,20 @@ export async function POST(
 
   if (!guest) return NextResponse.json({ error: "not a guest of this event" }, { status: 403 });
 
-  // Event must still be open
   const { data: event } = await supabase
     .from("events")
-    .select("ends_at")
+    .select("ends_at, type")
     .eq("id", eventId)
     .single();
 
   if (!event) return NextResponse.json({ error: "event not found" }, { status: 404 });
-  if (new Date(event.ends_at) < new Date()) {
+
+  // Events have a hard close date; groups never close
+  if (event.type === "event" && event.ends_at && new Date(event.ends_at) < new Date()) {
     return NextResponse.json({ error: "event is closed" }, { status: 422 });
   }
 
-  const { question, options, visibility, invitedUserIds } = await req.json();
+  const { question, options, visibility, invitedUserIds, deadline } = await req.json();
 
   if (!question?.trim() || question.trim().length > 200) {
     return NextResponse.json({ error: "question required (max 200 chars)" }, { status: 400 });
@@ -51,14 +51,22 @@ export async function POST(
     return NextResponse.json({ error: "invalid visibility" }, { status: 400 });
   }
 
-  // Insert bet — deadline inherits from event's ends_at
+  // Groups use per-bet deadline; events inherit ends_at
+  let betDeadline: string;
+  if (event.type === "group") {
+    if (!deadline) return NextResponse.json({ error: "deadline required for group bets" }, { status: 400 });
+    betDeadline = deadline;
+  } else {
+    betDeadline = event.ends_at!;
+  }
+
   const { data: bet, error: betError } = await supabase
     .from("bets")
     .insert({
       event_id: eventId,
       creator_id: user.userId,
       question: question.trim(),
-      deadline: event.ends_at,
+      deadline: betDeadline,
       visibility: visibility ?? "public",
     })
     .select("id")
@@ -66,14 +74,12 @@ export async function POST(
 
   if (betError || !bet) return NextResponse.json({ error: betError?.message ?? "failed" }, { status: 500 });
 
-  // Insert options
   const { error: optError } = await supabase
     .from("bet_options")
     .insert(options.map((label: string) => ({ bet_id: bet.id, label: label.trim() })));
 
   if (optError) return NextResponse.json({ error: optError.message }, { status: 500 });
 
-  // Insert invites for private bets (always include creator)
   if (visibility === "private" && Array.isArray(invitedUserIds) && invitedUserIds.length > 0) {
     const inviteRows = [...new Set([user.userId, ...invitedUserIds])].map((uid) => ({
       bet_id: bet.id,

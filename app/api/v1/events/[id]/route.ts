@@ -73,7 +73,7 @@ export async function GET(
   const { data: event, error } = await supabase
     .from("events")
     .select(`
-      id, name, ends_at, host_id, invite_token,
+      id, name, ends_at, type, host_id, invite_token,
       event_guests(user_id, balances(display_name, avatar_url)),
       bets(
         id, question, deadline, visibility, status, winning_option_id, creator_id, created_at,

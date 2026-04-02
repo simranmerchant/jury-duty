@@ -20,11 +20,22 @@ export default function NewBetPage() {
   const [loadingGuests, setLoadingGuests] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isGroup, setIsGroup] = useState(false);
+  const [deadline, setDeadline] = useState("");
 
   useEffect(() => {
     if (!ready) return;
     if (!authenticated) router.replace("/login");
   }, [ready, authenticated, router]);
+
+  useEffect(() => {
+    if (!ready || !authenticated) return;
+    getAccessToken().then((token) =>
+      fetch(`/api/v1/events/${eventId}`, { headers: { Authorization: `Bearer ${token}` } })
+        .then((r) => r.json())
+        .then((d) => { if (d.event?.type === "group") setIsGroup(true); })
+    );
+  }, [ready, authenticated, eventId, getAccessToken]);
 
   const fetchGuests = useCallback(async () => {
     setLoadingGuests(true);
@@ -67,7 +78,8 @@ export default function NewBetPage() {
     question.trim().length > 0 &&
     question.trim().length <= 200 &&
     options.filter((o) => o.trim()).length >= 2 &&
-    options.every((o) => o.trim().length <= 100);
+    options.every((o) => o.trim().length <= 100) &&
+    (!isGroup || !!deadline);
 
   async function submit() {
     if (!canSubmit || submitting) return;
@@ -83,6 +95,7 @@ export default function NewBetPage() {
         options: options.filter((o) => o.trim()),
         visibility,
         invitedUserIds: visibility === "private" ? invitedIds : [],
+        ...(isGroup ? { deadline } : {}),
       }),
     });
 
@@ -183,6 +196,22 @@ export default function NewBetPage() {
             </button>
           )}
         </div>
+
+        {/* Deadline — groups only */}
+        {isGroup && (
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--muted)" }}>
+              bet closes at
+            </label>
+            <input
+              type="datetime-local"
+              className="rounded-2xl px-4 py-3 text-[15px] outline-none"
+              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-soft)", color: "var(--text)" }}
+              value={deadline}
+              onChange={(e) => setDeadline(e.target.value)}
+            />
+          </div>
+        )}
 
         {/* Visibility */}
         <div className="flex flex-col gap-1.5">

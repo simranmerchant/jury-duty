@@ -8,7 +8,8 @@ type Bet = { id: string; status: string; visibility: string };
 type Event = {
   id: string;
   name: string;
-  ends_at: string;
+  ends_at: string | null;
+  type: "event" | "group";
   host_id: string;
   invite_token: string;
   bets: Bet[];
@@ -26,6 +27,7 @@ export default function EventsPage() {
   const [joinInput, setJoinInput] = useState("");
   const [name, setName] = useState("");
   const [endsAt, setEndsAt] = useState("");
+  const [createType, setCreateType] = useState<"event" | "group">("event");
   const [creating, setCreating] = useState(false);
 
   const fetchEvents = useCallback(async () => {
@@ -49,21 +51,66 @@ export default function EventsPage() {
   }, [ready, authenticated, router, fetchEvents]);
 
   async function createEvent() {
-    if (!name.trim() || !endsAt) return;
+    if (!name.trim()) return;
+    if (createType === "event" && !endsAt) return;
     setCreating(true);
     const token = await getAccessToken();
     await fetch("/api/v1/events", {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ name, ends_at: endsAt }),
+      body: JSON.stringify({ name, type: createType, ...(createType === "event" ? { ends_at: endsAt } : {}) }),
     });
-    setName(""); setEndsAt(""); setShowCreate(false); setCreating(false);
+    setName(""); setEndsAt(""); setShowCreate(false); setCreating(false); setCreateType("event");
     fetchEvents();
   }
 
   if (!ready) return null;
 
-  const openCount = events.filter((e) => new Date(e.ends_at) >= new Date()).length;
+  const groups = events.filter((e) => e.type === "group");
+  const eventsList = events.filter((e) => e.type !== "group");
+  const activeEvents = eventsList.filter((e) => e.ends_at && new Date(e.ends_at) >= new Date()).length;
+
+  function EventCard({ event }: { event: Event }) {
+    const publicBets = event.bets?.filter((b) => b.visibility === "public").length ?? 0;
+    const privateBets = event.bets?.filter((b) => b.visibility === "private").length ?? 0;
+    const isGroup = event.type === "group";
+    const isPast = !isGroup && event.ends_at && new Date(event.ends_at) < new Date();
+    return (
+      <button
+        onClick={() => router.push(`/e/${event.id}`)}
+        className="w-full text-left rounded-3xl p-5"
+        style={{ background: "var(--card)", border: "1px solid var(--border-soft)", opacity: isPast ? 0.45 : 1 }}
+      >
+        <div className="font-extrabold text-[17px] mb-0.5" style={{ fontFamily: "var(--font-nunito)" }}>
+          {event.name}
+        </div>
+        <div className="text-[13px] mb-3" style={{ color: "var(--muted)" }}>
+          {isGroup
+            ? "group · ongoing"
+            : event.ends_at
+              ? `closes ${new Date(event.ends_at).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}`
+              : ""}
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          {publicBets > 0 && (
+            <span className="text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: "var(--accent-dim)", color: "var(--accent)", border: "1px solid var(--accent-border)" }}>
+              {publicBets} public {publicBets === 1 ? "bet" : "bets"}
+            </span>
+          )}
+          {privateBets > 0 && (
+            <span className="text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: "var(--purple-dim)", color: "var(--purple)", border: "1px solid var(--purple-border)" }}>
+              {privateBets} private
+            </span>
+          )}
+          {publicBets === 0 && privateBets === 0 && (
+            <span className="text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: "rgba(255,255,255,0.05)", color: "var(--dimmer)" }}>
+              no bets yet
+            </span>
+          )}
+        </div>
+      </button>
+    );
+  }
 
   return (
     <div className="min-h-screen" style={{ background: "var(--bg)", color: "var(--text)" }}>
@@ -73,7 +120,7 @@ export default function EventsPage() {
             betsy<span style={{ color: "var(--accent)" }}>gal</span>
           </h1>
           <p className="text-sm mt-0.5" style={{ color: "var(--dimmer)" }}>
-            your events · {openCount} active
+            {groups.length > 0 ? `${groups.length} group${groups.length !== 1 ? "s" : ""} · ` : ""}{activeEvents} active event{activeEvents !== 1 ? "s" : ""}
           </p>
         </div>
         <button onClick={() => router.push("/profile")} className="flex flex-col items-center gap-1 mt-1">
@@ -93,52 +140,36 @@ export default function EventsPage() {
       </div>
 
       <div className="px-3 pt-2 pb-32 flex flex-col gap-3">
-        {events.map((event) => {
-          const publicBets = event.bets?.filter((b) => b.visibility === "public").length ?? 0;
-          const privateBets = event.bets?.filter((b) => b.visibility === "private").length ?? 0;
-          const isPast = new Date(event.ends_at) < new Date();
-          return (
-            <button
-              key={event.id}
-              onClick={() => router.push(`/e/${event.id}`)}
-              className="w-full text-left rounded-3xl p-5"
-              style={{ background: "var(--card)", border: "1px solid var(--border-soft)", opacity: isPast ? 0.45 : 1 }}
-            >
-              <div className="font-extrabold text-[17px] mb-0.5" style={{ fontFamily: "var(--font-nunito)" }}>
-                {event.name}
-              </div>
-              <div className="text-[13px] mb-3" style={{ color: "var(--muted)" }}>
-                closes {new Date(event.ends_at).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
-              </div>
-              <div className="flex gap-2 flex-wrap">
-                {publicBets > 0 && (
-                  <span className="text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: "var(--accent-dim)", color: "var(--accent)", border: "1px solid var(--accent-border)" }}>
-                    {publicBets} public {publicBets === 1 ? "bet" : "bets"}
-                  </span>
-                )}
-                {privateBets > 0 && (
-                  <span className="text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: "var(--purple-dim)", color: "var(--purple)", border: "1px solid var(--purple-border)" }}>
-                    {privateBets} private
-                  </span>
-                )}
-                {publicBets === 0 && privateBets === 0 && (
-                  <span className="text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: "rgba(255,255,255,0.05)", color: "var(--dimmer)" }}>
-                    no bets yet
-                  </span>
-                )}
-              </div>
-            </button>
-          );
-        })}
+        {/* Groups section */}
+        {groups.length > 0 && (
+          <>
+            <p className="text-[11px] font-bold uppercase tracking-wider px-2 pt-2" style={{ color: "var(--dimmer)" }}>groups</p>
+            {groups.map((g) => <EventCard key={g.id} event={g} />)}
+          </>
+        )}
 
-        <div className="flex gap-2">
+        {/* Events section */}
+        {eventsList.length > 0 && (
+          <>
+            {groups.length > 0 && (
+              <p className="text-[11px] font-bold uppercase tracking-wider px-2 pt-2" style={{ color: "var(--dimmer)" }}>events</p>
+            )}
+            {eventsList.map((e) => <EventCard key={e.id} event={e} />)}
+          </>
+        )}
+
+        {events.length === 0 && (
+          <p className="text-center py-12 text-[14px]" style={{ color: "var(--dimmer)" }}>no events or groups yet</p>
+        )}
+
+        <div className="flex gap-2 mt-1">
           <button
             onClick={() => setShowCreate(true)}
             className="flex-1 rounded-2xl px-4 py-3.5 flex items-center gap-2"
             style={{ border: "1px dashed var(--border)", color: "var(--dimmer)" }}
           >
             <span className="w-6 h-6 rounded-full flex items-center justify-center text-base font-bold flex-shrink-0" style={{ background: "var(--accent-dim)", color: "var(--accent)" }}>+</span>
-            <span className="text-sm">new event</span>
+            <span className="text-sm">new</span>
           </button>
           <button
             onClick={() => setShowJoin(true)}
@@ -146,54 +177,88 @@ export default function EventsPage() {
             style={{ border: "1px dashed var(--border)", color: "var(--dimmer)" }}
           >
             <span className="w-6 h-6 rounded-full flex items-center justify-center text-base font-bold flex-shrink-0" style={{ background: "rgba(255,255,255,0.06)", color: "var(--muted)" }}>→</span>
-            <span className="text-sm">join event</span>
+            <span className="text-sm">join</span>
           </button>
         </div>
       </div>
 
+      {/* Create modal */}
       {showCreate && (
         <div className="fixed inset-0 z-50 flex flex-col justify-end" style={{ background: "rgba(0,0,0,0.6)" }}>
           <div className="rounded-t-3xl p-6 flex flex-col gap-4" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
             <div className="w-9 h-1 rounded-full mx-auto mb-1" style={{ background: "var(--border)" }} />
-            <h2 className="text-xl font-black" style={{ fontFamily: "var(--font-nunito)" }}>New Event</h2>
+
+            {/* Type toggle */}
+            <div className="flex gap-2">
+              {(["event", "group"] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setCreateType(t)}
+                  className="flex-1 py-2.5 rounded-2xl font-bold text-[14px]"
+                  style={{
+                    background: createType === t ? "var(--accent-dim)" : "rgba(255,255,255,0.04)",
+                    border: `1px solid ${createType === t ? "var(--accent-border)" : "var(--border-soft)"}`,
+                    color: createType === t ? "var(--accent)" : "var(--muted)",
+                  }}
+                >
+                  {t === "event" ? "event" : "group"}
+                </button>
+              ))}
+            </div>
+            <p className="text-[12px] -mt-1" style={{ color: "var(--dimmer)" }}>
+              {createType === "event"
+                ? "time-boxed — bets close when the event ends"
+                : "ongoing — each bet has its own deadline"}
+            </p>
+
             <div className="flex flex-col gap-1">
               <label className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--muted)" }}>Name</label>
               <input
                 className="rounded-2xl px-4 py-3 text-[15px] outline-none"
                 style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--accent-border)", color: "var(--text)" }}
-                placeholder="Ava's Birthday 🎂"
+                placeholder={createType === "event" ? "Ava's Birthday 🎂" : "The Squad"}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 autoFocus
               />
             </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--muted)" }}>Closes at</label>
-              <input
-                type="datetime-local"
-                className="rounded-2xl px-4 py-3 text-[15px] outline-none"
-                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-soft)", color: "var(--text)" }}
-                value={endsAt}
-                onChange={(e) => setEndsAt(e.target.value)}
-              />
-            </div>
+
+            {createType === "event" && (
+              <div className="flex flex-col gap-1">
+                <label className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--muted)" }}>Closes at</label>
+                <input
+                  type="datetime-local"
+                  className="rounded-2xl px-4 py-3 text-[15px] outline-none"
+                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-soft)", color: "var(--text)" }}
+                  value={endsAt}
+                  onChange={(e) => setEndsAt(e.target.value)}
+                />
+              </div>
+            )}
+
             <div className="flex gap-3 mt-1">
-              <button onClick={() => setShowCreate(false)} className="flex-1 py-3.5 rounded-2xl font-bold text-[15px]" style={{ background: "rgba(255,255,255,0.06)", color: "var(--muted)" }}>
+              <button onClick={() => { setShowCreate(false); setCreateType("event"); }} className="flex-1 py-3.5 rounded-2xl font-bold text-[15px]" style={{ background: "rgba(255,255,255,0.06)", color: "var(--muted)" }}>
                 Cancel
               </button>
-              <button onClick={createEvent} disabled={creating || !name.trim() || !endsAt} className="flex-1 py-3.5 rounded-2xl font-bold text-[15px] text-white disabled:opacity-40" style={{ background: "var(--accent)", fontFamily: "var(--font-nunito)" }}>
-                {creating ? "Creating..." : "Create"}
+              <button
+                onClick={createEvent}
+                disabled={creating || !name.trim() || (createType === "event" && !endsAt)}
+                className="flex-1 py-3.5 rounded-2xl font-bold text-[15px] text-white disabled:opacity-40"
+                style={{ background: "var(--accent)", fontFamily: "var(--font-nunito)" }}
+              >
+                {creating ? "Creating..." : `Create ${createType}`}
               </button>
             </div>
           </div>
         </div>
       )}
 
+      {/* Join modal */}
       {showJoin && (
         <div className="fixed inset-0 z-50 flex flex-col justify-end" style={{ background: "rgba(0,0,0,0.6)" }}>
           <div className="rounded-t-3xl p-6 flex flex-col gap-4" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
             <div className="w-9 h-1 rounded-full mx-auto mb-1" style={{ background: "var(--border)" }} />
-            <h2 className="text-xl font-black" style={{ fontFamily: "var(--font-nunito)" }}>Join an Event</h2>
+            <h2 className="text-xl font-black" style={{ fontFamily: "var(--font-nunito)" }}>Join</h2>
             <div className="flex flex-col gap-1">
               <label className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--muted)" }}>Paste invite link</label>
               <input
@@ -215,8 +280,7 @@ export default function EventsPage() {
                   const input = joinInput.trim();
                   const match = input.match(/\/join\/([^/?#]+)/);
                   const token = match ? match[1] : input;
-                  setShowJoin(false);
-                  setJoinInput("");
+                  setShowJoin(false); setJoinInput("");
                   router.push(`/join/${token}`);
                 }}
                 className="flex-1 py-3.5 rounded-2xl font-bold text-[15px] text-white disabled:opacity-40"

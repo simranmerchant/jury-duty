@@ -24,7 +24,8 @@ type Guest = { user_id: string; balances?: { display_name: string | null; avatar
 type Event = {
   id: string;
   name: string;
-  ends_at: string;
+  ends_at: string | null;
+  type: "event" | "group";
   host_id: string;
   invite_token: string;
   event_guests: Guest[];
@@ -110,7 +111,8 @@ export default function EventPage() {
   if (!event) return null;
 
   const isHost = userId === event.host_id;
-  const isClosed = new Date(event.ends_at) < new Date();
+  const isGroup = event.type === "group";
+  const isClosed = !isGroup && !!event.ends_at && new Date(event.ends_at) < new Date();
   const guestCount = event.event_guests?.length ?? 0;
   const openBets = event.bets?.filter((b) => b.status === "open") ?? [];
   const resolvedBets = event.bets?.filter((b) => b.status === "resolved") ?? [];
@@ -139,11 +141,13 @@ export default function EventPage() {
           <span style={{ color: "var(--border)" }}>·</span>
           <span
             className="text-[13px]"
-            style={{ color: isClosed ? "var(--muted)" : "var(--accent)" }}
+            style={{ color: isClosed ? "var(--muted)" : isGroup ? "var(--dimmer)" : "var(--accent)" }}
           >
-            {isClosed
-              ? "closed"
-              : `closes ${new Date(event.ends_at).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}`}
+            {isGroup
+              ? "ongoing"
+              : isClosed
+                ? "closed"
+                : `closes ${new Date(event.ends_at!).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}`}
           </span>
           {isHost && (
             <>
@@ -242,6 +246,7 @@ export default function EventPage() {
                 bet={bet}
                 userId={userId!}
                 isHost={isHost}
+                isGroup={isGroup}
                 eventGuests={event.event_guests}
                 eventInviteToken={event.invite_token}
                 onUpdate={fetchEvent}
@@ -261,6 +266,7 @@ export default function EventPage() {
                 bet={bet}
                 userId={userId!}
                 isHost={isHost}
+                isGroup={isGroup}
                 eventGuests={event.event_guests}
                 eventInviteToken={event.invite_token}
                 onUpdate={fetchEvent}
@@ -287,6 +293,7 @@ function BetCard({
   bet,
   userId,
   isHost,
+  isGroup,
   eventGuests,
   eventInviteToken,
   onUpdate,
@@ -294,6 +301,7 @@ function BetCard({
   bet: Bet;
   userId: string;
   isHost: boolean;
+  isGroup: boolean;
   eventGuests: Guest[];
   eventInviteToken: string;
   onUpdate: () => void;
@@ -515,6 +523,15 @@ function BetCard({
         )}
       </div>
 
+      {/* Per-bet deadline for groups */}
+      {isGroup && bet.deadline && (
+        <p className="text-[11px] mb-2" style={{ color: isPast ? "var(--muted)" : "var(--dimmer)" }}>
+          {isPast
+            ? "closed"
+            : `closes ${new Date(bet.deadline).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`}
+        </p>
+      )}
+
       {/* Pot summary */}
       {totalPot > 0 && (
         <p className="text-[12px] mb-3" style={{ color: "var(--muted)" }}>
@@ -598,10 +615,15 @@ function BetCard({
                           const name = e.balances?.display_name;
                           const avatar = e.balances?.avatar_url;
                           const isMe = e.user_id === userId;
-                          const anon = e.is_anonymous && !isMe;
-                          return anon ? (
+                          const anonSelf = e.is_anonymous && isMe;
+                          const anonOther = e.is_anonymous && !isMe;
+                          return anonOther ? (
                             <div key={e.id} className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] border border-[var(--card)]" style={{ marginLeft: i === 0 ? 0 : -6, zIndex: pickers.length - i, background: "rgba(255,255,255,0.08)" }}>
                               👻
+                            </div>
+                          ) : anonSelf ? (
+                            <div key={e.id} className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] border border-[var(--card)]" style={{ marginLeft: i === 0 ? 0 : -6, zIndex: pickers.length - i, background: "var(--accent-dim)" }}>
+                              🫣
                             </div>
                           ) : avatar ? (
                             <img key={e.id} src={avatar} alt={name ?? ""} className="w-5 h-5 rounded-full object-cover border border-[var(--card)]" style={{ marginLeft: i === 0 ? 0 : -6, zIndex: pickers.length - i }} />
