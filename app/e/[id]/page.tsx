@@ -120,7 +120,7 @@ export default function EventPage() {
       try {
         await navigator.share({
           title: `Join "${event!.name}" on jury duty`,
-          text: "Make bets with your friends 🎉",
+          text: "you've been summoned. 🫵",
           url,
         });
       } catch {
