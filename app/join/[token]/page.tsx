@@ -98,7 +98,7 @@ function JoinPageInner() {
       <div className="w-full max-w-sm flex flex-col items-center gap-6 text-center">
         {/* Wordmark */}
         <p className="text-[15px] font-black" style={{ fontFamily: "var(--font-nunito)", color: "var(--dimmer)" }}>
-          betsy<span style={{ color: "var(--accent)" }}>gal</span>
+          jury<span style={{ color: "var(--accent)" }}>duty</span>
         </p>
 
         {/* Event card */}

@@ -36,7 +36,7 @@ function LoginInner() {
           className="text-4xl font-black tracking-tight"
           style={{ fontFamily: "var(--font-nunito)" }}
         >
-          betsy<span style={{ color: "var(--accent)" }}>gal</span>
+          jury<span style={{ color: "var(--accent)" }}>duty</span>
         </h1>
         <p className="text-center" style={{ color: "var(--muted)", fontSize: 15 }}>
           make bets with your friends
