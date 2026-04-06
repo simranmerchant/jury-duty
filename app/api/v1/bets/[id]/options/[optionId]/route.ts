@@ -75,22 +75,24 @@ export async function PATCH(
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-    // Notify the tagged user
-    const creatorName = creatorData?.display_name ?? "someone";
-    await Promise.all([
-      supabase.from("notifications").insert({
-        user_id: tagged_user_id,
-        type: "bet_tagged",
-        title: "you've been put on the board 🎯",
-        body: `${creatorName} named you in a bet: "${bet.question}"`,
-        data: { bet_id: betId, event_id: bet.event_id },
-      }),
-      sendPushToUsers([tagged_user_id], {
-        title: "you've been put on the board 🎯",
-        body: `${creatorName} named you in a bet: "${bet.question}"`,
-        data: { event_id: bet.event_id },
-      }),
-    ]);
+    // Notify the tagged user (skip if they tagged themselves)
+    if (tagged_user_id !== user.userId) {
+      const creatorName = creatorData?.display_name ?? "someone";
+      await Promise.all([
+        supabase.from("notifications").insert({
+          user_id: tagged_user_id,
+          type: "bet_tagged",
+          title: "you've been put on the board 🎯",
+          body: `${creatorName} named you in a bet: "${bet.question}"`,
+          data: { bet_id: betId, event_id: bet.event_id },
+        }),
+        sendPushToUsers([tagged_user_id], {
+          title: "you've been put on the board 🎯",
+          body: `${creatorName} named you in a bet: "${bet.question}"`,
+          data: { event_id: bet.event_id },
+        }),
+      ]);
+    }
 
     return NextResponse.json({ ok: true });
   }

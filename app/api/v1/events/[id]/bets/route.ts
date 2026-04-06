@@ -98,10 +98,10 @@ export async function POST(
     .filter((o) => o.tagged_user_id)
     .map((o) => o.tagged_user_id as string);
 
-  // Notify users tagged in the question text (skip option-tagged users to avoid double-notifying)
+  // Notify users tagged in the question text (excluding creator and option-tagged users to avoid double-notifying)
   const questionTaggedIds: string[] = Array.isArray(question_tagged_user_ids) ? question_tagged_user_ids : [];
   const externalQuestionTaggedIds = questionTaggedIds.filter(
-    (uid) => !taggedUserIds.includes(uid)
+    (uid) => uid !== user.userId && !taggedUserIds.includes(uid)
   );
   if (externalQuestionTaggedIds.length > 0) {
     await Promise.all([
@@ -120,8 +120,8 @@ export async function POST(
     ]);
   }
 
-  // Notify all users tagged in options
-  const externalTaggedIds = taggedUserIds;
+  // Notify users tagged in options (excluding the creator if they tagged themselves)
+  const externalTaggedIds = taggedUserIds.filter((uid) => uid !== user.userId);
   if (externalTaggedIds.length > 0) {
     await Promise.all([
       supabase.from("notifications").insert(externalTaggedIds.map((uid) => ({
