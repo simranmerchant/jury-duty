@@ -10,7 +10,9 @@ export async function GET(req: NextRequest) {
   const user = await requireUser(token).catch(() => null);
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  const q = req.nextUrl.searchParams.get("q")?.trim() ?? "";
+  const raw = req.nextUrl.searchParams.get("q")?.trim() ?? "";
+  // Strip leading @ so "search by @handle" works as expected
+  const q = raw.startsWith("@") ? raw.slice(1) : raw;
   if (q.length < 2) return NextResponse.json({ users: [] });
 
   // Strip PostgREST filter-string special chars to prevent condition injection
