@@ -73,7 +73,7 @@ export default function EventPage() {
 
   // Add people to event
   const [showAddGuests, setShowAddGuests] = useState(false);
-  const [contacts, setContacts] = useState<{ userId: string; displayName: string | null; avatarUrl: string | null }[]>([]);
+  const [contacts, setContacts] = useState<{ user_id: string; balances: { display_name: string | null; avatar_url: string | null; username?: string | null } }[]>([]);
   const [addSelected, setAddSelected] = useState<string[]>([]);
   const [addingGuests, setAddingGuests] = useState(false);
 
@@ -210,7 +210,7 @@ export default function EventPage() {
       {/* Add guests modal */}
       {showAddGuests && (() => {
         const currentGuestIds = new Set(event.event_guests.map((g) => g.user_id));
-        const available = contacts.filter((c) => !currentGuestIds.has(c.userId));
+        const available = contacts.filter((c) => !currentGuestIds.has(c.user_id));
         return (
           <div
             className="fixed inset-0 z-50 flex items-end justify-center"
@@ -226,17 +226,17 @@ export default function EventPage() {
               ) : (
                 <div className="flex flex-col gap-2 max-h-64 overflow-y-auto">
                   {available.map((c) => {
-                    const selected = addSelected.includes(c.userId);
-                    const name = c.displayName ?? "unknown";
+                    const selected = addSelected.includes(c.user_id);
+                    const name = c.balances?.display_name ?? "unknown";
                     return (
                       <button
-                        key={c.userId}
-                        onClick={() => setAddSelected(selected ? addSelected.filter((id) => id !== c.userId) : [...addSelected, c.userId])}
+                        key={c.user_id}
+                        onClick={() => setAddSelected(selected ? addSelected.filter((id) => id !== c.user_id) : [...addSelected, c.user_id])}
                         className="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-left"
                         style={{ background: selected ? "var(--accent-dim)" : "rgba(255,255,255,0.04)", border: `1px solid ${selected ? "var(--accent-border)" : "transparent"}` }}
                       >
-                        {c.avatarUrl ? (
-                          <img src={c.avatarUrl} alt={name} className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+                        {c.balances?.avatar_url ? (
+                          <img src={c.balances.avatar_url} alt={name} className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
                         ) : (
                           <div className="w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-black flex-shrink-0" style={{ background: "rgba(255,255,255,0.08)", color: "var(--muted)" }}>
                             {name[0]?.toUpperCase() ?? "?"}
