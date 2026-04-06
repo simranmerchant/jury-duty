@@ -13,11 +13,14 @@ export async function GET(req: NextRequest) {
   const q = req.nextUrl.searchParams.get("q")?.trim() ?? "";
   if (q.length < 2) return NextResponse.json({ users: [] });
 
+  // Strip PostgREST filter-string special chars to prevent condition injection
+  const safe = q.replace(/[,.()"]/g, "");
+
   const { data, error } = await supabase
     .from("balances")
     .select("user_id, display_name, username, avatar_url")
     .neq("user_id", user.userId)
-    .or(`username.ilike.%${q}%,display_name.ilike.%${q}%`)
+    .or(`username.ilike.%${safe}%,display_name.ilike.%${safe}%`)
     .limit(20);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
