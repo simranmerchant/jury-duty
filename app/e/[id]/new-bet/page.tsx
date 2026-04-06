@@ -141,7 +141,7 @@ export default function NewBetPage() {
 
   function tagOption(i: number, guest: Guest) {
     setOptions((prev) => prev.map((o, idx) => idx === i ? {
-      label: guest.display_name ?? "",
+      label: guest.display_name ?? guest.username ?? "?",
       tagged_user_id: guest.user_id,
       tagged_display_name: guest.display_name ?? undefined,
       tagged_username: guest.username,
