@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/privy";
 import { supabase } from "@/lib/supabase";
+import { sendPushToUsers } from "@/lib/push";
 
 export async function POST(
   req: NextRequest,
@@ -52,6 +53,16 @@ export async function POST(
 
     if (notifications.length > 0) {
       await supabase.from("notifications").insert(notifications);
+
+      // Push notifications
+      const wonIds = notifications.filter((n) => n.type === "bet_resolved_won").map((n) => n.user_id);
+      const lostIds = notifications.filter((n) => n.type === "bet_resolved_lost").map((n) => n.user_id);
+      const refundIds = notifications.filter((n) => n.type === "bet_resolved_refunded").map((n) => n.user_id);
+      await Promise.all([
+        wonIds.length > 0 && sendPushToUsers(wonIds, { title: "jury's in — you won 🎉", body: `you called it on "${bet.title}"`, data: { bet_id: betId, outcome: "won" } }),
+        lostIds.length > 0 && sendPushToUsers(lostIds, { title: "jury's in — you lost 💀", body: `the jury has spoken on "${bet.title}"`, data: { bet_id: betId, outcome: "lost" } }),
+        refundIds.length > 0 && sendPushToUsers(refundIds, { title: "case dismissed", body: `"${bet.title}" was called off`, data: { bet_id: betId, outcome: "refunded" } }),
+      ]);
     }
   }
 

@@ -2,7 +2,9 @@
 
 import { usePrivy } from "@privy-io/react-auth";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
+
+const USERNAME_RE = /^[a-z0-9][a-z0-9._]{1,18}[a-z0-9]$|^[a-z0-9]{3}$/;
 
 type HistoryEntry = {
   id: string;
@@ -31,9 +33,13 @@ export default function ProfilePage() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [displayName, setDisplayName] = useState<string>("");
+  const [username, setUsername] = useState<string | null>(null);
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState("");
+  const [usernameInput, setUsernameInput] = useState("");
+  const [usernameStatus, setUsernameStatus] = useState<"idle" | "checking" | "available" | "taken" | "invalid" | "unchanged">("idle");
   const [savingName, setSavingName] = useState(false);
+  const checkTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -46,6 +52,7 @@ export default function ProfilePage() {
     const data = await res.json();
     setPoints(data.points);
     setDisplayName(data.display_name ?? "");
+    setUsername(data.username ?? null);
     setAvatarUrl(data.avatar_url ?? null);
     setHistory(data.history ?? []);
     setStats(data.stats ?? null);
@@ -86,20 +93,48 @@ export default function ProfilePage() {
     e.target.value = "";
   }
 
+  function onUsernameInputChange(val: string) {
+    const u = val.toLowerCase().replace(/[^a-z0-9._]/g, "");
+    setUsernameInput(u);
+    if (checkTimer.current) clearTimeout(checkTimer.current);
+    if (!u) { setUsernameStatus("idle"); return; }
+    if (u === username) { setUsernameStatus("unchanged"); return; }
+    if (!USERNAME_RE.test(u)) { setUsernameStatus("invalid"); return; }
+    setUsernameStatus("checking");
+    checkTimer.current = setTimeout(async () => {
+      const res = await fetch(`/api/v1/me/username?u=${encodeURIComponent(u)}`).catch(() => null);
+      if (!res) { setUsernameStatus("idle"); return; }
+      const data = await res.json().catch(() => ({}));
+      setUsernameStatus(data.available ? "available" : "taken");
+    }, 400);
+  }
+
   async function saveName() {
     const trimmed = nameInput.trim();
     if (!trimmed || savingName) return;
+    if (usernameInput && usernameStatus !== "available" && usernameStatus !== "unchanged") return;
     setSavingName(true);
     const token = await getAccessToken();
-    const res = await fetch("/api/v1/me", {
-      method: "PATCH",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ display_name: trimmed }),
-    });
-    if (res.ok) {
-      setDisplayName(trimmed);
-      setEditingName(false);
+    const promises: Promise<any>[] = [
+      fetch("/api/v1/me", {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ display_name: trimmed }),
+      }),
+    ];
+    if (usernameInput && usernameStatus === "available") {
+      promises.push(
+        fetch("/api/v1/me/username", {
+          method: "PATCH",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ username: usernameInput }),
+        })
+      );
     }
+    await Promise.all(promises);
+    setDisplayName(trimmed);
+    if (usernameInput && usernameStatus === "available") setUsername(usernameInput);
+    setEditingName(false);
     setSavingName(false);
   }
 
@@ -146,43 +181,70 @@ export default function ProfilePage() {
 
         <div className="flex items-center justify-between">
           {editingName ? (
-            <div className="flex items-center gap-2 flex-1">
+            <div className="flex flex-col gap-2 flex-1">
               <input
-                className="rounded-xl px-3 py-2 text-[18px] font-bold outline-none flex-1"
+                className="rounded-xl px-3 py-2 text-[18px] font-bold outline-none"
                 style={{ background: "rgba(255,255,255,0.06)", border: "1px solid var(--accent-border)", color: "var(--text)" }}
+                placeholder="display name"
                 value={nameInput}
                 onChange={(e) => setNameInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && saveName()}
                 maxLength={40}
                 autoFocus
               />
-              <button
-                onClick={saveName}
-                disabled={!nameInput.trim() || savingName}
-                className="px-3 py-2 rounded-xl font-bold text-[13px] text-white disabled:opacity-40"
-                style={{ background: "var(--accent)" }}
+              <div
+                className="flex items-center rounded-xl px-3 gap-1"
+                style={{ background: "rgba(255,255,255,0.06)", border: "1px solid var(--accent-border)" }}
               >
-                {savingName ? "..." : "save"}
-              </button>
-              <button
-                onClick={() => setEditingName(false)}
-                className="px-3 py-2 rounded-xl font-bold text-[13px]"
-                style={{ background: "rgba(255,255,255,0.06)", color: "var(--muted)" }}
-              >
-                cancel
-              </button>
+                <span className="font-bold text-[15px]" style={{ color: "var(--accent)" }}>@</span>
+                <input
+                  className="flex-1 py-2 text-[15px] font-bold outline-none bg-transparent"
+                  style={{ color: "var(--text)" }}
+                  placeholder="username"
+                  value={usernameInput}
+                  onChange={(e) => onUsernameInputChange(e.target.value)}
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+                {usernameStatus === "checking" && <span className="text-[12px]" style={{ color: "var(--dimmer)" }}>...</span>}
+                {(usernameStatus === "available" || usernameStatus === "unchanged") && <span style={{ color: "var(--win)" }}>✓</span>}
+                {usernameStatus === "taken" && <span style={{ color: "var(--accent)" }}>✕</span>}
+              </div>
+              {usernameStatus === "invalid" && <p className="text-[11px]" style={{ color: "var(--muted)" }}>3–20 chars, lowercase, letters/numbers/. and _</p>}
+              {usernameStatus === "taken" && <p className="text-[11px]" style={{ color: "var(--accent)" }}>username taken</p>}
+              <div className="flex gap-2">
+                <button
+                  onClick={saveName}
+                  disabled={!nameInput.trim() || savingName || usernameStatus === "taken" || usernameStatus === "invalid" || usernameStatus === "checking"}
+                  className="flex-1 py-2 rounded-xl font-bold text-[13px] text-white disabled:opacity-40"
+                  style={{ background: "var(--accent)" }}
+                >
+                  {savingName ? "..." : "save"}
+                </button>
+                <button
+                  onClick={() => setEditingName(false)}
+                  className="px-4 py-2 rounded-xl font-bold text-[13px]"
+                  style={{ background: "rgba(255,255,255,0.06)", color: "var(--muted)" }}
+                >
+                  cancel
+                </button>
+              </div>
             </div>
           ) : (
             <>
-              <h1 className="text-[32px] font-black tracking-tight" style={{ fontFamily: "var(--font-nunito)" }}>
-                {displayName || "you"}
-              </h1>
+              <div>
+                <h1 className="text-[32px] font-black tracking-tight" style={{ fontFamily: "var(--font-nunito)" }}>
+                  {displayName || "you"}
+                </h1>
+                {username && (
+                  <p className="text-[14px] font-semibold mt-0.5" style={{ color: "var(--muted)" }}>@{username}</p>
+                )}
+              </div>
               <button
-                onClick={() => { setNameInput(displayName); setEditingName(true); }}
+                onClick={() => { setNameInput(displayName); setUsernameInput(username ?? ""); setUsernameStatus(username ? "unchanged" : "idle"); setEditingName(true); }}
                 className="text-[12px] font-bold px-3 py-1.5 rounded-full"
                 style={{ background: "rgba(255,255,255,0.06)", color: "var(--muted)" }}
               >
-                edit name
+                edit
               </button>
             </>
           )}

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import { sendPushToUsers } from "@/lib/push";
 
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get("authorization");
@@ -27,6 +28,13 @@ export async function GET(req: NextRequest) {
   }));
 
   await supabase.from("notifications").insert(notifications);
+
+  // Push notifications to bet creators
+  const creatorIds = overdueBets.map((b) => b.creator_id);
+  await sendPushToUsers(creatorIds, {
+    title: "time to deliberate 🔨",
+    body: "one of your bets is past its deadline. go resolve it.",
+  });
 
   // Mark them all notified
   await supabase

@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
   // Get all other users from those events, with their profile info
   const { data: rows } = await supabase
     .from("event_guests")
-    .select("user_id, balances(display_name, avatar_url)")
+    .select("user_id, balances(display_name, avatar_url, username)")
     .in("event_id", eventIds)
     .neq("user_id", user.userId);
 
@@ -35,9 +35,12 @@ export async function GET(req: NextRequest) {
       return true;
     })
     .map((r: any) => ({
-      userId: r.user_id,
-      displayName: r.balances?.display_name ?? null,
-      avatarUrl: r.balances?.avatar_url ?? null,
+      user_id: r.user_id,
+      balances: {
+        display_name: r.balances?.display_name ?? null,
+        avatar_url: r.balances?.avatar_url ?? null,
+        username: r.balances?.username ?? null,
+      },
     }));
 
   return NextResponse.json({ contacts });

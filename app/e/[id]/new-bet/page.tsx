@@ -2,9 +2,10 @@
 
 import { usePrivy } from "@privy-io/react-auth";
 import { useRouter, useParams } from "next/navigation";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 
-type Guest = { userId: string; label: string };
+type Guest = { user_id: string; display_name: string | null; username: string | null; avatar_url: string | null };
+type BetOption = { label: string; tagged_user_id?: string; tagged_display_name?: string; tagged_username?: string | null };
 
 export default function NewBetPage() {
   const { ready, authenticated, getAccessToken } = usePrivy();
@@ -13,60 +14,73 @@ export default function NewBetPage() {
   const eventId = params.id as string;
 
   const [question, setQuestion] = useState("");
-  const [options, setOptions] = useState(["", ""]);
+  const [options, setOptions] = useState<BetOption[]>([{ label: "" }, { label: "" }]);
   const [visibility, setVisibility] = useState<"public" | "private">("public");
   const [guests, setGuests] = useState<Guest[]>([]);
   const [invitedIds, setInvitedIds] = useState<string[]>([]);
-  const [loadingGuests, setLoadingGuests] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isGroup, setIsGroup] = useState(false);
   const [deadline, setDeadline] = useState("");
+  const [tagPickerIdx, setTagPickerIdx] = useState<number | null>(null);
+  const tagPickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!ready) return;
     if (!authenticated) router.replace("/login");
   }, [ready, authenticated, router]);
 
-  useEffect(() => {
-    if (!ready || !authenticated) return;
-    getAccessToken().then((token) =>
-      fetch(`/api/v1/events/${eventId}`, { headers: { Authorization: `Bearer ${token}` } })
-        .then((r) => r.json())
-        .then((d) => { if (d.event?.type === "group") setIsGroup(true); })
-    );
-  }, [ready, authenticated, eventId, getAccessToken]);
-
-  const fetchGuests = useCallback(async () => {
-    setLoadingGuests(true);
+  const fetchEventData = useCallback(async () => {
     const token = await getAccessToken();
-    const res = await fetch(`/api/v1/events/${eventId}/guests`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const res = await fetch(`/api/v1/events/${eventId}`, { headers: { Authorization: `Bearer ${token}` } });
     const data = await res.json();
-    setGuests(data.guests ?? []);
-    setLoadingGuests(false);
+    if (data.event?.type === "group") setIsGroup(true);
+    const gs: Guest[] = (data.event?.event_guests ?? []).map((g: any) => ({
+      user_id: g.user_id,
+      display_name: g.balances?.display_name ?? null,
+      username: g.balances?.username ?? null,
+      avatar_url: g.balances?.avatar_url ?? null,
+    }));
+    setGuests(gs);
   }, [eventId, getAccessToken]);
 
-  function toggleVisibility(v: "public" | "private") {
-    setVisibility(v);
-    if (v === "private" && guests.length === 0) fetchGuests();
-    if (v === "public") setInvitedIds([]);
+  useEffect(() => {
+    if (!ready || !authenticated) return;
+    fetchEventData();
+  }, [ready, authenticated, fetchEventData]);
+
+  // Close tag picker on outside click
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (tagPickerRef.current && !tagPickerRef.current.contains(e.target as Node)) {
+        setTagPickerIdx(null);
+      }
+    }
+    if (tagPickerIdx !== null) document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [tagPickerIdx]);
+
+  function updateOptionLabel(i: number, val: string) {
+    setOptions((prev) => prev.map((o, idx) => idx === i ? { ...o, label: val } : o));
   }
 
-  function toggleInvite(userId: string) {
-    setInvitedIds((prev) =>
-      prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
-    );
+  function tagOption(i: number, guest: Guest) {
+    setOptions((prev) => prev.map((o, idx) => idx === i ? {
+      label: guest.display_name ?? "",
+      tagged_user_id: guest.user_id,
+      tagged_display_name: guest.display_name ?? undefined,
+      tagged_username: guest.username,
+    } : o));
+    setTagPickerIdx(null);
   }
 
-  function updateOption(i: number, val: string) {
-    setOptions((prev) => prev.map((o, idx) => (idx === i ? val : o)));
+  function untagOption(i: number) {
+    setOptions((prev) => prev.map((o, idx) => idx === i ? { label: o.tagged_display_name ?? o.label } : o));
   }
 
   function addOption() {
     if (options.length >= 5) return;
-    setOptions((prev) => [...prev, ""]);
+    setOptions((prev) => [...prev, { label: "" }]);
   }
 
   function removeOption(i: number) {
@@ -74,38 +88,38 @@ export default function NewBetPage() {
     setOptions((prev) => prev.filter((_, idx) => idx !== i));
   }
 
+  function toggleInvite(userId: string) {
+    setInvitedIds((prev) => prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]);
+  }
+
+  const filledOptions = options.filter((o) => o.label.trim() || o.tagged_user_id);
   const canSubmit =
     question.trim().length > 0 &&
     question.trim().length <= 200 &&
-    options.filter((o) => o.trim()).length >= 2 &&
-    options.every((o) => o.trim().length <= 100) &&
+    filledOptions.length >= 2 &&
+    options.every((o) => (o.label.trim() || o.tagged_user_id) && o.label.trim().length <= 100) &&
     (!isGroup || !!deadline);
 
   async function submit() {
     if (!canSubmit || submitting) return;
     setSubmitting(true);
     setError(null);
-
     const token = await getAccessToken();
     const res = await fetch(`/api/v1/events/${eventId}/bets`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         question: question.trim(),
-        options: options.filter((o) => o.trim()),
+        options: options
+          .filter((o) => o.label.trim() || o.tagged_user_id)
+          .map((o) => ({ label: o.label.trim(), tagged_user_id: o.tagged_user_id })),
         visibility,
         invitedUserIds: visibility === "private" ? invitedIds : [],
         ...(isGroup && deadline ? { deadline: new Date(deadline).toISOString() } : {}),
       }),
     });
-
     const data = await res.json();
-    if (!res.ok) {
-      setError(data.error ?? "something went wrong");
-      setSubmitting(false);
-      return;
-    }
-
+    if (!res.ok) { setError(data.error ?? "something went wrong"); setSubmitting(false); return; }
     router.push(`/e/${eventId}`);
   }
 
@@ -121,10 +135,7 @@ export default function NewBetPage() {
         >
           ← back
         </button>
-        <h1
-          className="text-[28px] font-black tracking-tight"
-          style={{ fontFamily: "var(--font-nunito)" }}
-        >
+        <h1 className="text-[28px] font-black tracking-tight" style={{ fontFamily: "var(--font-nunito)" }}>
           add a bet
         </h1>
       </div>
@@ -161,19 +172,66 @@ export default function NewBetPage() {
           </label>
           <div className="flex flex-col gap-2">
             {options.map((opt, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <input
-                  className="flex-1 rounded-2xl px-4 py-3 text-[15px] outline-none"
-                  style={{
-                    background: "rgba(255,255,255,0.04)",
-                    border: "1px solid var(--border-soft)",
-                    color: "var(--text)",
-                  }}
-                  placeholder={i === 0 ? "Jake" : i === 1 ? "Maya" : `option ${i + 1}`}
-                  maxLength={100}
-                  value={opt}
-                  onChange={(e) => updateOption(i, e.target.value)}
-                />
+              <div key={i} className="relative flex items-center gap-2">
+                {opt.tagged_user_id ? (
+                  /* Tagged chip */
+                  <div
+                    className="flex-1 flex items-center gap-2 rounded-2xl px-4 py-3"
+                    style={{ background: "var(--accent-dim)", border: "1px solid var(--accent-border)" }}
+                  >
+                    <div
+                      className="w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-black flex-shrink-0 overflow-hidden"
+                      style={{ background: "var(--accent)", color: "#fff" }}
+                    >
+                      {opt.tagged_display_name?.[0]?.toUpperCase() ?? "?"}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <span className="text-[15px] font-bold" style={{ color: "var(--accent)" }}>
+                        {opt.tagged_display_name ?? opt.label}
+                      </span>
+                      {opt.tagged_username && (
+                        <span className="text-[12px] ml-1.5" style={{ color: "var(--muted)" }}>@{opt.tagged_username}</span>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => untagOption(i)}
+                      className="text-[13px] font-bold flex-shrink-0"
+                      style={{ color: "var(--muted)" }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ) : (
+                  /* Text input + @ button */
+                  <div className="flex-1 flex items-center gap-2">
+                    <input
+                      className="flex-1 rounded-2xl px-4 py-3 text-[15px] outline-none"
+                      style={{
+                        background: "rgba(255,255,255,0.04)",
+                        border: "1px solid var(--border-soft)",
+                        color: "var(--text)",
+                      }}
+                      placeholder={i === 0 ? "Jake" : i === 1 ? "Maya" : `option ${i + 1}`}
+                      maxLength={100}
+                      value={opt.label}
+                      onChange={(e) => updateOptionLabel(i, e.target.value)}
+                    />
+                    {guests.length > 0 && (
+                      <button
+                        onClick={() => setTagPickerIdx(tagPickerIdx === i ? null : i)}
+                        className="px-3 py-3 rounded-2xl text-[13px] font-bold flex-shrink-0"
+                        style={{
+                          background: tagPickerIdx === i ? "var(--accent-dim)" : "rgba(255,255,255,0.04)",
+                          border: `1px solid ${tagPickerIdx === i ? "var(--accent-border)" : "var(--border-soft)"}`,
+                          color: tagPickerIdx === i ? "var(--accent)" : "var(--muted)",
+                        }}
+                      >
+                        @
+                      </button>
+                    )}
+                  </div>
+                )}
+
                 {options.length > 2 && (
                   <button
                     onClick={() => removeOption(i)}
@@ -182,6 +240,34 @@ export default function NewBetPage() {
                   >
                     ×
                   </button>
+                )}
+
+                {/* Tag picker dropdown */}
+                {tagPickerIdx === i && (
+                  <div
+                    ref={tagPickerRef}
+                    className="absolute left-0 top-full mt-1 w-full rounded-2xl z-10 overflow-hidden"
+                    style={{ background: "var(--card)", border: "1px solid var(--border-soft)", boxShadow: "0 8px 32px rgba(0,0,0,0.4)" }}
+                  >
+                    {guests.map((g) => (
+                      <button
+                        key={g.user_id}
+                        onClick={() => tagOption(i, g)}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/5 transition-colors"
+                      >
+                        <div
+                          className="w-7 h-7 rounded-full flex items-center justify-center text-[12px] font-black flex-shrink-0"
+                          style={{ background: "var(--accent-dim)", color: "var(--accent)" }}
+                        >
+                          {g.display_name?.[0]?.toUpperCase() ?? "?"}
+                        </div>
+                        <div>
+                          <p className="text-[14px] font-bold">{g.display_name ?? "anonymous"}</p>
+                          {g.username && <p className="text-[11px]" style={{ color: "var(--muted)" }}>@{g.username}</p>}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
                 )}
               </div>
             ))}
@@ -221,7 +307,7 @@ export default function NewBetPage() {
           </label>
           <div className="flex gap-2">
             <button
-              onClick={() => toggleVisibility("public")}
+              onClick={() => { setVisibility("public"); setInvitedIds([]); }}
               className="flex-1 py-3 rounded-2xl font-bold text-[14px]"
               style={{
                 background: visibility === "public" ? "var(--accent-dim)" : "rgba(255,255,255,0.04)",
@@ -232,7 +318,7 @@ export default function NewBetPage() {
               all guests
             </button>
             <button
-              onClick={() => toggleVisibility("private")}
+              onClick={() => setVisibility("private")}
               className="flex-1 py-3 rounded-2xl font-bold text-[14px]"
               style={{
                 background: visibility === "private" ? "var(--purple-dim)" : "rgba(255,255,255,0.04)",
@@ -244,25 +330,15 @@ export default function NewBetPage() {
             </button>
           </div>
 
-          {visibility === "private" && (
+          {visibility === "private" && guests.length > 0 && (
             <div className="mt-2 flex flex-col gap-2">
-              <p className="text-[11px]" style={{ color: "var(--dimmer)" }}>
-                select who can see and join this bet
-              </p>
-              {loadingGuests && (
-                <p className="text-[13px]" style={{ color: "var(--dimmer)" }}>loading guests...</p>
-              )}
-              {!loadingGuests && guests.length === 0 && (
-                <p className="text-[13px]" style={{ color: "var(--dimmer)" }}>
-                  no other guests yet — you can add people to this bet later
-                </p>
-              )}
+              <p className="text-[11px]" style={{ color: "var(--dimmer)" }}>select who can see and join this bet</p>
               {guests.map((g) => {
-                const selected = invitedIds.includes(g.userId);
+                const selected = invitedIds.includes(g.user_id);
                 return (
                   <button
-                    key={g.userId}
-                    onClick={() => toggleInvite(g.userId)}
+                    key={g.user_id}
+                    onClick={() => toggleInvite(g.user_id)}
                     className="flex items-center gap-3 px-4 py-3 rounded-2xl text-left"
                     style={{
                       background: selected ? "var(--purple-dim)" : "rgba(255,255,255,0.04)",
@@ -271,38 +347,27 @@ export default function NewBetPage() {
                   >
                     <span
                       className="w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0"
-                      style={{
-                        background: selected ? "var(--purple)" : "rgba(255,255,255,0.1)",
-                        color: selected ? "#fff" : "var(--dimmer)",
-                      }}
+                      style={{ background: selected ? "var(--purple)" : "rgba(255,255,255,0.1)", color: selected ? "#fff" : "var(--dimmer)" }}
                     >
                       {selected ? "✓" : ""}
                     </span>
-                    <span className="text-[14px] font-bold">{g.label}</span>
+                    <div>
+                      <p className="text-[14px] font-bold">{g.display_name ?? "anonymous"}</p>
+                      {g.username && <p className="text-[11px]" style={{ color: "var(--muted)" }}>@{g.username}</p>}
+                    </div>
                   </button>
                 );
               })}
-              {invitedIds.length === 0 && guests.length > 0 && (
-                <p className="text-[11px]" style={{ color: "var(--dimmer)" }}>you can add people now or after creating</p>
-              )}
             </div>
           )}
 
           {visibility === "public" && (
-            <p className="text-[11px]" style={{ color: "var(--dimmer)" }}>
-              all guests can see and join this bet
-            </p>
+            <p className="text-[11px]" style={{ color: "var(--dimmer)" }}>all guests can see and join this bet</p>
           )}
         </div>
 
-        {/* Error */}
-        {error && (
-          <p className="text-[13px] font-bold" style={{ color: "var(--accent)" }}>
-            {error}
-          </p>
-        )}
+        {error && <p className="text-[13px] font-bold" style={{ color: "var(--accent)" }}>{error}</p>}
 
-        {/* Submit */}
         <button
           onClick={submit}
           disabled={!canSubmit || submitting}

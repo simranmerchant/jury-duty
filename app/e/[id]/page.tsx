@@ -4,7 +4,7 @@ import { usePrivy } from "@privy-io/react-auth";
 import { useRouter, useParams } from "next/navigation";
 import { useEffect, useState, useCallback, useRef } from "react";
 
-type BetOption = { id: string; label: string };
+type BetOption = { id: string; label: string; tagged_user_id?: string | null; balances?: { display_name: string | null; avatar_url: string | null; username?: string | null } | null };
 type BetEntry = { id: string; user_id: string; option_id: string; points_staked: number; is_anonymous: boolean; balances?: { display_name: string | null; avatar_url: string | null } };
 type BetInvite = { user_id: string };
 type Bet = {
@@ -21,7 +21,7 @@ type Bet = {
   bet_entries: BetEntry[];
   bet_invites: BetInvite[];
 };
-type Guest = { user_id: string; balances?: { display_name: string | null; avatar_url: string | null } };
+type Guest = { user_id: string; balances?: { display_name: string | null; avatar_url: string | null; username?: string | null } };
 type Event = {
   id: string;
   name: string;
@@ -587,6 +587,35 @@ function BetCard({
     onUpdate();
   }
 
+  // Tag option after creation
+  const [tagPickerOptId, setTagPickerOptId] = useState<string | null>(null);
+  const [tagging, setTagging] = useState(false);
+  const tagPickerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (tagPickerRef.current && !tagPickerRef.current.contains(e.target as Node)) {
+        setTagPickerOptId(null);
+      }
+    }
+    if (tagPickerOptId) document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [tagPickerOptId]);
+
+  async function submitTag(optionId: string, taggedUserId: string | null) {
+    if (tagging) return;
+    setTagging(true);
+    const token = await getAccessToken();
+    await fetch(`/api/v1/bets/${bet.id}/options/${optionId}`, {
+      method: "PATCH",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ tagged_user_id: taggedUserId }),
+    });
+    setTagging(false);
+    setTagPickerOptId(null);
+    onUpdate();
+  }
+
   // Edit deadline
   const [editingDeadline, setEditingDeadline] = useState(false);
   const [deadlineInput, setDeadlineInput] = useState("");
@@ -841,9 +870,8 @@ function BetCard({
           const pct = totalPot > 0 ? Math.round((optTotal / totalPot) * 100) : 0;
           const isSelectedForResolve = resolveOption === opt.id;
 
-          return (
+          return (<div key={opt.id} className="relative">
             <button
-              key={opt.id}
               disabled={!canBet && !resolving}
               onClick={() => {
                 if (resolving) {
@@ -884,12 +912,39 @@ function BetCard({
                 />
               )}
               <div className="relative flex items-center justify-between gap-2">
-                <span className="text-[14px] font-bold">
-                  {opt.label}
-                  {isWinner && (
-                    <span className="ml-2 text-[11px] font-bold" style={{ color: "var(--win)" }}>won</span>
+                <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                  {opt.tagged_user_id ? (
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black flex-shrink-0 overflow-hidden" style={{ background: "var(--accent-dim)", color: "var(--accent)" }}>
+                        {opt.balances?.display_name?.[0]?.toUpperCase() ?? opt.label[0]?.toUpperCase() ?? "?"}
+                      </div>
+                      <span className="text-[14px] font-bold truncate">
+                        {opt.balances?.display_name ?? opt.label}
+                        {opt.balances?.username && <span className="ml-1 text-[11px] font-semibold" style={{ color: "var(--muted)" }}>@{opt.balances.username}</span>}
+                      </span>
+                      {isWinner && <span className="text-[11px] font-bold flex-shrink-0" style={{ color: "var(--win)" }}>won</span>}
+                      {bet.creator_id === userId && isOpen && !resolving && (
+                        <button onClick={(e) => { e.stopPropagation(); submitTag(opt.id, null); }} className="text-[10px] flex-shrink-0" style={{ color: "var(--muted)" }}>✕</button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                      <span className="text-[14px] font-bold truncate">
+                        {opt.label}
+                        {isWinner && <span className="ml-2 text-[11px] font-bold" style={{ color: "var(--win)" }}>won</span>}
+                      </span>
+                      {bet.creator_id === userId && isOpen && !resolving && eventGuests.length > 0 && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setTagPickerOptId(tagPickerOptId === opt.id ? null : opt.id); }}
+                          className="text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0"
+                          style={{ background: "var(--accent-dim)", color: "var(--accent)", border: "1px solid var(--accent-border)" }}
+                        >
+                          @
+                        </button>
+                      )}
+                    </div>
                   )}
-                </span>
+                </div>
                 <div className="flex items-center gap-1.5">
                   {resolving && isSelectedForResolve && (
                     <span className="text-[11px] font-bold" style={{ color: "var(--win)" }}>
@@ -933,6 +988,31 @@ function BetCard({
                 </div>
               </div>
             </button>
+            {tagPickerOptId === opt.id && (
+              <div
+                ref={tagPickerRef}
+                className="absolute left-0 top-full mt-1 w-full rounded-2xl z-20 overflow-hidden"
+                style={{ background: "var(--card)", border: "1px solid var(--border-soft)", boxShadow: "0 8px 32px rgba(0,0,0,0.4)" }}
+              >
+                {eventGuests.filter((g) => g.user_id !== userId).map((g) => (
+                  <button
+                    key={g.user_id}
+                    onClick={(e) => { e.stopPropagation(); submitTag(opt.id, g.user_id); }}
+                    disabled={tagging}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/5 transition-colors disabled:opacity-40"
+                  >
+                    <div className="w-7 h-7 rounded-full flex items-center justify-center text-[12px] font-black flex-shrink-0" style={{ background: "var(--accent-dim)", color: "var(--accent)" }}>
+                      {g.balances?.display_name?.[0]?.toUpperCase() ?? "?"}
+                    </div>
+                    <div>
+                      <p className="text-[14px] font-bold">{g.balances?.display_name ?? "anonymous"}</p>
+                      {g.balances?.username && <p className="text-[11px]" style={{ color: "var(--muted)" }}>@{g.balances.username}</p>}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           );
         })}
       </div>
