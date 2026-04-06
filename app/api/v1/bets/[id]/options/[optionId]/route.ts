@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/privy";
 import { supabase } from "@/lib/supabase";
+import { sendPushToUsers } from "@/lib/push";
 
 export async function PATCH(
   req: NextRequest,
@@ -14,10 +15,9 @@ export async function PATCH(
 
   const { id: betId, optionId } = await params;
 
-  // Verify caller is the bet creator
   const { data: bet } = await supabase
     .from("bets")
-    .select("id, creator_id, status")
+    .select("id, creator_id, status, question, event_id")
     .eq("id", betId)
     .single();
 
@@ -50,10 +50,10 @@ export async function PATCH(
     if (!targetUser) return NextResponse.json({ error: "user not found" }, { status: 404 });
 
     // Verify they are a mutual — caller and target share at least one event/group
-    const { data: callerGroups } = await supabase
-      .from("event_guests")
-      .select("event_id")
-      .eq("user_id", user.userId);
+    const [{ data: callerGroups }, { data: creatorData }] = await Promise.all([
+      supabase.from("event_guests").select("event_id").eq("user_id", user.userId),
+      supabase.from("balances").select("display_name").eq("user_id", user.userId).single(),
+    ]);
 
     const callerEventIds = (callerGroups ?? []).map((g) => g.event_id);
 
@@ -67,11 +67,40 @@ export async function PATCH(
     if (!sharedMembership || sharedMembership.length === 0) {
       return NextResponse.json({ error: "you can only tag mutual contacts" }, { status: 403 });
     }
+
+    const { error } = await supabase
+      .from("bet_options")
+      .update({ tagged_user_id })
+      .eq("id", optionId);
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    // Notify the tagged user (skip if they tagged themselves)
+    if (tagged_user_id !== user.userId) {
+      const creatorName = creatorData?.display_name ?? "someone";
+      await Promise.all([
+        supabase.from("notifications").insert({
+          user_id: tagged_user_id,
+          type: "bet_tagged",
+          title: "you've been put on the board 🎯",
+          body: `${creatorName} named you in a bet: "${bet.question}"`,
+          data: { bet_id: betId, event_id: bet.event_id },
+        }),
+        sendPushToUsers([tagged_user_id], {
+          title: "you've been put on the board 🎯",
+          body: `${creatorName} named you in a bet: "${bet.question}"`,
+          data: { event_id: bet.event_id },
+        }),
+      ]);
+    }
+
+    return NextResponse.json({ ok: true });
   }
 
+  // Untagging — no notification needed
   const { error } = await supabase
     .from("bet_options")
-    .update({ tagged_user_id: tagged_user_id ?? null })
+    .update({ tagged_user_id: null })
     .eq("id", optionId);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

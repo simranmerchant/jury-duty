@@ -1,5 +1,7 @@
 import { supabase } from "./supabase";
 
+const EXPO_BATCH_LIMIT = 100;
+
 export async function sendPushToUsers(
   userIds: string[],
   { title, body, data }: { title: string; body: string; data?: Record<string, string> }
@@ -21,9 +23,13 @@ export async function sendPushToUsers(
     data: data ?? {},
   }));
 
-  await fetch("https://exp.host/--/api/v2/push/send", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify(messages),
-  });
+  // Expo accepts max 100 messages per request
+  for (let i = 0; i < messages.length; i += EXPO_BATCH_LIMIT) {
+    const batch = messages.slice(i, i + EXPO_BATCH_LIMIT);
+    await fetch("https://exp.host/--/api/v2/push/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify(batch),
+    }).catch((err) => console.error("push send failed:", err));
+  }
 }

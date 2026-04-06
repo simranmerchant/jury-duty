@@ -33,7 +33,7 @@ export async function POST(
   // Send notifications to all participants
   const { data: bet } = await supabase
     .from("bets")
-    .select("title, winning_option_id, bet_entries(user_id, option_id)")
+    .select("question, winning_option_id, bet_entries(user_id, option_id)")
     .eq("id", betId)
     .single();
 
@@ -44,10 +44,10 @@ export async function POST(
       const type = isRefund ? "bet_resolved_refunded" : won ? "bet_resolved_won" : "bet_resolved_lost";
       const title = isRefund ? "case dismissed" : won ? "jury's in — you won 🎉" : "jury's in — you lost 💀";
       const body = isRefund
-        ? `"${bet.title}" was called off. your points have been refunded.`
+        ? `"${bet.question}" was called off. your points have been refunded.`
         : won
-        ? `you called it on "${bet.title}". points incoming.`
-        : `you were wrong about "${bet.title}". the jury has spoken.`;
+        ? `you called it on "${bet.question}". points incoming.`
+        : `you were wrong about "${bet.question}". the jury has spoken.`;
       return { user_id: entry.user_id, type, title, body, data: { bet_id: betId } };
     });
 
@@ -59,9 +59,9 @@ export async function POST(
       const lostIds = notifications.filter((n) => n.type === "bet_resolved_lost").map((n) => n.user_id);
       const refundIds = notifications.filter((n) => n.type === "bet_resolved_refunded").map((n) => n.user_id);
       await Promise.all([
-        wonIds.length > 0 && sendPushToUsers(wonIds, { title: "jury's in — you won 🎉", body: `you called it on "${bet.title}"`, data: { bet_id: betId, outcome: "won" } }),
-        lostIds.length > 0 && sendPushToUsers(lostIds, { title: "jury's in — you lost 💀", body: `the jury has spoken on "${bet.title}"`, data: { bet_id: betId, outcome: "lost" } }),
-        refundIds.length > 0 && sendPushToUsers(refundIds, { title: "case dismissed", body: `"${bet.title}" was called off`, data: { bet_id: betId, outcome: "refunded" } }),
+        wonIds.length > 0 && sendPushToUsers(wonIds, { title: "jury's in — you won 🎉", body: `you called it on "${bet.question}"`, data: { bet_id: betId, outcome: "won" } }),
+        lostIds.length > 0 && sendPushToUsers(lostIds, { title: "jury's in — you lost 💀", body: `the jury has spoken on "${bet.question}"`, data: { bet_id: betId, outcome: "lost" } }),
+        refundIds.length > 0 && sendPushToUsers(refundIds, { title: "case dismissed", body: `"${bet.question}" was called off`, data: { bet_id: betId, outcome: "refunded" } }),
       ]);
     }
   }

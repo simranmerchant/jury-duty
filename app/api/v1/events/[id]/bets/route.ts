@@ -24,20 +24,19 @@ export async function POST(
 
   if (!guest) return NextResponse.json({ error: "not a guest of this event" }, { status: 403 });
 
-  const { data: event } = await supabase
-    .from("events")
-    .select("ends_at, type, name")
-    .eq("id", eventId)
-    .single();
+  // Fetch event + creator name in parallel
+  const [{ data: event }, { data: creatorData }] = await Promise.all([
+    supabase.from("events").select("ends_at, type, name").eq("id", eventId).single(),
+    supabase.from("balances").select("display_name").eq("user_id", user.userId).single(),
+  ]);
 
   if (!event) return NextResponse.json({ error: "event not found" }, { status: 404 });
 
-  // Events have a hard close date; groups never close
   if (event.type === "event" && event.ends_at && new Date(event.ends_at) < new Date()) {
     return NextResponse.json({ error: "event is closed" }, { status: 422 });
   }
 
-  const { question, options, visibility, invitedUserIds, deadline } = await req.json();
+  const { question, options, visibility, invitedUserIds, deadline, question_tagged_user_ids } = await req.json();
 
   if (!question?.trim() || question.trim().length > 200) {
     return NextResponse.json({ error: "question required (max 200 chars)" }, { status: 400 });
@@ -45,7 +44,6 @@ export async function POST(
   if (!Array.isArray(options) || options.length < 2) {
     return NextResponse.json({ error: "at least 2 options required" }, { status: 400 });
   }
-  // options can be string[] (legacy) or { label: string, tagged_user_id?: string }[]
   const normalizedOptions: { label: string; tagged_user_id?: string }[] = options.map((o: any) =>
     typeof o === "string" ? { label: o } : { label: o.label, tagged_user_id: o.tagged_user_id ?? undefined }
   );
@@ -56,7 +54,6 @@ export async function POST(
     return NextResponse.json({ error: "invalid visibility" }, { status: 400 });
   }
 
-  // Groups use per-bet deadline; events inherit ends_at
   let betDeadline: string;
   if (event.type === "group") {
     if (!deadline) return NextResponse.json({ error: "deadline required for group bets" }, { status: 400 });
@@ -80,78 +77,114 @@ export async function POST(
 
   if (betError || !bet) return NextResponse.json({ error: betError?.message ?? "failed" }, { status: 500 });
 
-  const { error: optError } = await supabase
-    .from("bet_options")
-    .insert(normalizedOptions.map((o) => ({
-      bet_id: bet.id,
-      label: o.label.trim(),
-      ...(o.tagged_user_id ? { tagged_user_id: o.tagged_user_id } : {}),
-    })));
+  // Insert options + fetch guests in parallel
+  const [{ error: optError }, { data: allGuests }] = await Promise.all([
+    supabase.from("bet_options").insert(
+      normalizedOptions.map((o) => ({
+        bet_id: bet.id,
+        label: o.label.trim(),
+        ...(o.tagged_user_id ? { tagged_user_id: o.tagged_user_id } : {}),
+      }))
+    ),
+    supabase.from("event_guests").select("user_id").eq("event_id", eventId).neq("user_id", user.userId),
+  ]);
 
   if (optError) return NextResponse.json({ error: optError.message }, { status: 500 });
 
-  // Get all other guests for notifications
-  const { data: allGuests } = await supabase
-    .from("event_guests")
-    .select("user_id")
-    .eq("event_id", eventId)
-    .neq("user_id", user.userId);
   const otherGuestIds = (allGuests ?? []).map((g: any) => g.user_id as string);
-
-  const { data: creatorData } = await supabase
-    .from("balances")
-    .select("display_name")
-    .eq("user_id", user.userId)
-    .single();
   const creatorName = creatorData?.display_name ?? "someone";
 
-  // Also invite any tagged users from options automatically
   const taggedUserIds = normalizedOptions
     .filter((o) => o.tagged_user_id)
     .map((o) => o.tagged_user_id as string);
 
+  // Notify users tagged in the question text (excluding creator and option-tagged users to avoid double-notifying)
+  const questionTaggedIds: string[] = Array.isArray(question_tagged_user_ids) ? question_tagged_user_ids : [];
+  const externalQuestionTaggedIds = questionTaggedIds.filter(
+    (uid) => uid !== user.userId && !taggedUserIds.includes(uid)
+  );
+  if (externalQuestionTaggedIds.length > 0) {
+    await Promise.all([
+      supabase.from("notifications").insert(externalQuestionTaggedIds.map((uid) => ({
+        user_id: uid,
+        type: "bet_tagged",
+        title: "you've been put on the board 🎯",
+        body: `${creatorName} mentioned you in a bet: "${question.trim()}"`,
+        data: { bet_id: bet.id, event_id: eventId },
+      }))),
+      sendPushToUsers(externalQuestionTaggedIds, {
+        title: "you've been put on the board 🎯",
+        body: `${creatorName} mentioned you in a bet: "${question.trim()}"`,
+        data: { event_id: eventId },
+      }),
+    ]);
+  }
+
+  // Notify users tagged in options (excluding the creator if they tagged themselves)
+  const externalTaggedIds = taggedUserIds.filter((uid) => uid !== user.userId);
+  if (externalTaggedIds.length > 0) {
+    await Promise.all([
+      supabase.from("notifications").insert(externalTaggedIds.map((uid) => ({
+        user_id: uid,
+        type: "bet_tagged",
+        title: "you've been put on the board 🎯",
+        body: `${creatorName} named you in a bet: "${question.trim()}"`,
+        data: { bet_id: bet.id, event_id: eventId },
+      }))),
+      sendPushToUsers(externalTaggedIds, {
+        title: "you've been put on the board 🎯",
+        body: `${creatorName} named you in a bet: "${question.trim()}"`,
+        data: { event_id: eventId },
+      }),
+    ]);
+  }
+
   if (visibility === "private") {
     const inviteIds = [...new Set([user.userId, ...(Array.isArray(invitedUserIds) ? invitedUserIds : []), ...taggedUserIds])];
-    await supabase.from("bet_invites").insert(inviteIds.map((uid) => ({ bet_id: bet.id, user_id: uid })));
-
     const notifyIds = inviteIds.filter((uid) => uid !== user.userId);
-    if (notifyIds.length > 0) {
-      await supabase.from("notifications").insert(notifyIds.map((uid) => ({
+
+    await Promise.all([
+      supabase.from("bet_invites").insert(inviteIds.map((uid) => ({ bet_id: bet.id, user_id: uid }))),
+      notifyIds.length > 0 && supabase.from("notifications").insert(notifyIds.map((uid) => ({
         user_id: uid,
         type: "bet_invited",
         title: "you've been added to a private bet 👀",
-        body: "open the app to see it",
+        body: `${creatorName} added you. open the app to see it.`,
         data: { bet_id: bet.id, event_id: eventId },
-      })));
-      await sendPushToUsers(notifyIds, {
+      }))),
+      notifyIds.length > 0 && sendPushToUsers(notifyIds, {
         title: "you've been added to a private bet 👀",
         body: "open the app to see it",
         data: { event_id: eventId },
-      });
-    }
+      }),
+    ]);
   } else if (otherGuestIds.length > 0) {
-    await supabase.from("notifications").insert(otherGuestIds.map((uid) => ({
-      user_id: uid,
-      type: "new_bet",
-      title: `new bet in ${event.name} 🗳️`,
-      body: "open the app to vote",
-      data: { bet_id: bet.id, event_id: eventId },
-    })));
-    await sendPushToUsers(otherGuestIds, {
-      title: `new bet in ${event.name} 🗳️`,
-      body: "open the app to vote",
-      data: { event_id: eventId },
-    });
+    await Promise.all([
+      supabase.from("notifications").insert(otherGuestIds.map((uid) => ({
+        user_id: uid,
+        type: "new_bet",
+        title: `new bet in ${event.name} 🗳️`,
+        body: `${creatorName} just posted a new bet. open the app to vote.`,
+        data: { bet_id: bet.id, event_id: eventId },
+      }))),
+      sendPushToUsers(otherGuestIds, {
+        title: `new bet in ${event.name} 🗳️`,
+        body: "open the app to vote",
+        data: { event_id: eventId },
+      }),
+    ]);
   }
 
-  await supabase.rpc("increment_balance", { p_user_id: user.userId, p_amount: 100 });
-  await supabase.from("notifications").insert({
-    user_id: user.userId,
-    type: "points_earned",
-    title: "+100 pts",
-    body: `you earned 100 points for creating a bet. keep the jury busy.`,
-    data: { bet_id: bet.id },
-  });
+  await Promise.all([
+    supabase.rpc("increment_balance", { p_user_id: user.userId, p_amount: 100 }),
+    supabase.from("notifications").insert({
+      user_id: user.userId,
+      type: "points_earned",
+      title: "+100 pts",
+      body: "you earned 100 points for creating a bet. keep the jury busy.",
+      data: { bet_id: bet.id },
+    }),
+  ]);
 
   return NextResponse.json({ betId: bet.id }, { status: 201 });
 }

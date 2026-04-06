@@ -22,8 +22,17 @@ export default function NewBetPage() {
   const [error, setError] = useState<string | null>(null);
   const [isGroup, setIsGroup] = useState(false);
   const [deadline, setDeadline] = useState("");
+
+  // Option tag picker
   const [tagPickerIdx, setTagPickerIdx] = useState<number | null>(null);
   const tagPickerRef = useRef<HTMLDivElement>(null);
+
+  // Question @mention
+  const [questionTaggedIds, setQuestionTaggedIds] = useState<string[]>([]);
+  const [mentionSearch, setMentionSearch] = useState<string | null>(null); // null = no picker
+  const [mentionFilter, setMentionFilter] = useState("");
+  const questionRef = useRef<HTMLTextAreaElement>(null);
+  const mentionPickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!ready) return;
@@ -49,7 +58,7 @@ export default function NewBetPage() {
     fetchEventData();
   }, [ready, authenticated, fetchEventData]);
 
-  // Close tag picker on outside click
+  // Close option tag picker on outside click
   useEffect(() => {
     function handler(e: MouseEvent) {
       if (tagPickerRef.current && !tagPickerRef.current.contains(e.target as Node)) {
@@ -59,6 +68,72 @@ export default function NewBetPage() {
     if (tagPickerIdx !== null) document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [tagPickerIdx]);
+
+  // Close mention picker on outside click
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (
+        mentionPickerRef.current && !mentionPickerRef.current.contains(e.target as Node) &&
+        questionRef.current && !questionRef.current.contains(e.target as Node)
+      ) {
+        setMentionSearch(null);
+      }
+    }
+    if (mentionSearch !== null) document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [mentionSearch]);
+
+  function onQuestionChange(val: string) {
+    setQuestion(val);
+
+    // Detect @mention: find last @ before cursor in the new value
+    const textarea = questionRef.current;
+    const cursor = textarea?.selectionStart ?? val.length;
+    const textUpToCursor = val.slice(0, cursor);
+    const atIndex = textUpToCursor.lastIndexOf("@");
+
+    if (atIndex !== -1) {
+      const wordAfterAt = textUpToCursor.slice(atIndex + 1);
+      // Only show picker if no space in the word (still typing the mention)
+      if (!wordAfterAt.includes(" ")) {
+        setMentionSearch(wordAfterAt);
+        setMentionFilter(wordAfterAt.toLowerCase());
+        return;
+      }
+    }
+    setMentionSearch(null);
+  }
+
+  function insertMention(guest: Guest) {
+    const textarea = questionRef.current;
+    const cursor = textarea?.selectionStart ?? question.length;
+    const textUpToCursor = question.slice(0, cursor);
+    const atIndex = textUpToCursor.lastIndexOf("@");
+
+    const name = guest.display_name ?? guest.username ?? "unknown";
+    const before = question.slice(0, atIndex);
+    const after = question.slice(cursor);
+    const newQuestion = `${before}@${name}${after}`;
+
+    setQuestion(newQuestion);
+    setQuestionTaggedIds((prev) => prev.includes(guest.user_id) ? prev : [...prev, guest.user_id]);
+    setMentionSearch(null);
+
+    // Restore focus and move cursor after the inserted mention
+    setTimeout(() => {
+      if (questionRef.current) {
+        const newCursor = before.length + name.length + 1;
+        questionRef.current.focus();
+        questionRef.current.setSelectionRange(newCursor, newCursor);
+      }
+    }, 0);
+  }
+
+  const mentionGuests = guests.filter((g) =>
+    !mentionFilter ||
+    g.display_name?.toLowerCase().includes(mentionFilter) ||
+    g.username?.toLowerCase().includes(mentionFilter)
+  );
 
   function updateOptionLabel(i: number, val: string) {
     setOptions((prev) => prev.map((o, idx) => idx === i ? { ...o, label: val } : o));
@@ -115,6 +190,7 @@ export default function NewBetPage() {
           .map((o) => ({ label: o.label.trim(), tagged_user_id: o.tagged_user_id })),
         visibility,
         invitedUserIds: visibility === "private" ? invitedIds : [],
+        question_tagged_user_ids: questionTaggedIds,
         ...(isGroup && deadline ? { deadline: new Date(deadline).toISOString() } : {}),
       }),
     });
@@ -146,22 +222,54 @@ export default function NewBetPage() {
           <label className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--muted)" }}>
             question
           </label>
-          <textarea
-            className="rounded-2xl px-4 py-3 text-[15px] outline-none resize-none"
-            style={{
-              background: "rgba(255,255,255,0.04)",
-              border: "1px solid var(--accent-border)",
-              color: "var(--text)",
-              minHeight: 88,
-            }}
-            placeholder="who leaves the party first?"
-            maxLength={200}
-            value={question}
-            onChange={(e) => setQuestion(e.target.value)}
-            autoFocus
-          />
+          <div className="relative">
+            <textarea
+              ref={questionRef}
+              className="w-full rounded-2xl px-4 py-3 text-[15px] outline-none resize-none"
+              style={{
+                background: "rgba(255,255,255,0.04)",
+                border: "1px solid var(--accent-border)",
+                color: "var(--text)",
+                minHeight: 88,
+              }}
+              placeholder="who leaves the party first?"
+              maxLength={200}
+              value={question}
+              onChange={(e) => onQuestionChange(e.target.value)}
+              autoFocus
+            />
+
+            {/* @mention picker */}
+            {mentionSearch !== null && mentionGuests.length > 0 && (
+              <div
+                ref={mentionPickerRef}
+                className="absolute left-0 top-full mt-1 w-full rounded-2xl z-10 overflow-hidden"
+                style={{ background: "var(--card)", border: "1px solid var(--border-soft)", boxShadow: "0 8px 32px rgba(0,0,0,0.4)" }}
+              >
+                {mentionGuests.slice(0, 5).map((g) => (
+                  <button
+                    key={g.user_id}
+                    onMouseDown={(e) => { e.preventDefault(); insertMention(g); }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/5 transition-colors"
+                  >
+                    <div
+                      className="w-7 h-7 rounded-full flex items-center justify-center text-[12px] font-black flex-shrink-0"
+                      style={{ background: "var(--accent-dim)", color: "var(--accent)" }}
+                    >
+                      {g.display_name?.[0]?.toUpperCase() ?? "?"}
+                    </div>
+                    <div>
+                      <p className="text-[14px] font-bold">{g.display_name ?? "anonymous"}</p>
+                      {g.username && <p className="text-[11px]" style={{ color: "var(--muted)" }}>@{g.username}</p>}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <p className="text-[11px] text-right" style={{ color: question.length > 180 ? "var(--accent)" : "var(--dimmer)" }}>
             {question.length}/200
+            {guests.length > 0 && <span className="ml-2" style={{ color: "var(--dimmer)" }}>· type @ to mention someone</span>}
           </p>
         </div>
 
@@ -174,7 +282,6 @@ export default function NewBetPage() {
             {options.map((opt, i) => (
               <div key={i} className="relative flex items-center gap-2">
                 {opt.tagged_user_id ? (
-                  /* Tagged chip */
                   <div
                     className="flex-1 flex items-center gap-2 rounded-2xl px-4 py-3"
                     style={{ background: "var(--accent-dim)", border: "1px solid var(--accent-border)" }}
@@ -202,7 +309,6 @@ export default function NewBetPage() {
                     </button>
                   </div>
                 ) : (
-                  /* Text input + @ button */
                   <div className="flex-1 flex items-center gap-2">
                     <input
                       className="flex-1 rounded-2xl px-4 py-3 text-[15px] outline-none"
@@ -242,7 +348,6 @@ export default function NewBetPage() {
                   </button>
                 )}
 
-                {/* Tag picker dropdown */}
                 {tagPickerIdx === i && (
                   <div
                     ref={tagPickerRef}

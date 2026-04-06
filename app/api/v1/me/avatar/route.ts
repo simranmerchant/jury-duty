@@ -26,10 +26,14 @@ export async function POST(req: NextRequest) {
   if (uploadError) return NextResponse.json({ error: uploadError.message }, { status: 500 });
 
   const { data: { publicUrl } } = supabase.storage.from("avatars").getPublicUrl(path);
-  // Cache-bust so browsers don't serve a stale avatar after re-upload
   const avatarUrl = `${publicUrl}?t=${Date.now()}`;
 
-  await supabase.from("balances").update({ avatar_url: avatarUrl }).eq("user_id", user.userId);
+  const { error: updateError } = await supabase
+    .from("balances")
+    .update({ avatar_url: avatarUrl })
+    .eq("user_id", user.userId);
+
+  if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
 
   return NextResponse.json({ avatar_url: avatarUrl });
 }

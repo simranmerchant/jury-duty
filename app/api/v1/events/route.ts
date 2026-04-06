@@ -12,6 +12,7 @@ export async function POST(req: NextRequest) {
 
   const { name, ends_at, type = "event" } = await req.json();
   if (!name?.trim()) return NextResponse.json({ error: "name required" }, { status: 400 });
+  if (name.trim().length > 100) return NextResponse.json({ error: "name must be 100 chars or fewer" }, { status: 400 });
   if (!["event", "group"].includes(type)) return NextResponse.json({ error: "invalid type" }, { status: 400 });
   if (type === "event" && !ends_at) return NextResponse.json({ error: "ends_at required for events" }, { status: 400 });
   if (type === "event" && ends_at && new Date(ends_at) <= new Date()) return NextResponse.json({ error: "end date must be in the future" }, { status: 400 });

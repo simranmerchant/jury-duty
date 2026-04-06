@@ -14,9 +14,11 @@ export async function POST(
 
   const { id } = await params;
 
-  await supabase
+  const { error } = await supabase
     .from("event_last_seen")
     .upsert({ user_id: user.userId, event_id: id, seen_at: new Date().toISOString() }, { onConflict: "user_id,event_id" });
+
+  if (error) console.error("seen upsert failed:", error.message);
 
   return NextResponse.json({ ok: true });
 }

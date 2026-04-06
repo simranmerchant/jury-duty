@@ -27,16 +27,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "invalid invite link" }, { status: 404 });
   }
 
-  // Add as guest (ignore if already a guest)
-  await supabase
+  const { error: joinError } = await supabase
     .from("event_guests")
-    .upsert({ event_id: event.id, user_id: user.userId }, { onConflict: "event_id,user_id" });
+    .upsert({ event_id: event.id, user_id: user.userId }, { onConflict: "event_id,user_id", ignoreDuplicates: true });
 
-  // If joining via a private bet share link, add to that bet's invite list
+  if (joinError) return NextResponse.json({ error: joinError.message }, { status: 500 });
+
   if (bet_id) {
-    await supabase
+    const { error: inviteError } = await supabase
       .from("bet_invites")
       .upsert({ bet_id, user_id: user.userId }, { onConflict: "bet_id,user_id", ignoreDuplicates: true });
+    if (inviteError) console.error("bet_invites upsert failed:", inviteError.message);
   }
 
   return NextResponse.json({ eventId: event.id, eventName: event.name });

@@ -119,13 +119,6 @@ export async function GET(
     if (!guest) return NextResponse.json({ error: "not found" }, { status: 404 });
   }
 
-  // Backfill: ensure host is always in event_guests (idempotent)
-  if (isHost) {
-    await supabase
-      .from("event_guests")
-      .upsert({ event_id: id, user_id: user.userId }, { onConflict: "event_id,user_id", ignoreDuplicates: true });
-  }
-
   const { data: event, error } = await supabase
     .from("events")
     .select(`

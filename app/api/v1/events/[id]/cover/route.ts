@@ -41,7 +41,12 @@ export async function POST(
   const { data: { publicUrl } } = supabase.storage.from("covers").getPublicUrl(path);
   const coverUrl = `${publicUrl}?t=${Date.now()}`;
 
-  await supabase.from("events").update({ cover_url: coverUrl }).eq("id", id);
+  const { error: updateError } = await supabase
+    .from("events")
+    .update({ cover_url: coverUrl })
+    .eq("id", id);
+
+  if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
 
   return NextResponse.json({ cover_url: coverUrl });
 }

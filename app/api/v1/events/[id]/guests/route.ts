@@ -2,6 +2,26 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/privy";
 import { supabase } from "@/lib/supabase";
 
+async function assertMember(eventId: string, userId: string): Promise<boolean> {
+  const { data: event } = await supabase
+    .from("events")
+    .select("host_id")
+    .eq("id", eventId)
+    .single();
+
+  if (!event) return false;
+  if (event.host_id === userId) return true;
+
+  const { data: guest } = await supabase
+    .from("event_guests")
+    .select("user_id")
+    .eq("event_id", eventId)
+    .eq("user_id", userId)
+    .single();
+
+  return !!guest;
+}
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -14,23 +34,8 @@ export async function GET(
 
   const { id } = await params;
 
-  // Must be host or guest
-  const { data: eventMeta } = await supabase
-    .from("events")
-    .select("host_id")
-    .eq("id", id)
-    .single();
-
-  if (!eventMeta) return NextResponse.json({ error: "not found" }, { status: 404 });
-
-  if (eventMeta.host_id !== user.userId) {
-    const { data: guest } = await supabase
-      .from("event_guests")
-      .select("user_id")
-      .eq("event_id", id)
-      .eq("user_id", user.userId)
-      .single();
-    if (!guest) return NextResponse.json({ error: "not found" }, { status: 404 });
+  if (!(await assertMember(id, user.userId))) {
+    return NextResponse.json({ error: "not found" }, { status: 404 });
   }
 
   const { data: guestRows } = await supabase
@@ -47,7 +52,6 @@ export async function GET(
   return NextResponse.json({ guests });
 }
 
-// Add a user directly to an event (any existing member can do this)
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -60,23 +64,8 @@ export async function POST(
 
   const { id } = await params;
 
-  // Must be a member
-  const { data: eventMeta } = await supabase
-    .from("events")
-    .select("host_id")
-    .eq("id", id)
-    .single();
-
-  if (!eventMeta) return NextResponse.json({ error: "not found" }, { status: 404 });
-
-  if (eventMeta.host_id !== user.userId) {
-    const { data: membership } = await supabase
-      .from("event_guests")
-      .select("user_id")
-      .eq("event_id", id)
-      .eq("user_id", user.userId)
-      .single();
-    if (!membership) return NextResponse.json({ error: "not found" }, { status: 404 });
+  if (!(await assertMember(id, user.userId))) {
+    return NextResponse.json({ error: "not found" }, { status: 404 });
   }
 
   const { userIds } = await req.json();

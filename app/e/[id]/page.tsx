@@ -924,7 +924,7 @@ function BetCard({
                       </span>
                       {isWinner && <span className="text-[11px] font-bold flex-shrink-0" style={{ color: "var(--win)" }}>won</span>}
                       {bet.creator_id === userId && isOpen && !resolving && (
-                        <button onClick={(e) => { e.stopPropagation(); submitTag(opt.id, null); }} className="text-[10px] flex-shrink-0" style={{ color: "var(--muted)" }}>✕</button>
+                        <span role="button" onClick={(e) => { e.stopPropagation(); submitTag(opt.id, null); }} className="text-[10px] flex-shrink-0 cursor-pointer" style={{ color: "var(--muted)" }}>✕</span>
                       )}
                     </div>
                   ) : (
@@ -934,13 +934,14 @@ function BetCard({
                         {isWinner && <span className="ml-2 text-[11px] font-bold" style={{ color: "var(--win)" }}>won</span>}
                       </span>
                       {bet.creator_id === userId && isOpen && !resolving && eventGuests.length > 0 && (
-                        <button
+                        <span
+                          role="button"
                           onClick={(e) => { e.stopPropagation(); setTagPickerOptId(tagPickerOptId === opt.id ? null : opt.id); }}
-                          className="text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0"
+                          className="text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 cursor-pointer"
                           style={{ background: "var(--accent-dim)", color: "var(--accent)", border: "1px solid var(--accent-border)" }}
                         >
                           @
-                        </button>
+                        </span>
                       )}
                     </div>
                   )}

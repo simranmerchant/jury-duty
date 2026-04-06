@@ -24,7 +24,8 @@ export async function PATCH(
   if (bet.status !== "open") return NextResponse.json({ error: "cannot edit a resolved bet" }, { status: 422 });
 
   const isCreator = bet.creator_id === user.userId;
-  const isHost = (bet.events as any)?.host_id === user.userId;
+  const eventHost = Array.isArray(bet.events) ? bet.events[0] : bet.events;
+  const isHost = (eventHost as { host_id: string } | null)?.host_id === user.userId;
   if (!isCreator && !isHost) return NextResponse.json({ error: "not authorized" }, { status: 403 });
 
   const { deadline } = await req.json();
@@ -57,7 +58,8 @@ export async function DELETE(
   if (!bet) return NextResponse.json({ error: "not found" }, { status: 404 });
 
   const isCreator = bet.creator_id === user.userId;
-  const isHost = (bet.events as any)?.host_id === user.userId;
+  const eventHost = Array.isArray(bet.events) ? bet.events[0] : bet.events;
+  const isHost = (eventHost as { host_id: string } | null)?.host_id === user.userId;
   if (!isCreator && !isHost) return NextResponse.json({ error: "not authorized" }, { status: 403 });
 
   // Refund open stakes before deleting

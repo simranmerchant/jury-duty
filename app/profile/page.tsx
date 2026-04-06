@@ -15,6 +15,7 @@ type HistoryEntry = {
   pick: string;
   points_staked: number;
   outcome: "pending" | "won" | "lost" | "refunded";
+  is_hidden_from_profile: boolean;
 };
 type Stats = { total: number; won: number; lost: number; pending: number };
 
@@ -308,28 +309,53 @@ export default function ProfilePage() {
             <div className="flex flex-col gap-2">
               {history.map((entry) => {
                 const style = OUTCOME_STYLE[entry.outcome];
+                const hidden = entry.is_hidden_from_profile;
+                async function toggleHidden(e: React.MouseEvent) {
+                  e.stopPropagation();
+                  const token = await getAccessToken();
+                  const res = await fetch(`/api/v1/me/history/${entry.id}`, {
+                    method: "PATCH",
+                    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+                    body: JSON.stringify({ hidden: !hidden }),
+                  });
+                  if (res.ok) {
+                    setHistory((prev) => prev.map((h) => h.id === entry.id ? { ...h, is_hidden_from_profile: !hidden } : h));
+                  }
+                }
                 return (
-                  <button
+                  <div
                     key={entry.id}
-                    onClick={() => entry.event_id && router.push(`/e/${entry.event_id}`)}
-                    className="w-full text-left rounded-2xl p-4 flex items-start justify-between gap-3"
-                    style={{ background: "var(--card)", border: "1px solid var(--border-soft)" }}
+                    className="rounded-2xl p-4 flex items-start justify-between gap-3"
+                    style={{ background: "var(--card)", border: "1px solid var(--border-soft)", opacity: hidden ? 0.5 : 1 }}
                   >
-                    <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+                    <button
+                      className="flex flex-col gap-0.5 flex-1 min-w-0 text-left"
+                      onClick={() => entry.event_id && router.push(`/e/${entry.event_id}`)}
+                    >
                       <p className="text-[13px] font-bold leading-snug truncate">
                         {entry.question}
                       </p>
                       <p className="text-[11px]" style={{ color: "var(--muted)" }}>
                         {entry.event_name} · {entry.pick} · {entry.points_staked.toLocaleString()} pts
                       </p>
+                    </button>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span
+                        className="text-[11px] font-bold px-2 py-1 rounded-full"
+                        style={{ background: style.bg, color: style.color, border: `1px solid ${style.border}` }}
+                      >
+                        {style.label}
+                      </span>
+                      <button
+                        onClick={toggleHidden}
+                        className="text-[13px] px-2 py-1 rounded-full font-bold"
+                        style={{ background: "rgba(255,255,255,0.05)", color: "var(--dimmer)" }}
+                        title={hidden ? "show on profile" : "hide from profile"}
+                      >
+                        {hidden ? "show" : "hide"}
+                      </button>
                     </div>
-                    <span
-                      className="text-[11px] font-bold px-2 py-1 rounded-full flex-shrink-0"
-                      style={{ background: style.bg, color: style.color, border: `1px solid ${style.border}` }}
-                    >
-                      {style.label}
-                    </span>
-                  </button>
+                  </div>
                 );
               })}
             </div>

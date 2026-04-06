@@ -35,13 +35,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 
-  // Mark anonymous after the RPC creates the entry
+  // Mark anonymous — do this after RPC and check for errors
   if (is_anonymous) {
-    await supabase
+    const { error: anonError } = await supabase
       .from("bet_entries")
       .update({ is_anonymous: true })
       .eq("bet_id", bet_id)
       .eq("user_id", user.userId);
+
+    if (anonError) console.error("failed to mark entry anonymous:", anonError.message);
   }
 
   return NextResponse.json({ ok: true });
