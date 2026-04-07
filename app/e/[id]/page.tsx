@@ -3,6 +3,7 @@
 import { usePrivy } from "@privy-io/react-auth";
 import { useRouter, useParams } from "next/navigation";
 import { useEffect, useState, useCallback, useRef } from "react";
+import { filterTagPickerGuests } from "../../lib/tag-picker";
 
 type BetOption = { id: string; label: string; tagged_user_id?: string | null; balances?: { display_name: string | null; avatar_url: string | null; username?: string | null } | null };
 type BetEntry = { id: string; user_id: string; option_id: string; points_staked: number; is_anonymous: boolean; balances?: { display_name: string | null; avatar_url: string | null } };
@@ -598,6 +599,7 @@ function BetCard({
     function handler(e: MouseEvent) {
       if (tagPickerRef.current && !tagPickerRef.current.contains(e.target as Node)) {
         setTagPickerOptId(null);
+        setTagPickerSearch("");
       }
     }
     if (tagPickerOptId) document.addEventListener("mousedown", handler);
@@ -1020,13 +1022,12 @@ function BetCard({
                   />
                 </div>
                 <div className="overflow-y-auto flex-1 pb-2" style={{ WebkitOverflowScrolling: "touch" }}>
-                  {eventGuests
-                    .filter((g) => {
-                      if (g.user_id === userId) return false;
-                      const q = tagPickerSearch.toLowerCase();
-                      return !q || g.balances?.display_name?.toLowerCase().includes(q) || g.balances?.username?.toLowerCase().includes(q);
-                    })
-                    .map((g) => (
+                  {(() => {
+                    const filtered = filterTagPickerGuests(eventGuests, userId, tagPickerSearch);
+                    if (filtered.length === 0) {
+                      return <p className="px-4 py-3 text-[13px]" style={{ color: "var(--muted)" }}>no results</p>;
+                    }
+                    return filtered.map((g) => (
                       <button
                         key={g.user_id}
                         onClick={(e) => { e.stopPropagation(); setTagPickerSearch(""); submitTag(opt.id, g.user_id); }}
@@ -1041,7 +1042,8 @@ function BetCard({
                           {g.balances?.username && <p className="text-[11px]" style={{ color: "var(--muted)" }}>@{g.balances.username}</p>}
                         </div>
                       </button>
-                    ))}
+                    ));
+                  })()}
                 </div>
               </div>
             )}
