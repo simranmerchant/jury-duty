@@ -589,8 +589,10 @@ function BetCard({
 
   // Tag option after creation
   const [tagPickerOptId, setTagPickerOptId] = useState<string | null>(null);
+  const [tagPickerSearch, setTagPickerSearch] = useState("");
   const [tagging, setTagging] = useState(false);
   const tagPickerRef = useRef<HTMLDivElement>(null);
+  const tagPickerInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     function handler(e: MouseEvent) {
@@ -936,7 +938,16 @@ function BetCard({
                       {bet.creator_id === userId && isOpen && !resolving && eventGuests.length > 0 && (
                         <span
                           role="button"
-                          onClick={(e) => { e.stopPropagation(); setTagPickerOptId(tagPickerOptId === opt.id ? null : opt.id); }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (tagPickerOptId === opt.id) {
+                              setTagPickerOptId(null);
+                            } else {
+                              setTagPickerOptId(opt.id);
+                              setTagPickerSearch("");
+                              setTimeout(() => tagPickerInputRef.current?.focus(), 50);
+                            }
+                          }}
                           className="text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 cursor-pointer"
                           style={{ background: "var(--accent-dim)", color: "var(--accent)", border: "1px solid var(--accent-border)" }}
                         >
@@ -992,25 +1003,46 @@ function BetCard({
             {tagPickerOptId === opt.id && (
               <div
                 ref={tagPickerRef}
-                className="absolute left-0 top-full mt-1 w-full rounded-2xl z-20 overflow-hidden"
-                style={{ background: "var(--card)", border: "1px solid var(--border-soft)", boxShadow: "0 8px 32px rgba(0,0,0,0.4)" }}
+                className="absolute left-0 top-full mt-1 w-full rounded-2xl z-20 flex flex-col"
+                style={{ background: "var(--card)", border: "1px solid var(--border-soft)", boxShadow: "0 8px 32px rgba(0,0,0,0.4)", maxHeight: 260 }}
               >
-                {eventGuests.filter((g) => g.user_id !== userId).map((g) => (
-                  <button
-                    key={g.user_id}
-                    onClick={(e) => { e.stopPropagation(); submitTag(opt.id, g.user_id); }}
-                    disabled={tagging}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/5 transition-colors disabled:opacity-40"
-                  >
-                    <div className="w-7 h-7 rounded-full flex items-center justify-center text-[12px] font-black flex-shrink-0" style={{ background: "var(--accent-dim)", color: "var(--accent)" }}>
-                      {g.balances?.display_name?.[0]?.toUpperCase() ?? "?"}
-                    </div>
-                    <div>
-                      <p className="text-[14px] font-bold">{g.balances?.display_name ?? "anonymous"}</p>
-                      {g.balances?.username && <p className="text-[11px]" style={{ color: "var(--muted)" }}>@{g.balances.username}</p>}
-                    </div>
-                  </button>
-                ))}
+                <div className="px-3 pt-3 pb-2 flex-shrink-0">
+                  <input
+                    ref={tagPickerInputRef}
+                    type="text"
+                    placeholder="search..."
+                    value={tagPickerSearch}
+                    onChange={(e) => setTagPickerSearch(e.target.value)}
+                    onKeyDown={(e) => e.stopPropagation()}
+                    onClick={(e) => e.stopPropagation()}
+                    className="w-full rounded-xl px-3 py-2 text-[14px] outline-none"
+                    style={{ background: "rgba(255,255,255,0.07)", border: "1px solid var(--border-soft)", color: "var(--text)" }}
+                  />
+                </div>
+                <div className="overflow-y-auto flex-1 pb-2" style={{ WebkitOverflowScrolling: "touch" }}>
+                  {eventGuests
+                    .filter((g) => {
+                      if (g.user_id === userId) return false;
+                      const q = tagPickerSearch.toLowerCase();
+                      return !q || g.balances?.display_name?.toLowerCase().includes(q) || g.balances?.username?.toLowerCase().includes(q);
+                    })
+                    .map((g) => (
+                      <button
+                        key={g.user_id}
+                        onClick={(e) => { e.stopPropagation(); setTagPickerSearch(""); submitTag(opt.id, g.user_id); }}
+                        disabled={tagging}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-left active:bg-white/5 disabled:opacity-40"
+                      >
+                        <div className="w-7 h-7 rounded-full flex items-center justify-center text-[12px] font-black flex-shrink-0" style={{ background: "var(--accent-dim)", color: "var(--accent)" }}>
+                          {g.balances?.display_name?.[0]?.toUpperCase() ?? "?"}
+                        </div>
+                        <div>
+                          <p className="text-[14px] font-bold">{g.balances?.display_name ?? "anonymous"}</p>
+                          {g.balances?.username && <p className="text-[11px]" style={{ color: "var(--muted)" }}>@{g.balances.username}</p>}
+                        </div>
+                      </button>
+                    ))}
+                </div>
               </div>
             )}
           </div>
