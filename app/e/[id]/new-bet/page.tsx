@@ -25,7 +25,9 @@ export default function NewBetPage() {
 
   // Option tag picker
   const [tagPickerIdx, setTagPickerIdx] = useState<number | null>(null);
+  const [tagPickerSearch, setTagPickerSearch] = useState("");
   const tagPickerRef = useRef<HTMLDivElement>(null);
+  const tagPickerInputRef = useRef<HTMLInputElement>(null);
 
   // Question @mention
   const [questionTaggedIds, setQuestionTaggedIds] = useState<string[]>([]);
@@ -324,7 +326,15 @@ export default function NewBetPage() {
                     />
                     {guests.length > 0 && (
                       <button
-                        onClick={() => setTagPickerIdx(tagPickerIdx === i ? null : i)}
+                        onClick={() => {
+                          if (tagPickerIdx === i) {
+                            setTagPickerIdx(null);
+                          } else {
+                            setTagPickerIdx(i);
+                            setTagPickerSearch("");
+                            setTimeout(() => tagPickerInputRef.current?.focus(), 50);
+                          }
+                        }}
                         className="px-3 py-3 rounded-2xl text-[13px] font-bold flex-shrink-0"
                         style={{
                           background: tagPickerIdx === i ? "var(--accent-dim)" : "rgba(255,255,255,0.04)",
@@ -351,27 +361,45 @@ export default function NewBetPage() {
                 {tagPickerIdx === i && (
                   <div
                     ref={tagPickerRef}
-                    className="absolute left-0 top-full mt-1 w-full rounded-2xl z-10 overflow-hidden"
-                    style={{ background: "var(--card)", border: "1px solid var(--border-soft)", boxShadow: "0 8px 32px rgba(0,0,0,0.4)" }}
+                    className="absolute left-0 top-full mt-1 w-full rounded-2xl z-10 flex flex-col"
+                    style={{ background: "var(--card)", border: "1px solid var(--border-soft)", boxShadow: "0 8px 32px rgba(0,0,0,0.4)", maxHeight: 260 }}
                   >
-                    {guests.map((g) => (
-                      <button
-                        key={g.user_id}
-                        onClick={() => tagOption(i, g)}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/5 transition-colors"
-                      >
-                        <div
-                          className="w-7 h-7 rounded-full flex items-center justify-center text-[12px] font-black flex-shrink-0"
-                          style={{ background: "var(--accent-dim)", color: "var(--accent)" }}
-                        >
-                          {g.display_name?.[0]?.toUpperCase() ?? "?"}
-                        </div>
-                        <div>
-                          <p className="text-[14px] font-bold">{g.display_name ?? "anonymous"}</p>
-                          {g.username && <p className="text-[11px]" style={{ color: "var(--muted)" }}>@{g.username}</p>}
-                        </div>
-                      </button>
-                    ))}
+                    <div className="px-3 pt-3 pb-2 flex-shrink-0">
+                      <input
+                        ref={tagPickerInputRef}
+                        type="text"
+                        placeholder="search..."
+                        value={tagPickerSearch}
+                        onChange={(e) => setTagPickerSearch(e.target.value)}
+                        className="w-full rounded-xl px-3 py-2 text-[14px] outline-none"
+                        style={{ background: "rgba(255,255,255,0.07)", border: "1px solid var(--border-soft)", color: "var(--text)" }}
+                      />
+                    </div>
+                    <div className="overflow-y-auto flex-1 pb-2" style={{ WebkitOverflowScrolling: "touch" }}>
+                      {guests
+                        .filter((g) => {
+                          const q = tagPickerSearch.toLowerCase();
+                          return !q || g.display_name?.toLowerCase().includes(q) || g.username?.toLowerCase().includes(q);
+                        })
+                        .map((g) => (
+                          <button
+                            key={g.user_id}
+                            onClick={() => { tagOption(i, g); setTagPickerSearch(""); }}
+                            className="w-full flex items-center gap-3 px-4 py-3 text-left active:bg-white/5"
+                          >
+                            <div
+                              className="w-7 h-7 rounded-full flex items-center justify-center text-[12px] font-black flex-shrink-0"
+                              style={{ background: "var(--accent-dim)", color: "var(--accent)" }}
+                            >
+                              {g.display_name?.[0]?.toUpperCase() ?? "?"}
+                            </div>
+                            <div>
+                              <p className="text-[14px] font-bold">{g.display_name ?? "anonymous"}</p>
+                              {g.username && <p className="text-[11px]" style={{ color: "var(--muted)" }}>@{g.username}</p>}
+                            </div>
+                          </button>
+                        ))}
+                    </div>
                   </div>
                 )}
               </div>

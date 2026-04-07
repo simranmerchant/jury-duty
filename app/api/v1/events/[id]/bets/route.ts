@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/privy";
 import { supabase } from "@/lib/supabase";
 import { sendPushToUsers } from "@/lib/push";
+import { buildInviteIds, questionMentionRecipients, optionTagRecipients } from "@/lib/notification-recipients";
 
 export async function POST(
   req: NextRequest,
@@ -98,11 +99,20 @@ export async function POST(
     .filter((o) => o.tagged_user_id)
     .map((o) => o.tagged_user_id as string);
 
-  // Notify users tagged in the question text (excluding creator and option-tagged users to avoid double-notifying)
   const questionTaggedIds: string[] = Array.isArray(question_tagged_user_ids) ? question_tagged_user_ids : [];
-  const externalQuestionTaggedIds = questionTaggedIds.filter(
-    (uid) => uid !== user.userId && !taggedUserIds.includes(uid)
-  );
+
+  const recipientCtx = {
+    creatorId: user.userId,
+    visibility: (visibility ?? "public") as "public" | "private",
+    guestIds: otherGuestIds,
+    explicitInviteIds: Array.isArray(invitedUserIds) ? invitedUserIds : [],
+    optionTaggedIds: taggedUserIds,
+    questionTaggedIds,
+  };
+
+  const inviteIds = buildInviteIds(recipientCtx);
+  const externalQuestionTaggedIds = questionMentionRecipients(recipientCtx, inviteIds);
+
   if (externalQuestionTaggedIds.length > 0) {
     await Promise.all([
       supabase.from("notifications").insert(externalQuestionTaggedIds.map((uid) => ({
@@ -120,8 +130,7 @@ export async function POST(
     ]);
   }
 
-  // Notify users tagged in options (excluding the creator if they tagged themselves)
-  const externalTaggedIds = taggedUserIds.filter((uid) => uid !== user.userId);
+  const externalTaggedIds = optionTagRecipients(recipientCtx);
   if (externalTaggedIds.length > 0) {
     await Promise.all([
       supabase.from("notifications").insert(externalTaggedIds.map((uid) => ({
@@ -140,7 +149,6 @@ export async function POST(
   }
 
   if (visibility === "private") {
-    const inviteIds = [...new Set([user.userId, ...(Array.isArray(invitedUserIds) ? invitedUserIds : []), ...taggedUserIds])];
     const notifyIds = inviteIds.filter((uid) => uid !== user.userId);
 
     await Promise.all([

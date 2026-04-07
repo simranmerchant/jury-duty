@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/privy";
 import { supabase } from "@/lib/supabase";
+import { sanitizeSearchQuery } from "@/lib/search";
 
 // GET /api/v1/users/search?q=handle — search users by username or display name
 export async function GET(req: NextRequest) {
@@ -11,12 +12,9 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const raw = req.nextUrl.searchParams.get("q")?.trim() ?? "";
-  // Strip leading @ so "search by @handle" works as expected
-  const q = raw.startsWith("@") ? raw.slice(1) : raw;
+  const q = sanitizeSearchQuery(raw);
   if (q.length < 2) return NextResponse.json({ users: [] });
-
-  // Strip PostgREST filter-string special chars to prevent condition injection
-  const safe = q.replace(/[,.()"]/g, "");
+  const safe = q;
 
   const { data, error } = await supabase
     .from("balances")

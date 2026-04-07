@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/privy";
 import { supabase } from "@/lib/supabase";
 import { sendPushToUsers } from "@/lib/push";
+import { buildResolveNotifications } from "@/lib/resolve-notifications";
 
 export async function POST(
   req: NextRequest,
@@ -38,18 +39,12 @@ export async function POST(
     .single();
 
   if (bet) {
-    const isRefund = !winning_option_id;
-    const notifications = (bet.bet_entries as { user_id: string; option_id: string }[]).map((entry) => {
-      const won = !isRefund && entry.option_id === bet.winning_option_id;
-      const type = isRefund ? "bet_resolved_refunded" : won ? "bet_resolved_won" : "bet_resolved_lost";
-      const title = isRefund ? "case dismissed" : won ? "jury's in — you won 🎉" : "jury's in — you lost 💀";
-      const body = isRefund
-        ? `"${bet.question}" was called off. your points have been refunded.`
-        : won
-        ? `you called it on "${bet.question}". points incoming.`
-        : `you were wrong about "${bet.question}". the jury has spoken.`;
-      return { user_id: entry.user_id, type, title, body, data: { bet_id: betId } };
-    });
+    const notifications = buildResolveNotifications(
+      betId,
+      bet.question,
+      bet.bet_entries as { user_id: string; option_id: string }[],
+      winning_option_id ?? null
+    );
 
     if (notifications.length > 0) {
       await supabase.from("notifications").insert(notifications);

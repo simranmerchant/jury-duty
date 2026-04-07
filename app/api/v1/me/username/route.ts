@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/privy";
 import { supabase } from "@/lib/supabase";
-
-const USERNAME_RE = /^[a-z0-9][a-z0-9._]{1,18}[a-z0-9]$|^[a-z0-9]{3}$/;
+import { USERNAME_RE } from "@/lib/username";
 
 // GET /api/v1/me/username?u=somehandle — availability check, no auth required
 export async function GET(req: NextRequest) {
