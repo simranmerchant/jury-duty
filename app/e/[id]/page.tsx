@@ -810,7 +810,7 @@ function BetCard({
     )}
 
     <div
-      className="rounded-3xl p-5 relative overflow-hidden"
+      className="rounded-3xl p-5 relative"
       style={{
         background: "var(--card)",
         border: "1px solid var(--border-soft)",
