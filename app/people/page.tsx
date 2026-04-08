@@ -138,11 +138,6 @@ export default function PeoplePage() {
           </div>
         )}
 
-        {!searched && (
-          <p className="text-center pt-6 text-[13px]" style={{ color: "var(--dimmer)" }}>
-            type at least 2 characters to search
-          </p>
-        )}
       </div>
     </div>
   );
