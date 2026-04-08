@@ -22,6 +22,6 @@ export function filterTagPickerGuests<T extends GuestLike>(
     const name = g.balances?.display_name;
     const uname = g.balances?.username;
     if (!name && !uname) return true;
-    return name?.toLowerCase().includes(q) || uname?.toLowerCase().includes(q);
+    return name?.toLowerCase().startsWith(q) || uname?.toLowerCase().startsWith(q);
   });
 }

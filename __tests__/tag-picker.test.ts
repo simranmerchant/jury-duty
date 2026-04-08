@@ -56,8 +56,13 @@ describe("filterTagPickerGuests", () => {
     expect(result).toHaveLength(0);
   });
 
-  it("substring match: 'ali' matches Alice", () => {
+  it("prefix match: 'ali' matches Alice (starts with)", () => {
     const result = filterTagPickerGuests(guests, "me", "ali");
     expect(result.map((g) => g.user_id)).toContain("user-1");
+  });
+
+  it("does not match when query is a substring but not a prefix", () => {
+    const result = filterTagPickerGuests(guests, "me", "lice");
+    expect(result.map((g) => g.user_id)).not.toContain("user-1");
   });
 });
