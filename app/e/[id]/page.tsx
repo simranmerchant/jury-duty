@@ -3,7 +3,7 @@
 import { usePrivy } from "@privy-io/react-auth";
 import { useRouter, useParams } from "next/navigation";
 import { useEffect, useState, useCallback, useRef } from "react";
-import { filterTagPickerGuests } from "../../lib/tag-picker";
+import { filterTagPickerGuests } from "../../../lib/tag-picker";
 
 type BetOption = { id: string; label: string; tagged_user_id?: string | null; balances?: { display_name: string | null; avatar_url: string | null; username?: string | null } | null };
 type BetEntry = { id: string; user_id: string; option_id: string; points_staked: number; is_anonymous: boolean; balances?: { display_name: string | null; avatar_url: string | null } };
