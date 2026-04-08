@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
     .from("balances")
     .select("user_id, display_name, username, avatar_url")
     .neq("user_id", user.userId)
-    .or(`username.ilike.%${safe}%,display_name.ilike.%${safe}%`)
+    .or(`username.ilike.${safe}%,display_name.ilike.${safe}%`)
     .limit(20);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
