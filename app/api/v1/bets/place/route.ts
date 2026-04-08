@@ -43,7 +43,9 @@ export async function POST(req: NextRequest) {
       .eq("bet_id", bet_id)
       .eq("user_id", user.userId);
 
-    if (anonError) console.error("failed to mark entry anonymous:", anonError.message);
+    if (anonError) {
+      return NextResponse.json({ error: "bet placed but failed to mark anonymous — try again" }, { status: 500 });
+    }
   }
 
   return NextResponse.json({ ok: true });
