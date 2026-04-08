@@ -36,22 +36,14 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "3–20 chars, letters/numbers/. and _ only, can't start or end with . or _" }, { status: 400 });
   }
 
-  // Check if already taken by someone else
-  const { data: existing } = await supabase
-    .from("balances")
-    .select("user_id")
-    .eq("username", u)
-    .single();
-
-  if (existing && existing.user_id !== user.userId) {
-    return NextResponse.json({ error: "username taken" }, { status: 409 });
-  }
-
   const { error } = await supabase
     .from("balances")
     .update({ username: u })
     .eq("user_id", user.userId);
 
+  if (error?.code === "23505") {
+    return NextResponse.json({ error: "username taken" }, { status: 409 });
+  }
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   return NextResponse.json({ username: u });
