@@ -40,6 +40,18 @@ export default function RootLayout({
       className={`${nunito.variable} ${dmSans.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+          <div
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              right: 0,
+              height: 260,
+              background: "linear-gradient(to bottom, rgba(255,94,128,0.28) 0%, rgba(255,94,128,0.08) 45%, transparent 100%)",
+              pointerEvents: "none",
+              zIndex: 0,
+            }}
+          />
           <Providers>{children}</Providers>
           <InstallPrompt />
         </body>
