@@ -130,7 +130,7 @@ export async function POST(
     ]);
   }
 
-  const externalTaggedIds = optionTagRecipients(recipientCtx);
+  const externalTaggedIds = optionTagRecipients(recipientCtx, inviteIds);
   if (externalTaggedIds.length > 0) {
     await Promise.all([
       supabase.from("notifications").insert(externalTaggedIds.map((uid) => ({

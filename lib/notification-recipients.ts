@@ -18,7 +18,7 @@ export interface RecipientContext {
 
 /**
  * Builds the full invite list for a private bet.
- * Always includes creator + explicit invites + option-tagged users.
+ * Only includes creator + explicit invites. Tagged users are never auto-added.
  */
 export function buildInviteIds(ctx: RecipientContext): string[] {
   if (ctx.visibility !== "private") return [];
@@ -26,7 +26,6 @@ export function buildInviteIds(ctx: RecipientContext): string[] {
     ...new Set([
       ctx.creatorId,
       ...ctx.explicitInviteIds,
-      ...ctx.optionTaggedIds,
     ]),
   ];
 }
@@ -60,11 +59,15 @@ export function questionMentionRecipients(
  * Rules:
  * - Not the creator
  * - Must be a member of the event/group
- * (For private bets they're already auto-added to inviteIds so they can see it.)
+ * - For private bets: must also be in the invite list
  */
-export function optionTagRecipients(ctx: RecipientContext): string[] {
+export function optionTagRecipients(ctx: RecipientContext, inviteIds?: string[]): string[] {
   const guestSet = new Set(ctx.guestIds);
+  const inviteSet = new Set(inviteIds ?? []);
   return ctx.optionTaggedIds.filter(
-    (uid) => uid !== ctx.creatorId && guestSet.has(uid)
+    (uid) =>
+      uid !== ctx.creatorId &&
+      guestSet.has(uid) &&
+      (ctx.visibility !== "private" || inviteSet.has(uid))
   );
 }

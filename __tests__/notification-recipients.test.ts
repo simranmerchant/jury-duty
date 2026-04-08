@@ -42,24 +42,25 @@ describe("buildInviteIds", () => {
     expect(buildInviteIds(ctx)).toContain(CREATOR);
   });
 
-  it("includes explicit invites and option-tagged users", () => {
-    const ctx = privateCtx({ explicitInviteIds: [GUEST_A], optionTaggedIds: [GUEST_B] });
-    const ids = buildInviteIds(ctx);
-    expect(ids).toContain(GUEST_A);
-    expect(ids).toContain(GUEST_B);
+  it("includes explicit invites", () => {
+    const ctx = privateCtx({ explicitInviteIds: [GUEST_A] });
+    expect(buildInviteIds(ctx)).toContain(GUEST_A);
   });
 
-  it("deduplicates when same user is both explicitly invited and option-tagged", () => {
-    const ctx = privateCtx({ explicitInviteIds: [GUEST_A], optionTaggedIds: [GUEST_A] });
+  it("does NOT auto-add option-tagged users (even event members)", () => {
+    const ctx = privateCtx({ optionTaggedIds: [GUEST_A] });
+    expect(buildInviteIds(ctx)).not.toContain(GUEST_A);
+  });
+
+  it("does NOT include outsiders even if option-tagged or explicitly invited", () => {
+    const ctx = privateCtx({ optionTaggedIds: [OUTSIDER] });
+    expect(buildInviteIds(ctx)).not.toContain(OUTSIDER);
+  });
+
+  it("deduplicates when same user appears in multiple lists", () => {
+    const ctx = privateCtx({ explicitInviteIds: [GUEST_A, GUEST_A] });
     const ids = buildInviteIds(ctx);
     expect(ids.filter((id) => id === GUEST_A).length).toBe(1);
-  });
-
-  it("does NOT include outsiders just because they were added — they must be set explicitly", () => {
-    // This test documents the intended behavior: buildInviteIds trusts its inputs.
-    // The API layer is responsible for validating who can be invited.
-    const ctx = privateCtx({ explicitInviteIds: [OUTSIDER] });
-    expect(buildInviteIds(ctx)).toContain(OUTSIDER);
   });
 });
 
@@ -162,14 +163,22 @@ describe("optionTagRecipients — public bet", () => {
 });
 
 describe("optionTagRecipients — private bet", () => {
-  it("notifies an event member tagged as an option (they can see it via auto-invite)", () => {
-    const ctx = privateCtx({ optionTaggedIds: [GUEST_A] });
-    expect(optionTagRecipients(ctx)).toContain(GUEST_A);
+  it("notifies an event member tagged as option only if they are in the invite list", () => {
+    const ctx = privateCtx({ optionTaggedIds: [GUEST_A], explicitInviteIds: [GUEST_A] });
+    const inviteIds = buildInviteIds(ctx);
+    expect(optionTagRecipients(ctx, inviteIds)).toContain(GUEST_A);
+  });
+
+  it("does NOT notify an event member tagged as option if NOT in the invite list", () => {
+    const ctx = privateCtx({ optionTaggedIds: [GUEST_A] }); // GUEST_A not explicitly invited
+    const inviteIds = buildInviteIds(ctx);
+    expect(optionTagRecipients(ctx, inviteIds)).not.toContain(GUEST_A);
   });
 
   it("does NOT notify an outsider tagged as an option in a private bet", () => {
     const ctx = privateCtx({ optionTaggedIds: [OUTSIDER] });
-    expect(optionTagRecipients(ctx)).not.toContain(OUTSIDER);
+    const inviteIds = buildInviteIds(ctx);
+    expect(optionTagRecipients(ctx, inviteIds)).not.toContain(OUTSIDER);
   });
 });
 
@@ -193,20 +202,14 @@ describe("Security: tagged user cannot discover they were tagged", () => {
     });
     const inviteIds = buildInviteIds(ctx);
     expect(questionMentionRecipients(ctx, inviteIds)).not.toContain(OUTSIDER);
-    expect(optionTagRecipients(ctx)).not.toContain(OUTSIDER);
+    expect(optionTagRecipients(ctx, inviteIds)).not.toContain(OUTSIDER);
   });
 
-  it("event member in a private bet they weren't invited to gets zero notifications", () => {
-    // GUEST_A is in the event but the bet is private and only GUEST_B was invited
-    const ctx = privateCtx({
-      questionTaggedIds: [GUEST_A],
-      optionTaggedIds: [GUEST_A],
-      explicitInviteIds: [GUEST_B],
-    });
+  it("event member tagged as option but NOT invited gets zero notifications", () => {
+    const ctx = privateCtx({ optionTaggedIds: [GUEST_A] }); // not explicitly invited
     const inviteIds = buildInviteIds(ctx);
-    expect(questionMentionRecipients(ctx, inviteIds)).not.toContain(GUEST_A);
-    // option tags still go through — they auto-add to inviteIds so they can see the bet
-    // but we verify question mentions are blocked
+    expect(inviteIds).not.toContain(GUEST_A);
+    expect(optionTagRecipients(ctx, inviteIds)).not.toContain(GUEST_A);
   });
 
   it("no one gets notified when no one is tagged", () => {
