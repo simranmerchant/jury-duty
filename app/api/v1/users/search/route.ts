@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
 
   const raw = req.nextUrl.searchParams.get("q")?.trim() ?? "";
   const q = sanitizeSearchQuery(raw);
-  if (q.length < 2) return NextResponse.json({ users: [] });
+  if (q.length < 1) return NextResponse.json({ users: [] });
   const safe = q;
 
   const { data, error } = await supabase
