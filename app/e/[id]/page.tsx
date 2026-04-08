@@ -876,7 +876,6 @@ function BetCard({
 
           return (<div key={opt.id} className="relative">
             <button
-              disabled={!canBet && !resolving}
               onClick={() => {
                 if (resolving) {
                   setResolveOption(isSelectedForResolve ? null : opt.id);
@@ -924,7 +923,6 @@ function BetCard({
                       </div>
                       <span className="text-[14px] font-bold truncate">
                         {opt.balances?.display_name ?? opt.label}
-                        {opt.balances?.username && <span className="ml-1 text-[11px] font-semibold" style={{ color: "var(--muted)" }}>@{opt.balances.username}</span>}
                       </span>
                       {isWinner && <span className="text-[11px] font-bold flex-shrink-0" style={{ color: "var(--win)" }}>won</span>}
                       {bet.creator_id === userId && isOpen && !resolving && (

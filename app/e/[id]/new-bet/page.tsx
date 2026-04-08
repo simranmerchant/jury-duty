@@ -294,14 +294,9 @@ export default function NewBetPage() {
                     >
                       {opt.tagged_display_name?.[0]?.toUpperCase() ?? "?"}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <span className="text-[15px] font-bold" style={{ color: "var(--accent)" }}>
-                        {opt.tagged_display_name ?? opt.label}
-                      </span>
-                      {opt.tagged_username && (
-                        <span className="text-[12px] ml-1.5" style={{ color: "var(--muted)" }}>@{opt.tagged_username}</span>
-                      )}
-                    </div>
+                    <span className="flex-1 min-w-0 text-[15px] font-bold truncate" style={{ color: "var(--accent)" }}>
+                      {opt.tagged_display_name ?? opt.label}
+                    </span>
                     <button
                       onClick={() => untagOption(i)}
                       className="text-[13px] font-bold flex-shrink-0"
@@ -311,14 +306,16 @@ export default function NewBetPage() {
                     </button>
                   </div>
                 ) : (
-                  <div className="flex-1 flex items-center gap-2">
+                  <div
+                    className="flex-1 flex items-center rounded-2xl overflow-hidden"
+                    style={{
+                      background: "rgba(255,255,255,0.04)",
+                      border: `1px solid ${tagPickerIdx === i ? "var(--accent-border)" : "var(--border-soft)"}`,
+                    }}
+                  >
                     <input
-                      className="flex-1 rounded-2xl px-4 py-3 text-[15px] outline-none"
-                      style={{
-                        background: "rgba(255,255,255,0.04)",
-                        border: "1px solid var(--border-soft)",
-                        color: "var(--text)",
-                      }}
+                      className="flex-1 px-4 py-3 text-[15px] outline-none bg-transparent"
+                      style={{ color: "var(--text)" }}
                       placeholder={i === 0 ? "Jake" : i === 1 ? "Maya" : `option ${i + 1}`}
                       maxLength={100}
                       value={opt.label}
@@ -335,11 +332,11 @@ export default function NewBetPage() {
                             setTimeout(() => tagPickerInputRef.current?.focus(), 50);
                           }
                         }}
-                        className="px-3 py-3 rounded-2xl text-[13px] font-bold flex-shrink-0"
+                        className="px-3 py-3 text-[13px] font-bold flex-shrink-0"
                         style={{
-                          background: tagPickerIdx === i ? "var(--accent-dim)" : "rgba(255,255,255,0.04)",
-                          border: `1px solid ${tagPickerIdx === i ? "var(--accent-border)" : "var(--border-soft)"}`,
-                          color: tagPickerIdx === i ? "var(--accent)" : "var(--muted)",
+                          borderLeft: "1px solid var(--border-soft)",
+                          color: tagPickerIdx === i ? "var(--accent)" : "var(--dimmer)",
+                          background: tagPickerIdx === i ? "var(--accent-dim)" : "transparent",
                         }}
                       >
                         @
@@ -379,7 +376,7 @@ export default function NewBetPage() {
                       {guests
                         .filter((g) => {
                           const q = tagPickerSearch.toLowerCase();
-                          return !q || g.display_name?.toLowerCase().includes(q) || g.username?.toLowerCase().includes(q);
+                          return !q || g.display_name?.toLowerCase().startsWith(q) || g.username?.toLowerCase().startsWith(q);
                         })
                         .map((g) => (
                           <button
