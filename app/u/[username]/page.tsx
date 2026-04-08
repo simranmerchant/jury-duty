@@ -4,60 +4,33 @@ import { usePrivy } from "@privy-io/react-auth";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-type TaggedBet = {
-  bet_id: string;
-  question: string;
-  label: string;
-  event_id: string | null;
-  event_name: string | null;
-  status: string;
-  outcome: "pending" | "won" | "lost" | "refunded";
-};
-
-type HistoryEntry = {
-  id: string;
-  bet_id: string;
-  event_id: string | null;
-  event_name: string | null;
-  question: string;
-  pick: string;
-  points_staked: number;
-  outcome: "pending" | "won" | "lost" | "refunded";
-};
-
-type Stats = { total: number; won: number; lost: number; pending: number; win_rate: number | null };
-type MutualEvent = { id: string; name: string; type: string };
-
 type Profile = {
   user_id: string;
   display_name: string | null;
   username: string;
   avatar_url: string | null;
+  points: number;
 };
 
-const OUTCOME_STYLE: Record<string, { label: string; color: string; bg: string; border: string }> = {
-  won:      { label: "won",      color: "var(--win)",    bg: "rgba(48,209,88,0.12)",   border: "rgba(48,209,88,0.25)" },
-  lost:     { label: "lost",     color: "var(--muted)",  bg: "rgba(255,255,255,0.04)", border: "transparent" },
-  refunded: { label: "refunded", color: "var(--purple)", bg: "var(--purple-dim)",      border: "var(--purple-border)" },
-  pending:  { label: "open",     color: "var(--accent)", bg: "var(--accent-dim)",      border: "var(--accent-border)" },
-};
+type EventItem = { id: string; name: string; type: string };
+type SharedBet = { bet_id: string; question: string; event_id: string | null; event_name: string | null; status: string };
 
 export default function PublicProfilePage() {
   const params = useParams();
   const router = useRouter();
   const username = params.username as string;
-  const { ready, getAccessToken } = usePrivy();
+  const { ready, authenticated, getAccessToken } = usePrivy();
 
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [taggedBets, setTaggedBets] = useState<TaggedBet[]>([]);
-  const [history, setHistory] = useState<HistoryEntry[]>([]);
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [mutualEvents, setMutualEvents] = useState<MutualEvent[]>([]);
+  const [winRate, setWinRate] = useState<number | null>(null);
+  const [mutualEvents, setMutualEvents] = useState<EventItem[]>([]);
+  const [sharedBets, setSharedBets] = useState<SharedBet[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
   useEffect(() => {
     if (!ready) return;
+    if (!authenticated) { router.replace("/login"); return; }
     getAccessToken().then((token) => {
       const headers: Record<string, string> = {};
       if (token) headers["Authorization"] = `Bearer ${token}`;
@@ -69,14 +42,13 @@ export default function PublicProfilePage() {
       .then((data) => {
         if (!data) return;
         setProfile(data.user);
-        setTaggedBets(data.tagged_bets ?? []);
-        setHistory(data.history ?? []);
-        setStats(data.stats ?? null);
+        setWinRate(data.win_rate ?? null);
         setMutualEvents(data.mutual_events ?? []);
+        setSharedBets(data.shared_bets ?? []);
         setLoading(false);
       })
       .catch(() => { setNotFound(true); setLoading(false); });
-  }, [ready, username, getAccessToken]);
+  }, [ready, authenticated, username, getAccessToken]);
 
   if (loading) return null;
 
@@ -91,6 +63,7 @@ export default function PublicProfilePage() {
   }
 
   const name = profile?.display_name ?? profile?.username ?? "unknown";
+  const isMutual = sharedBets.length > 0 || mutualEvents.length > 0;
 
   return (
     <div className="min-h-screen" style={{ background: "var(--bg)", color: "var(--text)" }}>
@@ -112,40 +85,86 @@ export default function PublicProfilePage() {
           )}
         </div>
 
-        <h1 className="text-[32px] font-black tracking-tight" style={{ fontFamily: "var(--font-nunito)" }}>
-          {name}
-        </h1>
+        <div className="flex items-center gap-2 flex-wrap">
+          <h1 className="text-[32px] font-black tracking-tight" style={{ fontFamily: "var(--font-nunito)" }}>
+            {name}
+          </h1>
+          {isMutual && (
+            <span
+              className="text-[11px] font-bold px-2.5 py-1 rounded-full"
+              style={{ background: "var(--accent-dim)", color: "var(--accent)", border: "1px solid var(--accent-border)" }}
+            >
+              mutual
+            </span>
+          )}
+        </div>
         {profile?.username && (
           <p className="text-[14px] font-semibold mt-0.5" style={{ color: "var(--muted)" }}>@{profile.username}</p>
         )}
       </div>
 
       <div className="px-4 pb-32 flex flex-col gap-4">
-        {/* Stats */}
-        {stats && stats.total > 0 && (
-          <div className="grid grid-cols-3 gap-2">
-            {[
-              { label: "total bets", value: stats.total },
-              { label: "won", value: stats.won },
-              { label: "win rate", value: stats.win_rate !== null ? `${stats.win_rate}%` : "—" },
-            ].map(({ label, value }) => (
-              <div
-                key={label}
-                className="rounded-2xl p-4 flex flex-col gap-0.5"
-                style={{ background: "var(--card)", border: "1px solid var(--border-soft)" }}
-              >
-                <p className="text-[20px] font-black" style={{ fontFamily: "var(--font-nunito)" }}>{value}</p>
-                <p className="text-[11px]" style={{ color: "var(--muted)" }}>{label}</p>
-              </div>
-            ))}
+        {/* Stats: points + win rate */}
+        <div className="grid grid-cols-2 gap-2">
+          <div
+            className="rounded-2xl p-4 flex flex-col gap-0.5"
+            style={{ background: "var(--card)", border: "1px solid var(--border-soft)" }}
+          >
+            <p className="text-[20px] font-black" style={{ fontFamily: "var(--font-nunito)" }}>
+              {(profile?.points ?? 0).toLocaleString()}
+            </p>
+            <p className="text-[11px]" style={{ color: "var(--muted)" }}>points</p>
           </div>
+          <div
+            className="rounded-2xl p-4 flex flex-col gap-0.5"
+            style={{ background: "var(--card)", border: "1px solid var(--border-soft)" }}
+          >
+            <p className="text-[20px] font-black" style={{ fontFamily: "var(--font-nunito)" }}>
+              {winRate !== null ? `${winRate}%` : "—"}
+            </p>
+            <p className="text-[11px]" style={{ color: "var(--muted)" }}>win rate</p>
+          </div>
+        </div>
+
+        {/* Bets in common */}
+        {sharedBets.length > 0 && (
+          <>
+            <p className="text-[11px] font-bold uppercase tracking-wider px-1 pt-2" style={{ color: "var(--dimmer)" }}>
+              bets in common
+            </p>
+            <div className="flex flex-col gap-2">
+              {sharedBets.map((bet) => (
+                <button
+                  key={bet.bet_id}
+                  onClick={() => bet.event_id && router.push(`/e/${bet.event_id}`)}
+                  className="w-full flex items-start justify-between px-4 py-3 rounded-2xl text-left gap-3"
+                  style={{ background: "var(--accent-dim)", border: "1px solid var(--accent-border)" }}
+                >
+                  <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+                    <p className="text-[13px] font-bold leading-snug">{bet.question}</p>
+                    {bet.event_name && (
+                      <p className="text-[11px]" style={{ color: "var(--muted)" }}>{bet.event_name}</p>
+                    )}
+                  </div>
+                  {bet.status !== "open" && (
+                    <span
+                      className="text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 mt-0.5"
+                      style={{ background: "rgba(255,255,255,0.06)", color: "var(--muted)" }}
+                    >
+                      {bet.status}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </>
         )}
 
-        {/* Mutual events */}
+        {/* Mutual events / groups */}
         {mutualEvents.length > 0 && (
           <>
             <p className="text-[11px] font-bold uppercase tracking-wider px-1 pt-2" style={{ color: "var(--dimmer)" }}>
-              in common
+              events & groups in common
             </p>
             <div className="flex flex-col gap-2">
               {mutualEvents.map((e) => (
@@ -174,78 +193,8 @@ export default function PublicProfilePage() {
           </>
         )}
 
-        {/* Tagged in */}
-        {taggedBets.length > 0 && (
-          <>
-            <p className="text-[11px] font-bold uppercase tracking-wider px-1 pt-2" style={{ color: "var(--dimmer)" }}>
-              tagged in
-            </p>
-            <div className="flex flex-col gap-2">
-              {taggedBets.map((tb) => {
-                const style = OUTCOME_STYLE[tb.outcome];
-                return (
-                  <button
-                    key={tb.bet_id}
-                    onClick={() => tb.event_id && router.push(`/e/${tb.event_id}`)}
-                    className="w-full text-left rounded-2xl p-4 flex items-start justify-between gap-3"
-                    style={{ background: "var(--card)", border: "1px solid var(--border-soft)" }}
-                  >
-                    <div className="flex flex-col gap-0.5 flex-1 min-w-0">
-                      <p className="text-[13px] font-bold leading-snug truncate">{tb.question}</p>
-                      <p className="text-[11px]" style={{ color: "var(--muted)" }}>
-                        {tb.event_name} · {tb.label}
-                      </p>
-                    </div>
-                    <span
-                      className="text-[11px] font-bold px-2 py-1 rounded-full flex-shrink-0"
-                      style={{ background: style.bg, color: style.color, border: `1px solid ${style.border}` }}
-                    >
-                      {style.label}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </>
-        )}
-
-        {/* Bet history */}
-        {history.length > 0 && (
-          <>
-            <p className="text-[11px] font-bold uppercase tracking-wider px-1 pt-2" style={{ color: "var(--dimmer)" }}>
-              bet history
-            </p>
-            <div className="flex flex-col gap-2">
-              {history.map((entry) => {
-                const style = OUTCOME_STYLE[entry.outcome];
-                return (
-                  <button
-                    key={entry.id}
-                    onClick={() => entry.event_id && router.push(`/e/${entry.event_id}`)}
-                    className="w-full text-left rounded-2xl p-4 flex items-start justify-between gap-3"
-                    style={{ background: "var(--card)", border: "1px solid var(--border-soft)" }}
-                  >
-                    <div className="flex flex-col gap-0.5 flex-1 min-w-0">
-                      <p className="text-[13px] font-bold leading-snug truncate">{entry.question}</p>
-                      <p className="text-[11px]" style={{ color: "var(--muted)" }}>
-                        {entry.event_name} · {entry.pick} · {entry.points_staked.toLocaleString()} pts
-                      </p>
-                    </div>
-                    <span
-                      className="text-[11px] font-bold px-2 py-1 rounded-full flex-shrink-0"
-                      style={{ background: style.bg, color: style.color, border: `1px solid ${style.border}` }}
-                    >
-                      {style.label}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </>
-        )}
-
-        {taggedBets.length === 0 && history.length === 0 && (
-          <p className="text-center py-8 text-[14px]" style={{ color: "var(--dimmer)" }}>no public bets yet</p>
+        {mutualEvents.length === 0 && sharedBets.length === 0 && (
+          <p className="text-center py-8 text-[14px]" style={{ color: "var(--dimmer)" }}>no public activity yet</p>
         )}
       </div>
     </div>

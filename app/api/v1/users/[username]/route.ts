@@ -3,7 +3,7 @@ import { requireUser } from "@/lib/privy";
 import { supabase } from "@/lib/supabase";
 import { computeOutcome } from "@/lib/outcome";
 
-// GET /api/v1/users/[username] — public profile (auth optional, used for mutual events)
+// GET /api/v1/users/[username] — public profile (auth optional)
 export async function GET(req: NextRequest, { params }: { params: Promise<{ username: string }> }) {
   const { username } = await params;
   const u = username?.toLowerCase().trim();
@@ -14,7 +14,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ user
 
   const { data: balance } = await supabase
     .from("balances")
-    .select("user_id, display_name, username, avatar_url")
+    .select("user_id, display_name, username, avatar_url, points")
     .eq("username", u)
     .single();
 
@@ -22,73 +22,71 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ user
 
   const userId = balance.user_id;
 
-  const [{ data: taggedOptions }, { data: entries }] = await Promise.all([
-    supabase
-      .from("bet_options")
-      .select("id, label, bets(id, question, status, winning_option_id, visibility, events(id, name))")
-      .eq("tagged_user_id", userId),
+  // Fetch entries only to compute win_rate — individual bets not exposed publicly
+  const [{ data: entries }, { data: memberships }] = await Promise.all([
     supabase
       .from("bet_entries")
-      .select("id, points_staked, option_id, bet_options(label), bets(id, question, status, winning_option_id, visibility, events(id, name))")
+      .select("option_id, bets(status, winning_option_id, visibility)")
       .eq("user_id", userId)
       .eq("is_anonymous", false)
-      .eq("is_hidden_from_profile", false)
-      .order("created_at", { ascending: false }),
+      .eq("is_hidden_from_profile", false),
+    supabase
+      .from("event_guests")
+      .select("events(id, name, type)")
+      .eq("user_id", userId),
   ]);
 
-  const taggedBets = (taggedOptions ?? [])
-    .filter((o: any) => o.bets?.visibility === "public")
-    .map((o: any) => ({
-      bet_id: o.bets.id,
-      question: o.bets.question,
-      label: o.label,
-      event_id: o.bets.events?.id ?? null,
-      event_name: o.bets.events?.name ?? null,
-      status: o.bets.status,
-      outcome: computeOutcome(o.bets.status, o.bets.winning_option_id, o.id),
-    }));
+  const publicEntries = (entries ?? []).filter((e: any) => e.bets?.visibility === "public");
+  const outcomes = publicEntries.map((e: any) =>
+    computeOutcome(e.bets.status, e.bets.winning_option_id, e.option_id),
+  );
+  const resolved = outcomes.filter((o) => o === "won" || o === "lost");
+  const won = outcomes.filter((o) => o === "won").length;
+  const win_rate = resolved.length > 0 ? Math.round((won / resolved.length) * 100) : null;
 
-  const history = (entries ?? [])
-    .filter((e: any) => e.bets?.visibility === "public")
-    .map((e: any) => ({
-      id: e.id,
-      bet_id: e.bets.id,
-      event_id: e.bets.events?.id ?? null,
-      event_name: e.bets.events?.name ?? null,
-      question: e.bets.question,
-      pick: e.bet_options?.label,
-      points_staked: e.points_staked,
-      outcome: computeOutcome(e.bets.status, e.bets.winning_option_id, e.option_id),
-    }));
-
-  const resolved = history.filter((h) => h.outcome === "won" || h.outcome === "lost");
-  const stats = {
-    total: history.length,
-    won: history.filter((h) => h.outcome === "won").length,
-    lost: history.filter((h) => h.outcome === "lost").length,
-    pending: history.filter((h) => h.outcome === "pending").length,
-    win_rate: resolved.length > 0
-      ? Math.round((history.filter((h) => h.outcome === "won").length / resolved.length) * 100)
-      : null,
-  };
+  const profileEventIds = new Set(
+    (memberships ?? []).map((m: any) => m.events?.id).filter(Boolean),
+  );
+  const profileEventsById = new Map(
+    (memberships ?? [])
+      .map((m: any) => m.events)
+      .filter(Boolean)
+      .map((e: any) => [e.id, { id: e.id, name: e.name, type: e.type }]),
+  );
 
   let mutual_events: { id: string; name: string; type: string }[] = [];
-  if (viewer && viewer.userId !== userId) {
-    const [{ data: myMemberships }, { data: theirMemberships }] = await Promise.all([
-      supabase.from("event_guests").select("event_id").eq("user_id", viewer.userId),
-      supabase.from("event_guests").select("event_id").eq("user_id", userId),
-    ]);
-    const myIds = new Set((myMemberships ?? []).map((r: any) => r.event_id));
-    const sharedIds = (theirMemberships ?? [])
-      .map((r: any) => r.event_id)
-      .filter((id: string) => myIds.has(id));
+  let shared_bets: { bet_id: string; question: string; event_id: string | null; event_name: string | null; status: string }[] = [];
 
-    if (sharedIds.length > 0) {
-      const { data: sharedEvents } = await supabase
-        .from("events")
-        .select("id, name, type")
-        .in("id", sharedIds);
-      mutual_events = (sharedEvents ?? []).map((e: any) => ({ id: e.id, name: e.name, type: e.type }));
+  if (viewer && viewer.userId !== userId) {
+    const [{ data: viewerMemberships }, { data: viewerEntries }] = await Promise.all([
+      supabase.from("event_guests").select("event_id").eq("user_id", viewer.userId),
+      supabase.from("bet_entries").select("bet_id").eq("user_id", viewer.userId).eq("is_anonymous", false),
+    ]);
+
+    mutual_events = (viewerMemberships ?? [])
+      .map((r: any) => r.event_id)
+      .filter((id: string) => profileEventIds.has(id))
+      .map((id: string) => profileEventsById.get(id))
+      .filter(Boolean) as { id: string; name: string; type: string }[];
+
+    const viewerBetIds = (viewerEntries ?? []).map((e: any) => e.bet_id);
+    if (viewerBetIds.length > 0) {
+      const { data: profileEntries } = await supabase
+        .from("bet_entries")
+        .select("bet_id, bets(id, question, status, visibility, events(id, name))")
+        .eq("user_id", userId)
+        .eq("is_anonymous", false)
+        .in("bet_id", viewerBetIds);
+
+      shared_bets = (profileEntries ?? [])
+        .filter((e: any) => e.bets?.visibility === "public")
+        .map((e: any) => ({
+          bet_id: e.bets.id,
+          question: e.bets.question,
+          event_id: e.bets.events?.id ?? null,
+          event_name: e.bets.events?.name ?? null,
+          status: e.bets.status,
+        }));
     }
   }
 
@@ -98,10 +96,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ user
       display_name: balance.display_name ?? null,
       username: balance.username,
       avatar_url: balance.avatar_url ?? null,
+      points: balance.points ?? 0,
     },
-    tagged_bets: taggedBets,
-    history,
-    stats,
+    win_rate,
     mutual_events,
+    shared_bets,
   });
 }
