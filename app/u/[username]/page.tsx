@@ -13,7 +13,6 @@ type Profile = {
 };
 
 type EventItem = { id: string; name: string; type: string };
-type SharedBet = { bet_id: string; question: string; event_id: string | null; event_name: string | null; status: string };
 
 export default function PublicProfilePage() {
   const params = useParams();
@@ -24,7 +23,6 @@ export default function PublicProfilePage() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [winRate, setWinRate] = useState<number | null>(null);
   const [mutualEvents, setMutualEvents] = useState<EventItem[]>([]);
-  const [sharedBets, setSharedBets] = useState<SharedBet[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
@@ -44,7 +42,6 @@ export default function PublicProfilePage() {
         setProfile(data.user);
         setWinRate(data.win_rate ?? null);
         setMutualEvents(data.mutual_events ?? []);
-        setSharedBets(data.shared_bets ?? []);
         setLoading(false);
       })
       .catch(() => { setNotFound(true); setLoading(false); });
@@ -63,7 +60,7 @@ export default function PublicProfilePage() {
   }
 
   const name = profile?.display_name ?? profile?.username ?? "unknown";
-  const isMutual = sharedBets.length > 0 || mutualEvents.length > 0;
+  const isMutual = mutualEvents.length > 0;
 
   return (
     <div className="min-h-screen" style={{ background: "var(--bg)", color: "var(--text)" }}>
@@ -126,40 +123,6 @@ export default function PublicProfilePage() {
           </div>
         </div>
 
-        {/* Bets in common */}
-        {sharedBets.length > 0 && (
-          <>
-            <p className="text-[11px] font-bold uppercase tracking-wider px-1 pt-2" style={{ color: "var(--dimmer)" }}>
-              bets in common
-            </p>
-            <div className="flex flex-col gap-2">
-              {sharedBets.map((bet) => (
-                <button
-                  key={bet.bet_id}
-                  onClick={() => bet.event_id && router.push(`/e/${bet.event_id}`)}
-                  className="w-full flex items-start justify-between px-4 py-3 rounded-2xl text-left gap-3"
-                  style={{ background: "var(--accent-dim)", border: "1px solid var(--accent-border)" }}
-                >
-                  <div className="flex flex-col gap-0.5 flex-1 min-w-0">
-                    <p className="text-[13px] font-bold leading-snug">{bet.question}</p>
-                    {bet.event_name && (
-                      <p className="text-[11px]" style={{ color: "var(--muted)" }}>{bet.event_name}</p>
-                    )}
-                  </div>
-                  {bet.status !== "open" && (
-                    <span
-                      className="text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 mt-0.5"
-                      style={{ background: "rgba(255,255,255,0.06)", color: "var(--muted)" }}
-                    >
-                      {bet.status}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-          </>
-        )}
-
         {/* Mutual events / groups */}
         {mutualEvents.length > 0 && (
           <>
@@ -193,8 +156,8 @@ export default function PublicProfilePage() {
           </>
         )}
 
-        {mutualEvents.length === 0 && sharedBets.length === 0 && (
-          <p className="text-center py-8 text-[14px]" style={{ color: "var(--dimmer)" }}>no public activity yet</p>
+        {mutualEvents.length === 0 && (
+          <p className="text-center py-8 text-[14px]" style={{ color: "var(--dimmer)" }}>no events in common</p>
         )}
       </div>
     </div>

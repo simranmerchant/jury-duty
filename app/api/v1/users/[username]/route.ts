@@ -55,39 +55,18 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ user
   );
 
   let mutual_events: { id: string; name: string; type: string }[] = [];
-  let shared_bets: { bet_id: string; question: string; event_id: string | null; event_name: string | null; status: string }[] = [];
 
   if (viewer && viewer.userId !== userId) {
-    const [{ data: viewerMemberships }, { data: viewerEntries }] = await Promise.all([
-      supabase.from("event_guests").select("event_id").eq("user_id", viewer.userId),
-      supabase.from("bet_entries").select("bet_id").eq("user_id", viewer.userId).eq("is_anonymous", false),
-    ]);
+    const { data: viewerMemberships } = await supabase
+      .from("event_guests")
+      .select("event_id")
+      .eq("user_id", viewer.userId);
 
     mutual_events = (viewerMemberships ?? [])
       .map((r: any) => r.event_id)
       .filter((id: string) => profileEventIds.has(id))
       .map((id: string) => profileEventsById.get(id))
       .filter(Boolean) as { id: string; name: string; type: string }[];
-
-    const viewerBetIds = (viewerEntries ?? []).map((e: any) => e.bet_id);
-    if (viewerBetIds.length > 0) {
-      const { data: profileEntries } = await supabase
-        .from("bet_entries")
-        .select("bet_id, bets(id, question, status, visibility, events(id, name))")
-        .eq("user_id", userId)
-        .eq("is_anonymous", false)
-        .in("bet_id", viewerBetIds);
-
-      shared_bets = (profileEntries ?? [])
-        .filter((e: any) => e.bets?.visibility === "public")
-        .map((e: any) => ({
-          bet_id: e.bets.id,
-          question: e.bets.question,
-          event_id: e.bets.events?.id ?? null,
-          event_name: e.bets.events?.name ?? null,
-          status: e.bets.status,
-        }));
-    }
   }
 
   return NextResponse.json({
@@ -100,6 +79,5 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ user
     },
     win_rate,
     mutual_events,
-    shared_bets,
   });
 }
