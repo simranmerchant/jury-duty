@@ -922,7 +922,7 @@ function BetCard({
                         {opt.balances?.display_name?.[0]?.toUpperCase() ?? opt.label[0]?.toUpperCase() ?? "?"}
                       </div>
                       <span className="text-[14px] font-bold truncate">
-                        {opt.balances?.display_name ?? opt.label}
+                        {opt.balances?.username ? `@${opt.balances.username}` : (opt.balances?.display_name ?? opt.label)}
                       </span>
                       {isWinner && <span className="text-[11px] font-bold flex-shrink-0" style={{ color: "var(--win)" }}>won</span>}
                       {bet.creator_id === userId && isOpen && !resolving && (
