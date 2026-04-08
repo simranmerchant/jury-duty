@@ -27,7 +27,7 @@ export default function PeoplePage() {
   }, [ready, authenticated, router]);
 
   const search = useCallback(async (q: string) => {
-    if (q.length < 2) { setResults([]); setSearched(false); return; }
+    if (q.length < 1) { setResults([]); setSearched(false); return; }
     setLoading(true);
     setSearched(true);
     const token = await getAccessToken();
