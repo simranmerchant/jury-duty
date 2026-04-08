@@ -295,7 +295,7 @@ export default function NewBetPage() {
                       {opt.tagged_display_name?.[0]?.toUpperCase() ?? "?"}
                     </div>
                     <span className="flex-1 min-w-0 text-[15px] font-bold truncate" style={{ color: "var(--accent)" }}>
-                      {opt.tagged_display_name ?? opt.label}
+                      {opt.tagged_username ? `@${opt.tagged_username}` : (opt.tagged_display_name ?? opt.label)}
                     </span>
                     <button
                       onClick={() => untagOption(i)}
