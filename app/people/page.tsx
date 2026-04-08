@@ -69,7 +69,10 @@ export default function PeoplePage() {
           className="flex items-center gap-2 rounded-2xl px-4"
           style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-soft)" }}
         >
-          <span className="text-[16px]" style={{ color: "var(--dimmer)" }}>🔍</span>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ color: "var(--dimmer)", flexShrink: 0 }}>
+            <circle cx="6.5" cy="6.5" r="5" stroke="currentColor" strokeWidth="1.5"/>
+            <path d="M10.5 10.5L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+          </svg>
           <input
             className="flex-1 py-3.5 text-[15px] outline-none bg-transparent"
             style={{ color: "var(--text)" }}
