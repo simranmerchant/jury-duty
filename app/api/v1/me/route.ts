@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
     supabase
       .from("bet_entries")
       .select(`
-        id, points_staked, option_id, is_hidden_from_profile,
+        id, points_staked, option_id, is_hidden_from_profile, is_anonymous,
         bet_options(label),
         bets(
           id, question, status, winning_option_id,
@@ -43,7 +43,8 @@ export async function GET(req: NextRequest) {
       pick: e.bet_options?.label,
       points_staked: e.points_staked,
       outcome: computeOutcome(bet.status, bet.winning_option_id, e.option_id),
-      is_hidden_from_profile: e.is_hidden_from_profile ?? false,
+      is_hidden_from_profile: (e.is_hidden_from_profile || e.is_anonymous) ?? false,
+      is_anonymous: e.is_anonymous ?? false,
     };
   });
 

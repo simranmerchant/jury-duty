@@ -16,6 +16,7 @@ type HistoryEntry = {
   points_staked: number;
   outcome: "pending" | "won" | "lost" | "refunded";
   is_hidden_from_profile: boolean;
+  is_anonymous: boolean;
 };
 type Stats = { total: number; won: number; lost: number; pending: number };
 
@@ -177,6 +178,14 @@ export default function ProfilePage() {
           <div className="absolute inset-0 rounded-full flex items-center justify-center" style={{ background: uploadingAvatar ? "rgba(0,0,0,0.5)" : "rgba(0,0,0,0)" }}>
             {uploadingAvatar && <span className="text-white text-[11px] font-bold">uploading...</span>}
           </div>
+          {!uploadingAvatar && (
+            <div className="absolute bottom-0 right-0 w-6 h-6 rounded-full flex items-center justify-center" style={{ background: "var(--card)", border: "2px solid var(--bg)" }}>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--muted)" }}>
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                <circle cx="12" cy="13" r="4"/>
+              </svg>
+            </div>
+          )}
           <input type="file" accept="image/*" className="hidden" onChange={uploadAvatar} disabled={uploadingAvatar} />
         </label>
 
@@ -258,7 +267,7 @@ export default function ProfilePage() {
           className="rounded-3xl p-6 flex flex-col gap-1"
           style={{ background: "var(--card)", border: "1px solid var(--border-soft)" }}
         >
-          <p className="text-[12px] font-bold uppercase tracking-wider" style={{ color: "var(--muted)" }}>
+          <p className="text-[12px] font-semibold" style={{ color: "var(--muted)" }}>
             your balance
           </p>
           <p
@@ -301,7 +310,7 @@ export default function ProfilePage() {
         {history.length > 0 && (
           <>
             <p
-              className="text-[11px] font-bold uppercase tracking-wider px-1 pt-2"
+              className="text-[12px] font-semibold px-1 pt-2"
               style={{ color: "var(--dimmer)" }}
             >
               bet history
@@ -346,14 +355,19 @@ export default function ProfilePage() {
                       >
                         {style.label}
                       </span>
-                      <button
-                        onClick={toggleHidden}
-                        className="text-[13px] px-2 py-1 rounded-full font-bold"
-                        style={{ background: "rgba(255,255,255,0.05)", color: "var(--dimmer)" }}
-                        title={hidden ? "show on profile" : "hide from profile"}
-                      >
-                        {hidden ? "show" : "hide"}
-                      </button>
+                      {hidden && (
+                        <div
+                          onClick={entry.is_anonymous ? undefined : toggleHidden}
+                          className="w-7 h-7 rounded-full flex items-center justify-center"
+                          style={{ background: "rgba(255,255,255,0.05)", color: "var(--dimmer)", cursor: entry.is_anonymous ? "default" : "pointer" }}
+                        >
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                            <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                            <line x1="1" y1="1" x2="23" y2="23"/>
+                          </svg>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );

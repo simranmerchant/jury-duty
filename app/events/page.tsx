@@ -110,61 +110,46 @@ export default function EventsPage() {
   const activeEvents = activeEventsList.length;
 
   function EventCard({ event }: { event: Event }) {
-    const publicBets = event.bets?.filter((b) => b.visibility === "public").length ?? 0;
-    const privateBets = event.bets?.filter((b) => b.visibility === "private").length ?? 0;
+    const totalBets = event.bets?.length ?? 0;
     const isGroup = event.type === "group";
     const isPast = !isGroup && event.ends_at && new Date(event.ends_at) < new Date();
     return (
       <button
         onClick={() => router.push(`/e/${event.id}`)}
-        className="w-full text-left rounded-3xl overflow-hidden"
+        className="w-full text-left rounded-2xl overflow-hidden"
         style={{
-          background: isGroup ? "rgba(147,51,234,0.06)" : "var(--card)",
+          background: "var(--card)",
           border: `1px solid ${isGroup ? "var(--purple-border)" : "var(--border-soft)"}`,
-          opacity: isPast ? 0.45 : 1,
+          opacity: isPast ? 0.4 : 1,
         }}
       >
         {event.cover_url && (
-          <div className="relative w-full" style={{ height: 110 }}>
+          <div className="relative w-full" style={{ height: 130 }}>
             <img src={event.cover_url} alt="" className="w-full h-full object-cover" />
-            <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.4) 100%)" }} />
+            <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, transparent 40%, rgba(0,0,0,0.55) 100%)" }} />
           </div>
         )}
-        <div className="p-5">
-          <div className="flex items-start justify-between gap-2 mb-2">
-            <div className="font-extrabold text-[17px] leading-snug flex-1 flex items-center gap-2" style={{ fontFamily: "var(--font-nunito)" }}>
-              {event.name}
+        <div className="px-4 py-4 flex items-center justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <p className="font-bold text-[16px] leading-tight truncate" style={{ fontFamily: "var(--font-nunito)" }}>
+                {event.name}
+              </p>
               {event.hasNew && !isPast && (
-                <span className="w-2 h-2 rounded-full flex-shrink-0 inline-block" style={{ background: "var(--accent)" }} />
+                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: "var(--accent)" }} />
               )}
             </div>
-            {isGroup ? (
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 mt-0.5" style={{ background: "var(--purple-dim)", color: "var(--purple)", border: "1px solid var(--purple-border)" }}>
-                ongoing
-              </span>
-            ) : event.ends_at && !isPast ? (
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 mt-0.5" style={{ background: "var(--accent-dim)", color: "var(--accent)", border: "1px solid var(--accent-border)" }}>
-                {new Date(event.ends_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-              </span>
-            ) : null}
+            <p className="text-[12px] mt-0.5" style={{ color: "var(--dimmer)" }}>
+              {isGroup ? "group" : isPast ? "ended" : event.ends_at
+                ? new Date(event.ends_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+                : ""
+              }
+              {totalBets > 0 ? ` · ${totalBets} bet${totalBets !== 1 ? "s" : ""}` : " · no bets yet"}
+            </p>
           </div>
-          <div className="flex gap-2 flex-wrap">
-            {publicBets > 0 && (
-              <span className="text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: "rgba(255,255,255,0.06)", color: "var(--muted)" }}>
-                {publicBets} public {publicBets === 1 ? "bet" : "bets"}
-              </span>
-            )}
-            {privateBets > 0 && (
-              <span className="text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: "var(--purple-dim)", color: "var(--purple)", border: "1px solid var(--purple-border)" }}>
-                {privateBets} private
-              </span>
-            )}
-            {publicBets === 0 && privateBets === 0 && (
-              <span className="text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: "rgba(255,255,255,0.05)", color: "var(--dimmer)" }}>
-                no bets yet
-              </span>
-            )}
-          </div>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--dimmer)", flexShrink: 0 }}>
+            <path d="M9 18l6-6-6-6" />
+          </svg>
         </div>
       </button>
     );
@@ -172,57 +157,47 @@ export default function EventsPage() {
 
   return (
     <div className="min-h-screen" style={{ background: "var(--bg)", color: "var(--text)" }}>
-      <div className="px-5 pt-14 pb-2 flex items-start justify-between">
-        <div>
-          <h1 className="text-[32px] font-black tracking-tight" style={{ fontFamily: "var(--font-nunito)" }}>
-            jury<span style={{ color: "var(--accent)" }}>duty</span>
-          </h1>
-          <p className="text-sm mt-0.5" style={{ color: "var(--dimmer)" }}>
-            {groups.length > 0 ? `${groups.length} group${groups.length !== 1 ? "s" : ""} · ` : ""}{activeEvents} active event{activeEvents !== 1 ? "s" : ""}
-          </p>
-        </div>
-        <div className="flex items-center gap-3 mt-1">
-        <button onClick={() => router.push("/people")} className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "var(--card)", border: "1px solid var(--border-soft)" }}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--muted)" }}>
-            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-            <circle cx="9" cy="7" r="4" />
-            <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-          </svg>
-        </button>
-        <button onClick={openNotifs} className="relative w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "var(--card)", border: "1px solid var(--border-soft)" }}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--muted)" }}>
-            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-            <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-          </svg>
-          {unreadCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 rounded-full flex items-center justify-center text-[10px] font-black text-white px-1" style={{ background: "var(--accent)" }}>
-              {unreadCount > 9 ? "9+" : unreadCount}
-            </span>
-          )}
-        </button>
-        <button onClick={() => router.push("/profile")} className="flex flex-col items-center gap-1">
-          {avatarUrl ? (
-            <img src={avatarUrl} alt="profile" className="w-10 h-10 rounded-full object-cover" />
-          ) : (
-            <div className="w-10 h-10 rounded-full flex items-center justify-center text-[15px] font-black" style={{ background: "var(--accent-dim)", color: "var(--accent)", fontFamily: "var(--font-nunito)" }}>
-              {displayName?.[0]?.toUpperCase() ?? "?"}
-            </div>
-          )}
-          {points !== null && (
-            <span className="text-[11px] font-bold" style={{ color: "var(--dimmer)" }}>
-              {points.toLocaleString()} pts
-            </span>
-          )}
-        </button>
+      <div className="px-5 pt-14 pb-3 flex items-center justify-between">
+        <h1 className="text-[28px] font-black tracking-tight" style={{ fontFamily: "var(--font-nunito)" }}>
+          jury<span style={{ color: "var(--accent)" }}>duty</span>
+        </h1>
+        <div className="flex items-center gap-5">
+          <button onClick={() => router.push("/people")}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--muted)" }}>
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg>
+          </button>
+          <button onClick={openNotifs} className="relative">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--muted)" }}>
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+            </svg>
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1.5 min-w-[16px] h-4 rounded-full flex items-center justify-center text-[10px] font-black text-white px-1" style={{ background: "var(--accent)" }}>
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
+          </button>
+          <button onClick={() => router.push("/profile")}>
+            {avatarUrl ? (
+              <img src={avatarUrl} alt="profile" className="w-8 h-8 rounded-full object-cover" />
+            ) : (
+              <div className="w-8 h-8 rounded-full flex items-center justify-center text-[13px] font-black" style={{ background: "var(--accent-dim)", color: "var(--accent)", fontFamily: "var(--font-nunito)" }}>
+                {displayName?.[0]?.toUpperCase() ?? "?"}
+              </div>
+            )}
+          </button>
         </div>
       </div>
 
-      <div className="px-3 pt-2 pb-32 flex flex-col gap-3">
+      <div className="px-4 pt-1 pb-36 flex flex-col gap-2">
         {/* Groups section */}
         {groups.length > 0 && (
           <>
-            <p className="text-[11px] font-bold uppercase tracking-wider px-2 pt-2" style={{ color: "var(--dimmer)" }}>groups</p>
+            <p className="text-[12px] font-semibold px-1 pt-3 pb-1" style={{ color: "var(--dimmer)" }}>Groups</p>
             {groups.map((g) => <EventCard key={g.id} event={g} />)}
           </>
         )}
@@ -231,34 +206,36 @@ export default function EventsPage() {
         {eventsList.length > 0 && (
           <>
             {groups.length > 0 && (
-              <p className="text-[11px] font-bold uppercase tracking-wider px-2 pt-2" style={{ color: "var(--dimmer)" }}>events</p>
+              <p className="text-[12px] font-semibold px-1 pt-3 pb-1" style={{ color: "var(--dimmer)" }}>Events</p>
             )}
             {eventsList.map((e) => <EventCard key={e.id} event={e} />)}
           </>
         )}
 
         {events.length === 0 && (
-          <p className="text-center py-12 text-[14px]" style={{ color: "var(--dimmer)" }}>no events or groups yet</p>
+          <div className="flex flex-col items-center justify-center py-16 gap-2">
+            <p className="text-[15px] font-semibold" style={{ color: "var(--muted)" }}>nothing here yet</p>
+            <p className="text-[13px]" style={{ color: "var(--dimmer)" }}>create an event or join one with a link</p>
+          </div>
         )}
+      </div>
 
-        <div className="flex gap-2 mt-1">
-          <button
-            onClick={() => setShowCreate(true)}
-            className="flex-1 rounded-2xl px-4 py-3.5 flex items-center gap-2"
-            style={{ border: "1px dashed var(--border)", color: "var(--dimmer)" }}
-          >
-            <span className="w-6 h-6 rounded-full flex items-center justify-center text-base font-bold flex-shrink-0" style={{ background: "var(--accent-dim)", color: "var(--accent)" }}>+</span>
-            <span className="text-sm">new</span>
-          </button>
-          <button
-            onClick={() => setShowJoin(true)}
-            className="flex-1 rounded-2xl px-4 py-3.5 flex items-center gap-2"
-            style={{ border: "1px dashed var(--border)", color: "var(--dimmer)" }}
-          >
-            <span className="w-6 h-6 rounded-full flex items-center justify-center text-base font-bold flex-shrink-0" style={{ background: "rgba(255,255,255,0.06)", color: "var(--muted)" }}>→</span>
-            <span className="text-sm">join</span>
-          </button>
-        </div>
+      {/* Floating action buttons */}
+      <div className="fixed bottom-6 left-0 right-0 flex justify-center gap-3 px-6" style={{ zIndex: 10 }}>
+        <button
+          onClick={() => setShowJoin(true)}
+          className="flex-1 py-3.5 rounded-2xl font-bold text-[15px]"
+          style={{ background: "var(--card)", border: "1px solid var(--border)", color: "var(--muted)" }}
+        >
+          join
+        </button>
+        <button
+          onClick={() => setShowCreate(true)}
+          className="flex-1 py-3.5 rounded-2xl font-bold text-[15px] text-white"
+          style={{ background: "var(--accent)" }}
+        >
+          + new
+        </button>
       </div>
 
       {/* Create modal */}

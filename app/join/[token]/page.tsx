@@ -61,8 +61,8 @@ function JoinPageInner() {
   }
 
   function handleGetStarted() {
-    const betParam = betId ? `?bet=${betId}` : "";
-    router.push(`/login?redirect=/join/${inviteToken}${betParam}`);
+    const destination = betId ? `/join/${inviteToken}?bet=${betId}` : `/join/${inviteToken}`;
+    router.push(`/login?redirect=${encodeURIComponent(destination)}`);
   }
 
   if (notFound) {

@@ -1,12 +1,12 @@
 @import "tailwindcss";
 
 :root {
-  --accent: #ff5e80;
-  --accent-dim: rgba(255, 94, 128, 0.13);
-  --accent-border: rgba(255, 94, 128, 0.30);
-  --purple: #C084FC;
-  --purple-dim: rgba(192, 132, 252, 0.13);
-  --purple-border: rgba(192, 132, 252, 0.30);
+  --accent: #ff8fa3;
+  --accent-dim: rgba(255, 143, 163, 0.13);
+  --accent-border: rgba(255, 143, 163, 0.30);
+  --purple: #d8b4fe;
+  --purple-dim: rgba(216, 180, 254, 0.13);
+  --purple-border: rgba(216, 180, 254, 0.30);
   --bg: #0d0b0e;
   --card: #181520;
   --border: #2a2535;

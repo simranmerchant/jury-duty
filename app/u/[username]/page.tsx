@@ -126,7 +126,7 @@ export default function PublicProfilePage() {
         {/* Mutual events / groups */}
         {mutualEvents.length > 0 && (
           <>
-            <p className="text-[11px] font-bold uppercase tracking-wider px-1 pt-2" style={{ color: "var(--dimmer)" }}>
+            <p className="text-[12px] font-semibold px-1 pt-2" style={{ color: "var(--dimmer)" }}>
               events & groups in common
             </p>
             <div className="flex flex-col gap-2">
@@ -136,20 +136,25 @@ export default function PublicProfilePage() {
                   onClick={() => router.push(`/e/${e.id}`)}
                   className="w-full flex items-center justify-between px-4 py-3 rounded-2xl text-left"
                   style={{
-                    background: e.type === "group" ? "rgba(147,51,234,0.06)" : "var(--card)",
+                    background: e.type === "group" ? "var(--purple-dim)" : "var(--card)",
                     border: `1px solid ${e.type === "group" ? "var(--purple-border)" : "var(--border-soft)"}`,
                   }}
                 >
                   <p className="text-[14px] font-bold">{e.name}</p>
-                  <span
-                    className="text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0"
-                    style={e.type === "group"
-                      ? { background: "var(--purple-dim)", color: "var(--purple)", border: "1px solid var(--purple-border)" }
-                      : { background: "rgba(255,255,255,0.06)", color: "var(--muted)" }
-                    }
-                  >
-                    {e.type}
-                  </span>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span
+                      className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                      style={e.type === "group"
+                        ? { background: "rgba(0,0,0,0.15)", color: "var(--purple)" }
+                        : { background: "rgba(255,255,255,0.06)", color: "var(--muted)" }
+                      }
+                    >
+                      {e.type}
+                    </span>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--dimmer)" }}>
+                      <path d="M9 18l6-6-6-6" />
+                    </svg>
+                  </div>
                 </button>
               ))}
             </div>

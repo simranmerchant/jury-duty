@@ -270,7 +270,7 @@ export default function EventPage() {
           <div className="w-full max-w-lg rounded-t-3xl p-6 flex flex-col gap-4" style={{ background: "var(--card)", border: "1px solid var(--border-soft)" }}>
             <p className="font-extrabold text-[16px]" style={{ fontFamily: "var(--font-nunito)" }}>edit</p>
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--muted)" }}>name</label>
+              <label className="text-[12px] font-semibold" style={{ color: "var(--muted)" }}>name</label>
               <input
                 className="rounded-2xl px-4 py-3 text-[15px] outline-none"
                 style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--accent-border)", color: "var(--text)" }}
@@ -282,7 +282,7 @@ export default function EventPage() {
             </div>
             {!isGroup && (
               <div className="flex flex-col gap-1">
-                <label className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--muted)" }}>closes at</label>
+                <label className="text-[12px] font-semibold" style={{ color: "var(--muted)" }}>closes at</label>
                 <input
                   type="datetime-local"
                   className="rounded-2xl px-4 py-3 text-[15px] outline-none"
@@ -406,7 +406,7 @@ export default function EventPage() {
               className="text-[12px] font-bold px-3 py-1.5 rounded-full"
               style={{ background: "rgba(255,255,255,0.04)", color: "var(--dimmer)", border: "1px solid var(--border-soft)" }}
             >
-              delete event
+              delete {isGroup ? "group" : "event"}
             </button>
           )
         )}
@@ -415,9 +415,6 @@ export default function EventPage() {
 
       {/* Guest list */}
       <div className="px-5 pb-3">
-        <p className="text-[11px] font-bold uppercase tracking-wider mb-2" style={{ color: "var(--dimmer)" }}>
-          guests
-        </p>
         <div className="flex gap-3 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
           {event.event_guests.map((g) => {
               const name = g.balances?.display_name;
@@ -425,12 +422,16 @@ export default function EventPage() {
               const isMe = g.user_id === userId;
               const label = isMe ? "you" : (name ?? "?");
               return (
-                <div key={g.user_id} className="flex flex-col items-center gap-1 flex-shrink-0">
+                <button
+                  key={g.user_id}
+                  onClick={() => g.balances?.username && router.push(`/u/${g.balances.username}`)}
+                  className="flex flex-col items-center gap-1.5 flex-shrink-0"
+                >
                   {avatar ? (
-                    <img src={avatar} alt={label} className="w-9 h-9 rounded-full object-cover" />
+                    <img src={avatar} alt={label} className="w-10 h-10 rounded-full object-cover" />
                   ) : (
                     <div
-                      className="w-9 h-9 rounded-full flex items-center justify-center text-[13px] font-black"
+                      className="w-10 h-10 rounded-full flex items-center justify-center text-[13px] font-black"
                       style={{ background: isMe ? "var(--accent-dim)" : "rgba(255,255,255,0.08)", color: isMe ? "var(--accent)" : "var(--muted)" }}
                     >
                       {label[0]?.toUpperCase() ?? "?"}
@@ -439,16 +440,17 @@ export default function EventPage() {
                   <span className="text-[10px] max-w-[52px] text-center truncate" style={{ color: "var(--muted)" }}>
                     {label}
                   </span>
-                </div>
+                </button>
               );
             })}
-            {/* Add people button */}
-            <button onClick={openAddGuests} className="flex flex-col items-center gap-1 flex-shrink-0">
+            <button onClick={openAddGuests} className="flex flex-col items-center gap-1.5 flex-shrink-0">
               <div
-                className="w-9 h-9 rounded-full flex items-center justify-center text-[18px]"
-                style={{ background: "rgba(255,255,255,0.06)", border: "1px dashed var(--border)", color: "var(--dimmer)" }}
+                className="w-10 h-10 rounded-full flex items-center justify-center"
+                style={{ background: "rgba(255,255,255,0.06)", color: "var(--dimmer)" }}
               >
-                +
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
               </div>
               <span className="text-[10px]" style={{ color: "var(--dimmer)" }}>add</span>
             </button>
@@ -465,7 +467,7 @@ export default function EventPage() {
 
         {openBets.length > 0 && (
           <>
-            <p className="text-[11px] font-bold uppercase tracking-wider px-2 pt-2" style={{ color: "var(--dimmer)" }}>
+            <p className="text-[12px] font-semibold px-2 pt-2" style={{ color: "var(--dimmer)" }}>
               open
             </p>
             {openBets.map((bet) => (
@@ -486,7 +488,7 @@ export default function EventPage() {
 
         {resolvedBets.length > 0 && (
           <>
-            <p className="text-[11px] font-bold uppercase tracking-wider px-2 pt-4" style={{ color: "var(--dimmer)" }}>
+            <p className="text-[12px] font-semibold px-2 pt-4" style={{ color: "var(--dimmer)" }}>
               resolved
             </p>
             {resolvedBets.map((bet) => (
@@ -824,7 +826,10 @@ function BetCard({
           style={{ background: "rgba(24,21,32,0.15)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)" }}
           onClick={() => setRevealed(true)}
         >
-          <span className="text-[20px]">🔒</span>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--muted)" }}>
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
           <span className="text-[12px] font-bold" style={{ color: "var(--muted)" }}>tap to reveal</span>
         </button>
       )}
@@ -841,7 +846,17 @@ function BetCard({
             className="text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 mt-0.5 flex items-center gap-1"
             style={{ background: "var(--purple-dim)", color: "var(--purple)", border: "1px solid var(--purple-border)" }}
           >
-            {revealed ? "🔓" : "🔒"} private
+            {revealed ? (
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                <path d="M7 11V7a5 5 0 0 1 9.9-1"/>
+              </svg>
+            ) : (
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+            )} private
           </button>
         )}
       </div>
@@ -922,7 +937,7 @@ function BetCard({
                         {opt.balances?.display_name?.[0]?.toUpperCase() ?? opt.label[0]?.toUpperCase() ?? "?"}
                       </div>
                       <span className="text-[14px] font-bold truncate">
-                        {opt.balances?.username ? `@${opt.balances.username}` : (opt.balances?.display_name ?? opt.label)}
+                        {opt.balances?.display_name ?? opt.label}
                       </span>
                       {isWinner && <span className="text-[11px] font-bold flex-shrink-0" style={{ color: "var(--win)" }}>won</span>}
                       {bet.creator_id === userId && isOpen && !resolving && (
@@ -948,10 +963,13 @@ function BetCard({
                               setTimeout(() => tagPickerInputRef.current?.focus(), 50);
                             }
                           }}
-                          className="text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 cursor-pointer"
-                          style={{ background: "var(--accent-dim)", color: "var(--accent)", border: "1px solid var(--accent-border)" }}
+                          className="flex-shrink-0 cursor-pointer"
+                          style={{ color: tagPickerOptId === opt.id ? "var(--accent)" : "var(--dimmer)" }}
                         >
-                          @
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                            <circle cx="12" cy="7" r="4" />
+                          </svg>
                         </span>
                       )}
                     </div>
@@ -975,12 +993,20 @@ function BetCard({
                           const anonSelf = e.is_anonymous && isMe;
                           const anonOther = e.is_anonymous && !isMe;
                           return anonOther ? (
-                            <div key={e.id} className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] border border-[var(--card)]" style={{ marginLeft: i === 0 ? 0 : -6, zIndex: pickers.length - i, background: "rgba(255,255,255,0.08)" }}>
-                              👻
+                            <div key={e.id} className="w-5 h-5 rounded-full flex items-center justify-center border border-[var(--card)]" style={{ marginLeft: i === 0 ? 0 : -6, zIndex: pickers.length - i, background: "rgba(255,255,255,0.08)" }}>
+                              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--muted)" }}>
+                                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                                <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                                <line x1="1" y1="1" x2="23" y2="23"/>
+                              </svg>
                             </div>
                           ) : anonSelf ? (
-                            <div key={e.id} className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] border border-[var(--card)]" style={{ marginLeft: i === 0 ? 0 : -6, zIndex: pickers.length - i, background: "var(--accent-dim)" }}>
-                              🫣
+                            <div key={e.id} className="w-5 h-5 rounded-full flex items-center justify-center border border-[var(--card)]" style={{ marginLeft: i === 0 ? 0 : -6, zIndex: pickers.length - i, background: "var(--accent-dim)" }}>
+                              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--accent)" }}>
+                                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                                <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                                <line x1="1" y1="1" x2="23" y2="23"/>
+                              </svg>
                             </div>
                           ) : avatar ? (
                             <img key={e.id} src={avatar} alt={name ?? ""} className="w-5 h-5 rounded-full object-cover border border-[var(--card)]" style={{ marginLeft: i === 0 ? 0 : -6, zIndex: pickers.length - i }} />
@@ -1088,7 +1114,12 @@ function BetCard({
               color: isAnonymous ? "var(--text)" : "var(--dimmer)",
             }}
           >
-            👻 {isAnonymous ? "ghost mode on" : "bet anonymously"}
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+              <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+              <line x1="1" y1="1" x2="23" y2="23"/>
+            </svg>
+            {isAnonymous ? "ghost mode on" : "bet anonymously"}
           </button>
         </div>
       )}

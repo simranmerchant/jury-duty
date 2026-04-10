@@ -221,7 +221,7 @@ export default function NewBetPage() {
       <div className="px-5 pt-4 pb-32 flex flex-col gap-6">
         {/* Question */}
         <div className="flex flex-col gap-1.5">
-          <label className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--muted)" }}>
+          <label className="text-[12px] font-semibold" style={{ color: "var(--muted)" }}>
             question
           </label>
           <div className="relative">
@@ -277,7 +277,7 @@ export default function NewBetPage() {
 
         {/* Options */}
         <div className="flex flex-col gap-1.5">
-          <label className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--muted)" }}>
+          <label className="text-[12px] font-semibold" style={{ color: "var(--muted)" }}>
             options
           </label>
           <div className="flex flex-col gap-2">
@@ -295,7 +295,7 @@ export default function NewBetPage() {
                       {opt.tagged_display_name?.[0]?.toUpperCase() ?? "?"}
                     </div>
                     <span className="flex-1 min-w-0 text-[15px] font-bold truncate" style={{ color: "var(--accent)" }}>
-                      {opt.tagged_username ? `@${opt.tagged_username}` : (opt.tagged_display_name ?? opt.label)}
+                      {opt.tagged_display_name ?? opt.label}
                     </span>
                     <button
                       onClick={() => untagOption(i)}
@@ -332,14 +332,17 @@ export default function NewBetPage() {
                             setTimeout(() => tagPickerInputRef.current?.focus(), 50);
                           }
                         }}
-                        className="px-3 py-3 text-[13px] font-bold flex-shrink-0"
+                        className="px-3 py-3 flex items-center justify-center flex-shrink-0"
                         style={{
                           borderLeft: "1px solid var(--border-soft)",
                           color: tagPickerIdx === i ? "var(--accent)" : "var(--dimmer)",
                           background: tagPickerIdx === i ? "var(--accent-dim)" : "transparent",
                         }}
                       >
-                        @
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                          <circle cx="12" cy="7" r="4" />
+                        </svg>
                       </button>
                     )}
                   </div>
@@ -416,7 +419,7 @@ export default function NewBetPage() {
         {/* Deadline — groups only */}
         {isGroup && (
           <div className="flex flex-col gap-1.5">
-            <label className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--muted)" }}>
+            <label className="text-[12px] font-semibold" style={{ color: "var(--muted)" }}>
               bet closes at
             </label>
             <input
@@ -432,7 +435,7 @@ export default function NewBetPage() {
 
         {/* Visibility */}
         <div className="flex flex-col gap-1.5">
-          <label className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--muted)" }}>
+          <label className="text-[12px] font-semibold" style={{ color: "var(--muted)" }}>
             who can see this
           </label>
           <div className="flex gap-2">
