@@ -268,7 +268,7 @@ export default function EventsPage() {
             </p>
 
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--muted)" }}>Name</label>
+              <label className="text-[12px] font-semibold" style={{ color: "var(--muted)" }}>Name</label>
               <input
                 className="rounded-2xl px-4 py-3 text-[15px] outline-none"
                 style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--accent-border)", color: "var(--text)" }}
@@ -281,7 +281,7 @@ export default function EventsPage() {
 
             {createType === "event" && (
               <div className="flex flex-col gap-1">
-                <label className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--muted)" }}>Closes at</label>
+                <label className="text-[12px] font-semibold" style={{ color: "var(--muted)" }}>Closes at</label>
                 <input
                   type="datetime-local"
                   className="rounded-2xl px-4 py-3 text-[15px] outline-none"
@@ -320,7 +320,7 @@ export default function EventsPage() {
             <div className="w-9 h-1 rounded-full mx-auto mb-1" style={{ background: "var(--border)" }} />
             <h2 className="text-xl font-black" style={{ fontFamily: "var(--font-nunito)" }}>Join</h2>
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--muted)" }}>Paste invite link</label>
+              <label className="text-[12px] font-semibold" style={{ color: "var(--muted)" }}>Paste invite link</label>
               <input
                 className="rounded-2xl px-4 py-3 text-[15px] outline-none"
                 style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--accent-border)", color: "var(--text)" }}
