@@ -238,41 +238,54 @@ export default function EventsPage() {
         </button>
       </div>
 
-      {/* Create modal */}
+      {/* Create modal — full screen */}
       {showCreate && (
-        <div className="fixed inset-0 z-50 flex flex-col justify-end" style={{ background: "rgba(0,0,0,0.6)" }}>
-          <div className="rounded-t-3xl p-6 flex flex-col gap-4" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
-            <div className="w-9 h-1 rounded-full mx-auto mb-1" style={{ background: "var(--border)" }} />
+        <div className="fixed inset-0 z-50 flex flex-col overflow-y-auto" style={{ background: "var(--bg)", color: "var(--text)" }}>
+          <div className="px-5 pt-14 pb-2">
+            <button
+              onClick={() => { setShowCreate(false); setCreateType("event"); setCreateError(null); setName(""); setEndsAt(""); }}
+              className="text-sm mb-5 flex items-center gap-1"
+              style={{ color: "var(--muted)" }}
+            >
+              ← back
+            </button>
+            <h1 className="text-[28px] font-black tracking-tight" style={{ fontFamily: "var(--font-nunito)" }}>
+              new {createType}
+            </h1>
+          </div>
 
+          <div className="px-5 pt-4 pb-32 flex flex-col gap-6">
             {/* Type toggle */}
-            <div className="flex gap-2">
-              {(["event", "group"] as const).map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setCreateType(t)}
-                  className="flex-1 py-2.5 rounded-2xl font-bold text-[14px]"
-                  style={{
-                    background: createType === t ? "var(--accent-dim)" : "rgba(255,255,255,0.04)",
-                    border: `1px solid ${createType === t ? "var(--accent-border)" : "var(--border-soft)"}`,
-                    color: createType === t ? "var(--accent)" : "var(--muted)",
-                  }}
-                >
-                  {t === "event" ? "event" : "group"}
-                </button>
-              ))}
+            <div className="flex flex-col gap-2">
+              <div className="flex gap-2">
+                {(["event", "group"] as const).map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setCreateType(t)}
+                    className="flex-1 py-2.5 rounded-2xl font-bold text-[14px]"
+                    style={{
+                      background: createType === t ? "var(--accent-dim)" : "rgba(255,255,255,0.04)",
+                      border: `1px solid ${createType === t ? "var(--accent-border)" : "var(--border-soft)"}`,
+                      color: createType === t ? "var(--accent)" : "var(--muted)",
+                    }}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[12px]" style={{ color: "var(--dimmer)" }}>
+                {createType === "event"
+                  ? "time-boxed — bets close when the event ends"
+                  : "ongoing — each bet has its own deadline"}
+              </p>
             </div>
-            <p className="text-[12px] -mt-1" style={{ color: "var(--dimmer)" }}>
-              {createType === "event"
-                ? "time-boxed — bets close when the event ends"
-                : "ongoing — each bet has its own deadline"}
-            </p>
 
-            <div className="flex flex-col gap-1">
-              <label className="text-[12px] font-semibold" style={{ color: "var(--muted)" }}>Name</label>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[12px] font-semibold" style={{ color: "var(--muted)" }}>name</label>
               <input
                 className="rounded-2xl px-4 py-3 text-[15px] outline-none"
                 style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--accent-border)", color: "var(--text)" }}
-                placeholder={createType === "event" ? "Ava's Birthday 🎂" : "The Squad"}
+                placeholder={createType === "event" ? "Ava's Birthday" : "The Squad"}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 autoFocus
@@ -280,8 +293,8 @@ export default function EventsPage() {
             </div>
 
             {createType === "event" && (
-              <div className="flex flex-col gap-1">
-                <label className="text-[12px] font-semibold" style={{ color: "var(--muted)" }}>Closes at</label>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[12px] font-semibold" style={{ color: "var(--muted)" }}>closes at</label>
                 <input
                   type="datetime-local"
                   className="rounded-2xl px-4 py-3 text-[15px] outline-none"
@@ -296,19 +309,15 @@ export default function EventsPage() {
             {createError && (
               <p className="text-[13px] font-bold" style={{ color: "var(--accent)" }}>{createError}</p>
             )}
-            <div className="flex gap-3 mt-1">
-              <button onClick={() => { setShowCreate(false); setCreateType("event"); setCreateError(null); }} className="flex-1 py-3.5 rounded-2xl font-bold text-[15px]" style={{ background: "rgba(255,255,255,0.06)", color: "var(--muted)" }}>
-                Cancel
-              </button>
-              <button
-                onClick={createEvent}
-                disabled={creating || !name.trim() || (createType === "event" && !endsAt)}
-                className="flex-1 py-3.5 rounded-2xl font-bold text-[15px] text-white disabled:opacity-40"
-                style={{ background: "var(--accent)", fontFamily: "var(--font-nunito)" }}
-              >
-                {creating ? "Creating..." : `Create ${createType}`}
-              </button>
-            </div>
+
+            <button
+              onClick={createEvent}
+              disabled={creating || !name.trim() || (createType === "event" && !endsAt)}
+              className="w-full py-4 rounded-2xl font-black text-[16px] text-white disabled:opacity-40"
+              style={{ background: "var(--accent)", fontFamily: "var(--font-nunito)" }}
+            >
+              {creating ? "creating..." : `create ${createType}`}
+            </button>
           </div>
         </div>
       )}
