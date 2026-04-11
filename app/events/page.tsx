@@ -27,7 +27,7 @@ export default function EventsPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [showJoin, setShowJoin] = useState(false);
   const [showNotifs, setShowNotifs] = useState(false);
-  const [notifications, setNotifications] = useState<{ id: string; type: string; title: string; body: string; read: boolean; created_at: string }[]>([]);
+  const [notifications, setNotifications] = useState<{ id: string; type: string; title: string; body: string; read: boolean; created_at: string; data: { bet_id?: string; event_id?: string; outcome?: string } | null }[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [joinInput, setJoinInput] = useState("");
   const [name, setName] = useState("");
@@ -375,21 +375,49 @@ export default function EventsPage() {
                 <p className="text-center py-12 text-[14px]" style={{ color: "var(--dimmer)" }}>no notifications yet</p>
               ) : (
                 <div className="flex flex-col divide-y" style={{ borderColor: "var(--border-soft)" }}>
-                  {notifications.map((n) => (
-                    <div key={n.id} className="px-6 py-4 flex gap-3 items-start" style={{ opacity: n.read ? 0.6 : 1 }}>
-                      <span className="text-[22px] flex-shrink-0 mt-0.5">
-                        {n.type === "bet_resolved_won" ? "🎉" : n.type === "bet_resolved_lost" ? "😬" : n.type === "bet_resolved_refunded" ? "↩️" : n.type === "points_earned" ? "🪙" : "⏰"}
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-bold text-[14px] leading-snug">{n.title}</p>
-                        <p className="text-[13px] mt-0.5 leading-snug" style={{ color: "var(--muted)" }}>{n.body}</p>
-                        <p className="text-[11px] mt-1" style={{ color: "var(--dimmer)" }}>
-                          {new Date(n.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
-                        </p>
-                      </div>
-                      {!n.read && <div className="w-2 h-2 rounded-full flex-shrink-0 mt-1.5" style={{ background: "var(--accent)" }} />}
-                    </div>
-                  ))}
+                  {notifications.map((n) => {
+                    const eventId = n.data?.event_id;
+                    const href = eventId ? `/e/${eventId}` : null;
+                    const iconConfig = (() => {
+                      if (n.type === "bet_resolved_won") return { bg: "rgba(52,199,89,0.15)", border: "rgba(52,199,89,0.3)", color: "#34c759", icon: <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#34c759" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> };
+                      if (n.type === "bet_resolved_lost") return { bg: "rgba(255,143,163,0.15)", border: "rgba(255,143,163,0.3)", color: "var(--accent)", icon: <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg> };
+                      if (n.type === "bet_resolved_refunded") return { bg: "rgba(180,180,200,0.15)", border: "rgba(180,180,200,0.3)", color: "var(--muted)", icon: <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg> };
+                      if (n.type === "points_earned") return { bg: "rgba(255,214,0,0.15)", border: "rgba(255,214,0,0.3)", color: "#f5a623", icon: <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#f5a623" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> };
+                      return { bg: "rgba(216,180,254,0.15)", border: "rgba(216,180,254,0.3)", color: "var(--purple,#d8b4fe)", icon: <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="var(--purple,#d8b4fe)" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg> };
+                    })();
+                    const timeAgo = (() => {
+                      const diff = Date.now() - new Date(n.created_at).getTime();
+                      const mins = Math.floor(diff / 60000);
+                      if (mins < 1) return "just now";
+                      if (mins < 60) return `${mins}m ago`;
+                      const hrs = Math.floor(mins / 60);
+                      if (hrs < 24) return `${hrs}h ago`;
+                      const days = Math.floor(hrs / 24);
+                      if (days < 7) return `${days}d ago`;
+                      return new Date(n.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                    })();
+                    const Row = href ? "a" : "div";
+                    return (
+                      <Row
+                        key={n.id}
+                        {...(href ? { href, onClick: () => setShowNotifs(false) } : {})}
+                        className="px-6 py-4 flex gap-3 items-start"
+                        style={{ opacity: n.read ? 0.6 : 1, cursor: href ? "pointer" : "default", textDecoration: "none", color: "inherit", display: "flex" }}
+                      >
+                        <div className="flex-shrink-0 mt-0.5 flex items-center justify-center rounded-full" style={{ width: 36, height: 36, background: iconConfig.bg, border: `1px solid ${iconConfig.border}` }}>
+                          {iconConfig.icon}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="font-bold text-[14px] leading-snug">{n.title}</p>
+                            <p className="text-[11px] flex-shrink-0 mt-0.5" style={{ color: "var(--dimmer)" }}>{timeAgo}</p>
+                          </div>
+                          <p className="text-[13px] mt-0.5 leading-snug" style={{ color: "var(--muted)" }}>{n.body}</p>
+                        </div>
+                        {!n.read && <div className="w-2 h-2 rounded-full flex-shrink-0 mt-1.5" style={{ background: "var(--accent)" }} />}
+                      </Row>
+                    );
+                  })}
                 </div>
               )}
             </div>

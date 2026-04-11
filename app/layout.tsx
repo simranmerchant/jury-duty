@@ -19,6 +19,17 @@ const dmSans = DM_Sans({
 export const metadata: Metadata = {
   title: "jury duty",
   description: "you've been summoned.",
+  openGraph: {
+    title: "jury duty",
+    description: "you've been summoned.",
+    type: "website",
+    siteName: "jury duty",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "jury duty",
+    description: "you've been summoned.",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
