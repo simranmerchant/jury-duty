@@ -79,12 +79,7 @@ export default function InstallPrompt() {
       >
         {/* Header */}
         <div className="flex items-center gap-4 px-5 pt-5 pb-4" style={{ borderBottom: "1px solid var(--border-soft)" }}>
-          <div
-            className="w-14 h-14 rounded-2xl flex items-center justify-center font-black text-white text-[20px] flex-shrink-0"
-            style={{ background: "linear-gradient(135deg, var(--accent), #d8b4fe)", fontFamily: "var(--font-nunito)" }}
-          >
-            JD
-          </div>
+          <img src="/icon.png" alt="jury duty" className="w-14 h-14 rounded-2xl flex-shrink-0" style={{ objectFit: "cover" }} />
           <div className="flex-1 min-w-0">
             <p className="font-black text-[17px]" style={{ fontFamily: "var(--font-nunito)" }}>jury duty</p>
             <p className="text-[12px] mt-0.5" style={{ color: "var(--muted)" }}>jurydutygame.com</p>
