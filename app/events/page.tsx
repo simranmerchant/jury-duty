@@ -35,6 +35,8 @@ export default function EventsPage() {
   const [createType, setCreateType] = useState<"event" | "group">("event");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [pushPrompted, setPushPrompted] = useState(false);
 
   const fetchEvents = useCallback(async () => {
     const token = await getAccessToken();
@@ -86,6 +88,28 @@ export default function EventsPage() {
     fetchEvents();
   }
 
+  async function subscribeToPush() {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+    try {
+      const reg = await navigator.serviceWorker.register("/sw.js");
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") return;
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+      });
+      const token = await getAccessToken();
+      await fetch("/api/v1/me/web-push-subscription", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify(sub.toJSON()),
+      });
+      setPushEnabled(true);
+    } catch {
+      // permission denied or not supported — silent fail
+    }
+  }
+
   async function openNotifs() {
     setShowNotifs(true);
     if (unreadCount > 0) {
@@ -93,6 +117,14 @@ export default function EventsPage() {
       await fetch("/api/v1/me/notifications", { method: "POST", headers: { Authorization: `Bearer ${token}` } });
       setUnreadCount(0);
       setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    }
+    // Check push state on first open
+    if (!pushPrompted && "Notification" in window) {
+      setPushPrompted(true);
+      if (Notification.permission === "granted") {
+        setPushEnabled(true);
+        subscribeToPush(); // re-register in case SW was cleared
+      }
     }
   }
 
@@ -380,6 +412,22 @@ export default function EventsPage() {
                 <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth={2.5} strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
               </button>
             </div>
+            {/* Push prompt banner */}
+            {"Notification" in (typeof window !== "undefined" ? window : {}) && !pushEnabled && Notification.permission !== "denied" && (
+              <div className="mx-4 mt-3 mb-1 flex items-center gap-3 rounded-2xl px-4 py-3" style={{ background: "rgba(216,180,254,0.1)", border: "1px solid rgba(216,180,254,0.2)" }}>
+                <div className="flex items-center justify-center rounded-full flex-shrink-0" style={{ width: 32, height: 32, background: "rgba(216,180,254,0.15)" }}>
+                  <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#d8b4fe" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                </div>
+                <p className="flex-1 text-[12px]" style={{ color: "var(--muted)", lineHeight: 1.4 }}>get notified when bets resolve</p>
+                <button
+                  onClick={subscribeToPush}
+                  className="text-[12px] font-bold flex-shrink-0 px-3 py-1.5 rounded-xl"
+                  style={{ background: "rgba(216,180,254,0.2)", color: "#d8b4fe", border: "1px solid rgba(216,180,254,0.3)" }}
+                >
+                  enable
+                </button>
+              </div>
+            )}
             {/* List */}
             <div className="overflow-y-auto flex-1" style={{ paddingBottom: "env(safe-area-inset-bottom, 24px)" }}>
               {notifications.length === 0 ? (

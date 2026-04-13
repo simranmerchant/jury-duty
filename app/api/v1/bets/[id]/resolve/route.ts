@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/privy";
 import { supabase } from "@/lib/supabase";
 import { sendPushToUsers } from "@/lib/push";
+import { sendWebPushToUsers } from "@/lib/webpush";
 import { buildResolveNotifications } from "@/lib/resolve-notifications";
 
 export async function POST(
@@ -57,6 +58,9 @@ export async function POST(
         wonIds.length > 0 && sendPushToUsers(wonIds, { title: "jury's in — you won 🎉", body: `you called it on "${bet.question}"`, data: { bet_id: betId, outcome: "won" } }),
         lostIds.length > 0 && sendPushToUsers(lostIds, { title: "jury's in — you lost 💀", body: `the jury has spoken on "${bet.question}"`, data: { bet_id: betId, outcome: "lost" } }),
         refundIds.length > 0 && sendPushToUsers(refundIds, { title: "case dismissed", body: `"${bet.question}" was called off`, data: { bet_id: betId, outcome: "refunded" } }),
+        wonIds.length > 0 && sendWebPushToUsers(wonIds, { title: "jury's in — you won 🎉", body: `you called it on "${bet.question}"`, data: { bet_id: betId, outcome: "won" } }),
+        lostIds.length > 0 && sendWebPushToUsers(lostIds, { title: "jury's in — you lost 💀", body: `the jury has spoken on "${bet.question}"`, data: { bet_id: betId, outcome: "lost" } }),
+        refundIds.length > 0 && sendWebPushToUsers(refundIds, { title: "case dismissed", body: `"${bet.question}" was called off`, data: { bet_id: betId, outcome: "refunded" } }),
       ]);
     }
   }

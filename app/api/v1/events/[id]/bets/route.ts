@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/privy";
 import { supabase } from "@/lib/supabase";
 import { sendPushToUsers } from "@/lib/push";
+import { sendWebPushToUsers } from "@/lib/webpush";
 import { buildInviteIds, questionMentionRecipients, optionTagRecipients } from "@/lib/notification-recipients";
 
 export async function POST(
@@ -127,6 +128,11 @@ export async function POST(
         body: `${creatorName} mentioned you in a bet: "${question.trim()}"`,
         data: { event_id: eventId },
       }),
+      sendWebPushToUsers(externalQuestionTaggedIds, {
+        title: "you've been put on the board 🎯",
+        body: `${creatorName} mentioned you in a bet: "${question.trim()}"`,
+        data: { event_id: eventId },
+      }),
     ]);
   }
 
@@ -141,6 +147,11 @@ export async function POST(
         data: { bet_id: bet.id, event_id: eventId },
       }))),
       sendPushToUsers(externalTaggedIds, {
+        title: "you've been put on the board 🎯",
+        body: `${creatorName} named you in a bet: "${question.trim()}"`,
+        data: { event_id: eventId },
+      }),
+      sendWebPushToUsers(externalTaggedIds, {
         title: "you've been put on the board 🎯",
         body: `${creatorName} named you in a bet: "${question.trim()}"`,
         data: { event_id: eventId },
@@ -165,6 +176,11 @@ export async function POST(
         body: "open the app to see it",
         data: { event_id: eventId },
       }),
+      notifyIds.length > 0 && sendWebPushToUsers(notifyIds, {
+        title: "you've been added to a private bet 👀",
+        body: "open the app to see it",
+        data: { event_id: eventId },
+      }),
     ]);
   } else if (otherGuestIds.length > 0) {
     await Promise.all([
@@ -176,6 +192,11 @@ export async function POST(
         data: { bet_id: bet.id, event_id: eventId },
       }))),
       sendPushToUsers(otherGuestIds, {
+        title: `new bet in ${event.name} 🗳️`,
+        body: "open the app to vote",
+        data: { event_id: eventId },
+      }),
+      sendWebPushToUsers(otherGuestIds, {
         title: `new bet in ${event.name} 🗳️`,
         body: "open the app to vote",
         data: { event_id: eventId },
