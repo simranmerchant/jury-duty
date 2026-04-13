@@ -24,6 +24,7 @@ export default function InstallPrompt() {
   const [show, setShow] = useState(false);
   const [platform, setPlatform] = useState<Platform>(null);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [pushEnabled, setPushEnabled] = useState(false);
 
   useEffect(() => {
     if (isStandalone()) return;
@@ -43,9 +44,14 @@ export default function InstallPrompt() {
     }
 
     if (plat === "ios") {
-      // Show after a short delay so it doesn't immediately interrupt
       const t = setTimeout(() => setShow(true), 3000);
       return () => clearTimeout(t);
+    }
+  }, []);
+
+  useEffect(() => {
+    if ("Notification" in window && Notification.permission === "granted") {
+      setPushEnabled(true);
     }
   }, []);
 
@@ -68,54 +74,76 @@ export default function InstallPrompt() {
   return (
     <div className="fixed bottom-0 left-0 right-0 z-[100] flex justify-center px-4 pb-6 pointer-events-none">
       <div
-        className="w-full max-w-sm rounded-3xl p-5 pointer-events-auto shadow-2xl"
-        style={{ background: "var(--card)", border: "1px solid var(--border-soft)" }}
+        className="w-full max-w-sm pointer-events-auto shadow-2xl"
+        style={{ background: "var(--card)", border: "1px solid var(--border-soft)", borderRadius: 28 }}
       >
-        <div className="flex items-start gap-4">
+        {/* Header */}
+        <div className="flex items-center gap-4 px-5 pt-5 pb-4" style={{ borderBottom: "1px solid var(--border-soft)" }}>
           <div
-            className="w-12 h-12 rounded-2xl flex items-center justify-center font-black text-white text-[17px] flex-shrink-0"
-            style={{ background: "var(--accent)", fontFamily: "var(--font-nunito)" }}
+            className="w-14 h-14 rounded-2xl flex items-center justify-center font-black text-white text-[20px] flex-shrink-0"
+            style={{ background: "linear-gradient(135deg, var(--accent), #d8b4fe)", fontFamily: "var(--font-nunito)" }}
           >
             JD
           </div>
           <div className="flex-1 min-w-0">
-            <p className="font-black text-[15px]" style={{ fontFamily: "var(--font-nunito)" }}>
-              add to home screen
-            </p>
-            {platform === "ios" ? (
-              <p className="text-[13px] mt-1 leading-snug" style={{ color: "var(--muted)" }}>
-                tap <strong style={{ color: "var(--text)" }}>Share</strong> then{" "}
-                <strong style={{ color: "var(--text)" }}>Add to Home Screen</strong> for the full experience
-              </p>
-            ) : (
-              <p className="text-[13px] mt-1 leading-snug" style={{ color: "var(--muted)" }}>
-                install jury duty for quick access
-              </p>
-            )}
+            <p className="font-black text-[17px]" style={{ fontFamily: "var(--font-nunito)" }}>jury duty</p>
+            <p className="text-[12px] mt-0.5" style={{ color: "var(--muted)" }}>jurydutygame.com</p>
           </div>
-          <button onClick={dismiss} className="text-[20px] flex-shrink-0 -mt-1" style={{ color: "var(--dimmer)" }}>×</button>
+          <button onClick={dismiss} className="flex items-center justify-center rounded-full flex-shrink-0" style={{ width: 28, height: 28, background: "var(--bg)", border: "1px solid var(--border-soft)" }}>
+            <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth={2.5} strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          </button>
         </div>
 
-        {platform === "android" && (
-          <button
-            onClick={install}
-            className="w-full mt-4 py-3 rounded-2xl font-bold text-[15px] text-white"
-            style={{ background: "var(--accent)", fontFamily: "var(--font-nunito)" }}
-          >
-            install
-          </button>
-        )}
-
-        {platform === "ios" && (
-          <div className="mt-4 flex items-center justify-center gap-2 py-2 rounded-2xl" style={{ background: "rgba(255,255,255,0.04)" }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--accent)" }}>
-              <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
-              <polyline points="16 6 12 2 8 6" />
-              <line x1="12" y1="2" x2="12" y2="15" />
-            </svg>
-            <span className="text-[13px] font-bold" style={{ color: "var(--muted)" }}>share → add to home screen</span>
+        <div className="px-5 py-4 flex flex-col gap-3">
+          {/* Push notification callout */}
+          <div className="flex items-start gap-3 rounded-2xl px-4 py-3" style={{ background: "rgba(255,143,163,0.08)", border: "1px solid rgba(255,143,163,0.2)" }}>
+            <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 mt-0.5"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            <p className="text-[13px] leading-snug" style={{ color: "var(--muted)" }}>
+              <span className="font-bold" style={{ color: "var(--text)" }}>push notifications require this.</span>{" "}
+              get notified when bets resolve, even with the tab closed.
+            </p>
           </div>
-        )}
+
+          {platform === "ios" && (
+            <>
+              {/* Step by step */}
+              <div className="flex flex-col gap-2">
+                {[
+                  { n: 1, icon: <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>, text: <>tap the <strong style={{ color: "var(--text)" }}>Share</strong> button at the bottom of Safari</> },
+                  { n: 2, icon: <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M12 8v8M8 12h8"/></svg>, text: <>scroll down and tap <strong style={{ color: "var(--text)" }}>Add to Home Screen</strong></> },
+                  { n: 3, icon: <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>, text: <>tap <strong style={{ color: "var(--text)" }}>Add</strong> — then open the app from your home screen and enable notifications</> },
+                ].map(({ n, icon, text }) => (
+                  <div key={n} className="flex items-start gap-3">
+                    <div className="flex items-center justify-center rounded-full flex-shrink-0 mt-0.5" style={{ width: 24, height: 24, background: "rgba(255,143,163,0.12)", border: "1px solid rgba(255,143,163,0.2)" }}>
+                      <span className="text-[11px] font-black" style={{ color: "var(--accent)" }}>{n}</span>
+                    </div>
+                    <p className="text-[13px] leading-snug pt-0.5" style={{ color: "var(--muted)" }}>{text}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Visual hint */}
+              <div className="flex items-center justify-center gap-2 py-2.5 rounded-2xl" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-soft)" }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "#3b82f6" }}>
+                  <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                  <polyline points="16 6 12 2 8 6" />
+                  <line x1="12" y1="2" x2="12" y2="15" />
+                </svg>
+                <span className="text-[12px] font-bold" style={{ color: "var(--muted)" }}>look for the share icon in Safari's toolbar</span>
+              </div>
+            </>
+          )}
+
+          {platform === "android" && (
+            <button
+              onClick={install}
+              className="w-full py-3.5 rounded-2xl font-bold text-[15px] text-white"
+              style={{ background: "var(--accent)", fontFamily: "var(--font-nunito)" }}
+            >
+              add to home screen
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
