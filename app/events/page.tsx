@@ -363,37 +363,54 @@ export default function EventsPage() {
       )}
       {/* Notifications panel */}
       {showNotifs && (
-        <div className="fixed inset-0 z-50 flex flex-col justify-end" style={{ background: "rgba(0,0,0,0.6)" }} onClick={() => setShowNotifs(false)}>
-          <div className="rounded-t-3xl flex flex-col max-h-[80vh]" style={{ background: "var(--card)", border: "1px solid var(--border)" }} onClick={(e) => e.stopPropagation()}>
-            <div className="px-6 pt-5 pb-4 flex items-center justify-between border-b" style={{ borderColor: "var(--border-soft)" }}>
-              <div className="w-9 h-1 rounded-full absolute left-1/2 -translate-x-1/2 top-3" style={{ background: "var(--border)" }} />
-              <h2 className="text-lg font-black mt-2" style={{ fontFamily: "var(--font-nunito)" }}>notifications</h2>
-              <button onClick={() => setShowNotifs(false)} className="text-[20px] mt-2" style={{ color: "var(--muted)" }}>×</button>
+        <div className="fixed inset-0 z-50 flex flex-col justify-end" style={{ background: "rgba(0,0,0,0.5)" }} onClick={() => setShowNotifs(false)}>
+          <div className="flex flex-col" style={{ maxHeight: "82vh", background: "var(--card)", borderTopLeftRadius: 28, borderTopRightRadius: 28, borderTop: "1px solid var(--border-soft)", borderLeft: "1px solid var(--border-soft)", borderRight: "1px solid var(--border-soft)" }} onClick={(e) => e.stopPropagation()}>
+            {/* Drag handle */}
+            <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
+              <div className="w-10 h-1 rounded-full" style={{ background: "var(--border)" }} />
             </div>
-            <div className="overflow-y-auto flex-1">
+            {/* Header */}
+            <div className="px-5 pt-2 pb-3 flex items-center justify-between flex-shrink-0" style={{ borderBottom: "1px solid var(--border-soft)" }}>
+              <h2 className="text-[18px] font-black" style={{ fontFamily: "var(--font-nunito)" }}>notifications</h2>
+              <button
+                onClick={() => setShowNotifs(false)}
+                className="flex items-center justify-center rounded-full"
+                style={{ width: 32, height: 32, background: "var(--bg)", border: "1px solid var(--border-soft)" }}
+              >
+                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth={2.5} strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+              </button>
+            </div>
+            {/* List */}
+            <div className="overflow-y-auto flex-1" style={{ paddingBottom: "env(safe-area-inset-bottom, 24px)" }}>
               {notifications.length === 0 ? (
-                <p className="text-center py-12 text-[14px]" style={{ color: "var(--dimmer)" }}>no notifications yet</p>
+                <div className="flex flex-col items-center justify-center py-16 gap-3">
+                  <div className="flex items-center justify-center rounded-full" style={{ width: 56, height: 56, background: "rgba(216,180,254,0.12)", border: "1px solid rgba(216,180,254,0.2)" }}>
+                    <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="var(--dimmer)" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                  </div>
+                  <p className="text-[14px] font-bold" style={{ color: "var(--muted)" }}>all caught up</p>
+                  <p className="text-[12px]" style={{ color: "var(--dimmer)" }}>no notifications yet</p>
+                </div>
               ) : (
-                <div className="flex flex-col divide-y" style={{ borderColor: "var(--border-soft)" }}>
+                <div className="flex flex-col">
                   {notifications.map((n) => {
                     const eventId = n.data?.event_id;
                     const href = eventId ? `/e/${eventId}` : null;
                     const iconConfig = (() => {
-                      if (n.type === "bet_resolved_won") return { bg: "rgba(52,199,89,0.15)", border: "rgba(52,199,89,0.3)", color: "#34c759", icon: <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#34c759" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> };
-                      if (n.type === "bet_resolved_lost") return { bg: "rgba(255,143,163,0.15)", border: "rgba(255,143,163,0.3)", color: "var(--accent)", icon: <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg> };
-                      if (n.type === "bet_resolved_refunded") return { bg: "rgba(180,180,200,0.15)", border: "rgba(180,180,200,0.3)", color: "var(--muted)", icon: <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg> };
-                      if (n.type === "points_earned") return { bg: "rgba(255,214,0,0.15)", border: "rgba(255,214,0,0.3)", color: "#f5a623", icon: <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#f5a623" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> };
-                      return { bg: "rgba(216,180,254,0.15)", border: "rgba(216,180,254,0.3)", color: "var(--purple,#d8b4fe)", icon: <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="var(--purple,#d8b4fe)" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg> };
+                      if (n.type === "bet_resolved_won") return { bg: "rgba(52,199,89,0.15)", border: "rgba(52,199,89,0.25)", icon: <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#34c759" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> };
+                      if (n.type === "bet_resolved_lost") return { bg: "rgba(255,143,163,0.15)", border: "rgba(255,143,163,0.25)", icon: <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg> };
+                      if (n.type === "bet_resolved_refunded") return { bg: "rgba(180,180,200,0.12)", border: "rgba(180,180,200,0.25)", icon: <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg> };
+                      if (n.type === "points_earned") return { bg: "rgba(255,200,0,0.12)", border: "rgba(255,200,0,0.25)", icon: <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#e6a817" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> };
+                      return { bg: "rgba(216,180,254,0.12)", border: "rgba(216,180,254,0.25)", icon: <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#d8b4fe" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg> };
                     })();
                     const timeAgo = (() => {
                       const diff = Date.now() - new Date(n.created_at).getTime();
                       const mins = Math.floor(diff / 60000);
                       if (mins < 1) return "just now";
-                      if (mins < 60) return `${mins}m ago`;
+                      if (mins < 60) return `${mins}m`;
                       const hrs = Math.floor(mins / 60);
-                      if (hrs < 24) return `${hrs}h ago`;
+                      if (hrs < 24) return `${hrs}h`;
                       const days = Math.floor(hrs / 24);
-                      if (days < 7) return `${days}d ago`;
+                      if (days < 7) return `${days}d`;
                       return new Date(n.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" });
                     })();
                     const Row = href ? "a" : "div";
@@ -401,20 +418,31 @@ export default function EventsPage() {
                       <Row
                         key={n.id}
                         {...(href ? { href, onClick: () => setShowNotifs(false) } : {})}
-                        className="px-6 py-4 flex gap-3 items-start"
-                        style={{ opacity: n.read ? 0.6 : 1, cursor: href ? "pointer" : "default", textDecoration: "none", color: "inherit", display: "flex" }}
+                        style={{
+                          display: "flex",
+                          alignItems: "flex-start",
+                          gap: 14,
+                          padding: "14px 20px",
+                          textDecoration: "none",
+                          color: "inherit",
+                          cursor: href ? "pointer" : "default",
+                          background: !n.read ? "rgba(255,143,163,0.04)" : "transparent",
+                          borderBottom: "1px solid var(--border-soft)",
+                          WebkitTapHighlightColor: "transparent",
+                        }}
                       >
-                        <div className="flex-shrink-0 mt-0.5 flex items-center justify-center rounded-full" style={{ width: 36, height: 36, background: iconConfig.bg, border: `1px solid ${iconConfig.border}` }}>
+                        {/* Unread bar */}
+                        <div style={{ position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)", width: 3, height: 32, borderRadius: 2, background: !n.read ? "var(--accent)" : "transparent" }} />
+                        <div className="flex-shrink-0 flex items-center justify-center rounded-full" style={{ width: 42, height: 42, background: iconConfig.bg, border: `1px solid ${iconConfig.border}` }}>
                           {iconConfig.icon}
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-2">
-                            <p className="font-bold text-[14px] leading-snug">{n.title}</p>
-                            <p className="text-[11px] flex-shrink-0 mt-0.5" style={{ color: "var(--dimmer)" }}>{timeAgo}</p>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
+                            <p style={{ fontWeight: 700, fontSize: 14, lineHeight: 1.3, color: "var(--text)", margin: 0 }}>{n.title}</p>
+                            <p style={{ fontSize: 11, color: "var(--dimmer)", flexShrink: 0, marginTop: 1 }}>{timeAgo}</p>
                           </div>
-                          <p className="text-[13px] mt-0.5 leading-snug" style={{ color: "var(--muted)" }}>{n.body}</p>
+                          <p style={{ fontSize: 13, color: "var(--muted)", marginTop: 3, lineHeight: 1.4 }}>{n.body}</p>
                         </div>
-                        {!n.read && <div className="w-2 h-2 rounded-full flex-shrink-0 mt-1.5" style={{ background: "var(--accent)" }} />}
                       </Row>
                     );
                   })}
