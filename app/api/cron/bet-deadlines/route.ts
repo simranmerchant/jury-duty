@@ -32,16 +32,16 @@ export async function GET(req: NextRequest) {
   const notifications = overdueBets.map((bet) => ({
     user_id: bet.creator_id,
     type: "bet_deadline",
-    title: "time to deliberate 🔨",
-    body: `"${bet.question}" is past its deadline. the jury is waiting — go resolve it.`,
+    title: "the people need to know.",
+    body: `"${bet.question}" is past its deadline. resolve your bet.`,
     data: { bet_id: bet.id },
   }));
 
   const [notifResult, , markResult] = await Promise.all([
     supabase.from("notifications").insert(notifications),
     sendPushToUsers(overdueBets.map((b) => b.creator_id), {
-      title: "time to deliberate 🔨",
-      body: "one of your bets is past its deadline. go resolve it.",
+      title: "the people need to know.",
+      body: "one of your bets is past its deadline. resolve it.",
     }),
     supabase.from("bets").update({ deadline_notified: true }).in("id", overdueBets.map((b) => b.id)),
   ]);
