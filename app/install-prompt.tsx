@@ -103,33 +103,21 @@ export default function InstallPrompt() {
           </div>
 
           {platform === "ios" && (
-            <>
-              {/* Step by step */}
-              <div className="flex flex-col gap-2">
-                {[
-                  { n: 1, icon: <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>, text: <>tap the <strong style={{ color: "var(--text)" }}>Share</strong> button at the bottom of Safari</> },
-                  { n: 2, icon: <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M12 8v8M8 12h8"/></svg>, text: <>scroll down and tap <strong style={{ color: "var(--text)" }}>Add to Home Screen</strong></> },
-                  { n: 3, icon: <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>, text: <>tap <strong style={{ color: "var(--text)" }}>Add</strong> — then open the app from your home screen and enable notifications</> },
-                ].map(({ n, icon, text }) => (
-                  <div key={n} className="flex items-start gap-3">
-                    <div className="flex items-center justify-center rounded-full flex-shrink-0 mt-0.5" style={{ width: 24, height: 24, background: "rgba(255,143,163,0.12)", border: "1px solid rgba(255,143,163,0.2)" }}>
-                      <span className="text-[11px] font-black" style={{ color: "var(--accent)" }}>{n}</span>
-                    </div>
-                    <p className="text-[13px] leading-snug pt-0.5" style={{ color: "var(--muted)" }}>{text}</p>
+            <div className="flex flex-col gap-2">
+              {[
+                { n: 1, text: <>tap the <strong style={{ color: "var(--text)" }}>three dots</strong> at the bottom right</> },
+                { n: 2, text: <>tap <strong style={{ color: "var(--text)" }}>Share</strong></> },
+                { n: 3, text: <>tap <strong style={{ color: "var(--text)" }}>Add to Home Screen</strong></> },
+                { n: 4, text: <>tap <strong style={{ color: "var(--text)" }}>Add</strong></> },
+              ].map(({ n, text }) => (
+                <div key={n} className="flex items-center gap-3">
+                  <div className="flex items-center justify-center rounded-full flex-shrink-0" style={{ width: 24, height: 24, background: "rgba(255,143,163,0.12)", border: "1px solid rgba(255,143,163,0.2)" }}>
+                    <span className="text-[11px] font-black" style={{ color: "var(--accent)" }}>{n}</span>
                   </div>
-                ))}
-              </div>
-
-              {/* Visual hint */}
-              <div className="flex items-center justify-center gap-2 py-2.5 rounded-2xl" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-soft)" }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "#3b82f6" }}>
-                  <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
-                  <polyline points="16 6 12 2 8 6" />
-                  <line x1="12" y1="2" x2="12" y2="15" />
-                </svg>
-                <span className="text-[12px] font-bold" style={{ color: "var(--muted)" }}>look for the share icon in Safari's toolbar</span>
-              </div>
-            </>
+                  <p className="text-[13px] leading-snug" style={{ color: "var(--muted)" }}>{text}</p>
+                </div>
+              ))}
+            </div>
           )}
 
           {platform === "android" && (
