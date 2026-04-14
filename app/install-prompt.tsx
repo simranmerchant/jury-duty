@@ -2,9 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { usePrivy } from "@privy-io/react-auth";
+import { usePathname } from "next/navigation";
 
 type Platform = "ios" | "android" | null;
 type Step = "install" | "push" | "done";
+
+const SNOOZE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 function detectPlatform(): Platform {
   if (typeof navigator === "undefined") return null;
@@ -22,27 +25,44 @@ function isStandalone(): boolean {
     ("standalone" in window.navigator && (window.navigator as any).standalone === true);
 }
 
+function isSnoozed(): boolean {
+  const val = localStorage.getItem("install-snoozed-until");
+  if (!val) return false;
+  return Date.now() < parseInt(val);
+}
+
 export default function InstallPrompt() {
   const { ready, authenticated } = usePrivy();
+  const pathname = usePathname();
   const [step, setStep] = useState<Step>("done");
   const [platform, setPlatform] = useState<Platform>(null);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
   useEffect(() => {
     if (!ready || !authenticated) return;
-    if (localStorage.getItem("install-dismissed")) return;
+    if (pathname === "/onboarding") return;
 
     const plat = detectPlatform();
+    if (!plat) return; // desktop — never show
+
+    const installed = isStandalone();
+    const notifGranted = "Notification" in window && Notification.permission === "granted";
+
+    // Fully set up — nothing to do
+    if (installed && notifGranted) return;
+
+    // Snoozed — respect the cooldown
+    if (isSnoozed()) return;
+
     setPlatform(plat);
 
-    if (isStandalone()) {
-      // Already installed — only show push prompt if not granted
-      if ("Notification" in window && Notification.permission === "default") {
-        setTimeout(() => setStep("push"), 3000);
-      }
+    if (installed) {
+      // Already on home screen, just need push permission
+      setTimeout(() => setStep("push"), 2000);
       return;
     }
 
+    // Not installed yet
     if (plat === "android") {
       const handler = (e: Event) => {
         e.preventDefault();
@@ -54,22 +74,21 @@ export default function InstallPrompt() {
     }
 
     if (plat === "ios") {
-      const t = setTimeout(() => setStep("install"), 3000);
+      const t = setTimeout(() => setStep("install"), 2000);
       return () => clearTimeout(t);
     }
-  }, [ready, authenticated]);
+  }, [ready, authenticated, pathname]);
 
-  function dismissAll() {
-    localStorage.setItem("install-dismissed", "1");
+  function snooze() {
+    localStorage.setItem("install-snoozed-until", String(Date.now() + SNOOZE_MS));
     setStep("done");
   }
 
   function afterInstall() {
-    // Move to push prompt step
     if ("Notification" in window && Notification.permission !== "granted") {
       setStep("push");
     } else {
-      dismissAll();
+      snooze();
     }
   }
 
@@ -87,7 +106,7 @@ export default function InstallPrompt() {
 
   async function enablePush() {
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
-      dismissAll();
+      snooze();
       return;
     }
     try {
@@ -103,11 +122,15 @@ export default function InstallPrompt() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(sub.toJSON()),
         });
+        // Fully set up — clear snooze so we never show again
+        localStorage.removeItem("install-snoozed-until");
+        setStep("done");
+        return;
       }
     } catch {
       // silent fail
     }
-    dismissAll();
+    snooze();
   }
 
   if (step === "done") return null;
@@ -125,7 +148,7 @@ export default function InstallPrompt() {
             <p className="font-black text-[17px]" style={{ fontFamily: "var(--font-nunito)" }}>jury duty</p>
             <p className="text-[12px] mt-0.5" style={{ color: "var(--muted)" }}>jurydutygame.com</p>
           </div>
-          <button onClick={dismissAll} className="flex items-center justify-center rounded-full flex-shrink-0" style={{ width: 28, height: 28, background: "var(--bg)", border: "1px solid var(--border-soft)" }}>
+          <button onClick={snooze} className="flex items-center justify-center rounded-full flex-shrink-0" style={{ width: 28, height: 28, background: "var(--bg)", border: "1px solid var(--border-soft)" }}>
             <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth={2.5} strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
           </button>
         </div>
@@ -175,8 +198,8 @@ export default function InstallPrompt() {
               <div className="flex items-start gap-3 rounded-2xl px-4 py-3" style={{ background: "rgba(216,180,254,0.08)", border: "1px solid rgba(216,180,254,0.2)" }}>
                 <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#d8b4fe" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 mt-0.5"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
                 <p className="text-[13px] leading-snug" style={{ color: "var(--muted)" }}>
-                  <span className="font-bold" style={{ color: "var(--text)" }}>enable push notifications.</span>{" "}
-                  get notified when bets resolve, even with the app closed.
+                  <span className="font-bold" style={{ color: "var(--text)" }}>never miss a bet.</span>{" "}
+                  get notified the moment something happens.
                 </p>
               </div>
               <button
@@ -187,7 +210,7 @@ export default function InstallPrompt() {
                 enable notifications
               </button>
               <button
-                onClick={dismissAll}
+                onClick={snooze}
                 className="w-full py-2 text-[13px] font-semibold"
                 style={{ color: "var(--dimmer)" }}
               >

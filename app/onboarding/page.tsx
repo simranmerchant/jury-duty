@@ -98,7 +98,7 @@ function OnboardingInner() {
                 what should we call you?
               </h1>
               <p className="text-[14px]" style={{ color: "var(--muted)" }}>
-                this shows up when you bet with friends
+                this is how you'll appear to friends on jury duty.
               </p>
             </div>
 
@@ -121,17 +121,17 @@ function OnboardingInner() {
               className="w-full py-4 rounded-2xl font-black text-[16px] text-white disabled:opacity-35"
               style={{ background: "var(--accent)", fontFamily: "var(--font-nunito)" }}
             >
-              {saving ? "saving..." : "next →"}
+              {saving ? "saving..." : "continue"}
             </button>
           </>
         ) : (
           <>
             <div>
               <h1 className="text-[32px] font-black tracking-tight mb-1" style={{ fontFamily: "var(--font-nunito)" }}>
-                pick a username
+                choose a username
               </h1>
               <p className="text-[14px]" style={{ color: "var(--muted)" }}>
-                so friends can tag you in bets. you can change it later.
+                friends can find and tag you by handle. you can change it later.
               </p>
             </div>
 
@@ -143,7 +143,7 @@ function OnboardingInner() {
               <input
                 className="flex-1 py-4 text-[18px] font-bold outline-none bg-transparent"
                 style={{ color: "var(--text)" }}
-                placeholder="yourhandle"
+                placeholder="yourname"
                 value={username}
                 onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9._]/g, ""))}
                 onKeyDown={(e) => e.key === "Enter" && saveUsername()}
@@ -165,11 +165,11 @@ function OnboardingInner() {
               className="w-full py-4 rounded-2xl font-black text-[16px] text-white disabled:opacity-35"
               style={{ background: "var(--accent)", fontFamily: "var(--font-nunito)" }}
             >
-              {saving ? "saving..." : "let's go →"}
+              {saving ? "saving..." : "get started"}
             </button>
 
             <button onClick={skip} className="text-center text-[14px] font-semibold" style={{ color: "var(--dimmer)" }}>
-              skip for now
+              skip
             </button>
           </>
         )}
