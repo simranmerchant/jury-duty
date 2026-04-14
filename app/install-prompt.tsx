@@ -136,8 +136,7 @@ export default function InstallPrompt() {
               <div className="flex items-start gap-3 rounded-2xl px-4 py-3" style={{ background: "rgba(255,143,163,0.08)", border: "1px solid rgba(255,143,163,0.2)" }}>
                 <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 mt-0.5"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
                 <p className="text-[13px] leading-snug" style={{ color: "var(--muted)" }}>
-                  <span className="font-bold" style={{ color: "var(--text)" }}>add to home screen to enable push notifications.</span>{" "}
-                  get notified when bets resolve, even with the tab closed.
+                  <span className="font-bold" style={{ color: "var(--text)" }}>add to home screen to enable push notifications</span>
                 </p>
               </div>
 
