@@ -86,11 +86,6 @@ export default function EventPage() {
     setShowAddGuests(true);
     setAddSearch("");
     setSearchResults([]);
-    if (contacts.length > 0) return;
-    const token = await getAccessToken();
-    const res = await fetch("/api/v1/me/contacts", { headers: { Authorization: `Bearer ${token}` } });
-    const data = await res.json();
-    setContacts(data.contacts ?? []);
   }
 
   async function onAddSearch(q: string) {
@@ -233,7 +228,7 @@ export default function EventPage() {
         const currentGuestIds = new Set(event.event_guests.map((g) => g.user_id));
         const displayList = addSearch.trim()
           ? searchResults.filter((r) => !currentGuestIds.has(r.user_id)).map((r) => ({ user_id: r.user_id, name: r.display_name ?? r.username ?? "unknown", avatar_url: r.avatar_url, username: r.username }))
-          : contacts.filter((c) => !currentGuestIds.has(c.user_id)).map((c) => ({ user_id: c.user_id, name: c.balances?.display_name ?? "unknown", avatar_url: c.balances?.avatar_url ?? null, username: c.balances?.username ?? null }));
+          : [];
         return (
           <div
             className="fixed inset-0 z-50 flex items-end justify-center"
