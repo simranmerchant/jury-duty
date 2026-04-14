@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePrivy } from "@privy-io/react-auth";
 
 type Platform = "ios" | "android" | null;
 
@@ -21,12 +22,14 @@ function isStandalone(): boolean {
 }
 
 export default function InstallPrompt() {
+  const { ready, authenticated } = usePrivy();
   const [show, setShow] = useState(false);
   const [platform, setPlatform] = useState<Platform>(null);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [pushEnabled, setPushEnabled] = useState(false);
 
   useEffect(() => {
+    if (!ready || !authenticated) return;
     if (isStandalone()) return;
     if (localStorage.getItem("install-dismissed")) return;
 
@@ -47,7 +50,7 @@ export default function InstallPrompt() {
       const t = setTimeout(() => setShow(true), 3000);
       return () => clearTimeout(t);
     }
-  }, []);
+  }, [ready, authenticated]);
 
   useEffect(() => {
     if ("Notification" in window && Notification.permission === "granted") {
