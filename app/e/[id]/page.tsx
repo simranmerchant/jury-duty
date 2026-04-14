@@ -77,14 +77,34 @@ export default function EventPage() {
   const [contacts, setContacts] = useState<{ user_id: string; balances: { display_name: string | null; avatar_url: string | null; username?: string | null } }[]>([]);
   const [addSelected, setAddSelected] = useState<string[]>([]);
   const [addingGuests, setAddingGuests] = useState(false);
+  const [addSearch, setAddSearch] = useState("");
+  const [searchResults, setSearchResults] = useState<{ user_id: string; display_name: string | null; username: string | null; avatar_url: string | null }[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const addSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   async function openAddGuests() {
     setShowAddGuests(true);
+    setAddSearch("");
+    setSearchResults([]);
     if (contacts.length > 0) return;
     const token = await getAccessToken();
     const res = await fetch("/api/v1/me/contacts", { headers: { Authorization: `Bearer ${token}` } });
     const data = await res.json();
     setContacts(data.contacts ?? []);
+  }
+
+  async function onAddSearch(q: string) {
+    setAddSearch(q);
+    if (addSearchTimer.current) clearTimeout(addSearchTimer.current);
+    if (!q.trim()) { setSearchResults([]); setSearchLoading(false); return; }
+    setSearchLoading(true);
+    addSearchTimer.current = setTimeout(async () => {
+      const token = await getAccessToken();
+      const res = await fetch(`/api/v1/users/search?q=${encodeURIComponent(q.trim())}`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      setSearchResults(data.users ?? []);
+      setSearchLoading(false);
+    }, 350);
   }
 
   async function submitAddGuests() {
@@ -211,52 +231,74 @@ export default function EventPage() {
       {/* Add guests modal */}
       {showAddGuests && (() => {
         const currentGuestIds = new Set(event.event_guests.map((g) => g.user_id));
-        const available = contacts.filter((c) => !currentGuestIds.has(c.user_id));
+        const displayList = addSearch.trim()
+          ? searchResults.filter((r) => !currentGuestIds.has(r.user_id)).map((r) => ({ user_id: r.user_id, name: r.display_name ?? r.username ?? "unknown", avatar_url: r.avatar_url, username: r.username }))
+          : contacts.filter((c) => !currentGuestIds.has(c.user_id)).map((c) => ({ user_id: c.user_id, name: c.balances?.display_name ?? "unknown", avatar_url: c.balances?.avatar_url ?? null, username: c.balances?.username ?? null }));
         return (
           <div
             className="fixed inset-0 z-50 flex items-end justify-center"
             style={{ background: "rgba(0,0,0,0.6)" }}
-            onClick={(e) => { if (e.target === e.currentTarget) { setShowAddGuests(false); setAddSelected([]); } }}
+            onClick={(e) => { if (e.target === e.currentTarget) { setShowAddGuests(false); setAddSelected([]); setAddSearch(""); setSearchResults([]); } }}
           >
-            <div className="w-full max-w-lg rounded-t-3xl p-6 flex flex-col gap-4" style={{ background: "var(--card)", border: "1px solid var(--border-soft)" }}>
-              <p className="font-extrabold text-[16px]" style={{ fontFamily: "var(--font-nunito)" }}>add people</p>
-              {contacts.length === 0 ? (
-                <p className="text-[13px]" style={{ color: "var(--muted)" }}>no contacts yet — they'll appear once you share events with friends</p>
-              ) : available.length === 0 ? (
-                <p className="text-[13px]" style={{ color: "var(--muted)" }}>everyone you know is already here</p>
-              ) : (
-                <div className="flex flex-col gap-2 max-h-64 overflow-y-auto">
-                  {available.map((c) => {
-                    const selected = addSelected.includes(c.user_id);
-                    const name = c.balances?.display_name ?? "unknown";
+            <div className="w-full max-w-lg rounded-t-3xl flex flex-col" style={{ background: "var(--card)", border: "1px solid var(--border-soft)", maxHeight: "80vh" }}>
+              <div className="px-6 pt-5 pb-4 flex flex-col gap-3 flex-shrink-0">
+                <p className="font-extrabold text-[16px]" style={{ fontFamily: "var(--font-nunito)" }}>add people</p>
+                <div className="flex items-center gap-2 px-3 py-2.5 rounded-2xl" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--border-soft)" }}>
+                  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="var(--dimmer)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                  <input
+                    autoFocus
+                    value={addSearch}
+                    onChange={(e) => onAddSearch(e.target.value)}
+                    placeholder="search by name or @username"
+                    className="flex-1 bg-transparent text-[14px] outline-none"
+                    style={{ color: "var(--text)" }}
+                  />
+                  {addSearch && (
+                    <button onClick={() => { setAddSearch(""); setSearchResults([]); }} style={{ color: "var(--dimmer)" }}>
+                      <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className="flex-1 overflow-y-auto px-6 pb-2 flex flex-col gap-2">
+                {searchLoading ? (
+                  <p className="text-center py-6 text-[13px]" style={{ color: "var(--dimmer)" }}>searching...</p>
+                ) : displayList.length === 0 ? (
+                  <p className="text-center py-6 text-[13px]" style={{ color: "var(--dimmer)" }}>
+                    {addSearch.trim() ? `no users found for "${addSearch}"` : "search to find people to add"}
+                  </p>
+                ) : (
+                  displayList.map((person) => {
+                    const selected = addSelected.includes(person.user_id);
                     return (
                       <button
-                        key={c.user_id}
-                        onClick={() => setAddSelected(selected ? addSelected.filter((id) => id !== c.user_id) : [...addSelected, c.user_id])}
-                        className="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-left"
+                        key={person.user_id}
+                        onClick={() => setAddSelected(selected ? addSelected.filter((id) => id !== person.user_id) : [...addSelected, person.user_id])}
+                        className="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-left w-full"
                         style={{ background: selected ? "var(--accent-dim)" : "rgba(255,255,255,0.04)", border: `1px solid ${selected ? "var(--accent-border)" : "transparent"}` }}
                       >
-                        {c.balances?.avatar_url ? (
-                          <img src={c.balances.avatar_url} alt={name} className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+                        {person.avatar_url ? (
+                          <img src={person.avatar_url} alt={person.name} className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
                         ) : (
                           <div className="w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-black flex-shrink-0" style={{ background: "rgba(255,255,255,0.08)", color: "var(--muted)" }}>
-                            {name[0]?.toUpperCase() ?? "?"}
+                            {person.name[0]?.toUpperCase() ?? "?"}
                           </div>
                         )}
-                        <span className="text-[14px] font-bold flex-1">{name}</span>
-                        {selected && <span style={{ color: "var(--accent)" }}>✓</span>}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[14px] font-bold truncate">{person.name}</p>
+                          {person.username && <p className="text-[11px]" style={{ color: "var(--dimmer)" }}>@{person.username}</p>}
+                        </div>
+                        {selected && <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
                       </button>
                     );
-                  })}
-                </div>
-              )}
-              <div className="flex gap-2">
-                <button onClick={() => { setShowAddGuests(false); setAddSelected([]); }} className="flex-1 py-2.5 rounded-2xl font-bold text-[14px]" style={{ background: "rgba(255,255,255,0.05)", color: "var(--muted)" }}>cancel</button>
-                {available.length > 0 && (
-                  <button onClick={submitAddGuests} disabled={addSelected.length === 0 || addingGuests} className="flex-1 py-2.5 rounded-2xl font-bold text-[14px] text-white disabled:opacity-40" style={{ background: "var(--accent)", fontFamily: "var(--font-nunito)" }}>
-                    {addingGuests ? "adding..." : `add${addSelected.length > 0 ? ` ${addSelected.length}` : ""}`}
-                  </button>
+                  })
                 )}
+              </div>
+              <div className="flex gap-2 px-6 py-4 flex-shrink-0" style={{ borderTop: "1px solid var(--border-soft)" }}>
+                <button onClick={() => { setShowAddGuests(false); setAddSelected([]); setAddSearch(""); setSearchResults([]); }} className="flex-1 py-2.5 rounded-2xl font-bold text-[14px]" style={{ background: "rgba(255,255,255,0.05)", color: "var(--muted)" }}>cancel</button>
+                <button onClick={submitAddGuests} disabled={addSelected.length === 0 || addingGuests} className="flex-1 py-2.5 rounded-2xl font-bold text-[14px] text-white disabled:opacity-40" style={{ background: "var(--accent)", fontFamily: "var(--font-nunito)" }}>
+                  {addingGuests ? "adding..." : `add${addSelected.length > 0 ? ` ${addSelected.length}` : ""}`}
+                </button>
               </div>
             </div>
           </div>
