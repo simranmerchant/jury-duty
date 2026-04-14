@@ -1,7 +1,7 @@
 "use client";
 
 import { usePrivy } from "@privy-io/react-auth";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { filterTagPickerGuests } from "../../../lib/tag-picker";
 
@@ -39,6 +39,7 @@ export default function EventPage() {
   const { ready, authenticated, getAccessToken } = usePrivy();
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const eventId = params.id as string;
 
   const [event, setEvent] = useState<Event | null>(null);
@@ -149,7 +150,13 @@ export default function EventPage() {
     if (!ready) return;
     if (!authenticated) { router.replace("/login"); return; }
     fetchEvent();
-  }, [ready, authenticated, router, fetchEvent]);
+    // Opened via push notification click — mark all notifications as read silently
+    if (searchParams.get("from") === "push") {
+      getAccessToken().then((token) => {
+        if (token) fetch("/api/v1/me/notifications", { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+      });
+    }
+  }, [ready, authenticated, router, fetchEvent, searchParams]);
 
   async function deleteEvent() {
     setDeleting(true);

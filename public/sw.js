@@ -13,7 +13,7 @@ self.addEventListener("push", (event) => {
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const eventId = event.notification.data?.event_id;
-  const url = eventId ? `/e/${eventId}` : "/";
+  const url = (eventId ? `/e/${eventId}` : "/") + "?from=push";
   event.waitUntil(
     clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
       for (const client of windowClients) {
