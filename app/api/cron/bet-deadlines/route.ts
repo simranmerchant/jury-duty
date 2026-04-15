@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { timingSafeEqual } from "crypto";
 import { supabase } from "@/lib/supabase";
 import { sendPushToUsers } from "@/lib/push";
+import { sendWebPushToUsers } from "@/lib/webpush";
 
 function isAuthorized(req: NextRequest): boolean {
   const secret = process.env.CRON_SECRET;
@@ -21,7 +22,7 @@ export async function GET(req: NextRequest) {
 
   const { data: overdueBets, error } = await supabase
     .from("bets")
-    .select("id, question, creator_id")
+    .select("id, question, creator_id, event_id")
     .eq("status", "open")
     .eq("deadline_notified", false)
     .lt("deadline", new Date().toISOString());
@@ -37,13 +38,17 @@ export async function GET(req: NextRequest) {
     data: { bet_id: bet.id },
   }));
 
-  const [notifResult, , markResult] = await Promise.all([
+  const pushPayloads = overdueBets.map((b) => ({
+    title: "the people need to know.",
+    body: `"${b.question}" is past its deadline. resolve it.`,
+    data: { bet_id: b.id, event_id: b.event_id },
+  }));
+
+  const [notifResult, markResult] = await Promise.all([
     supabase.from("notifications").insert(notifications),
-    sendPushToUsers(overdueBets.map((b) => b.creator_id), {
-      title: "the people need to know.",
-      body: "one of your bets is past its deadline. resolve it.",
-    }),
     supabase.from("bets").update({ deadline_notified: true }).in("id", overdueBets.map((b) => b.id)),
+    ...overdueBets.map((b, i) => sendPushToUsers([b.creator_id], pushPayloads[i])),
+    ...overdueBets.map((b, i) => sendWebPushToUsers([b.creator_id], pushPayloads[i])),
   ]);
 
   if (notifResult.error) console.error("cron: notification insert failed", notifResult.error.message);

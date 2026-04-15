@@ -131,7 +131,7 @@ function OnboardingInner() {
                 choose a username
               </h1>
               <p className="text-[14px]" style={{ color: "var(--muted)" }}>
-                friends can find and tag you by handle. you can change it later.
+                friends can find and tag you. you can change this later.
               </p>
             </div>
 
@@ -143,7 +143,7 @@ function OnboardingInner() {
               <input
                 className="flex-1 py-4 text-[18px] font-bold outline-none bg-transparent"
                 style={{ color: "var(--text)" }}
-                placeholder="yourname"
+                placeholder="username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9._]/g, ""))}
                 onKeyDown={(e) => e.key === "Enter" && saveUsername()}

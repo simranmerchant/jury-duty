@@ -174,12 +174,12 @@ export async function POST(
       notifyIds.length > 0 && sendPushToUsers(notifyIds, {
         title: "you've been added to a private bet 👀",
         body: "open the app to see it",
-        data: { event_id: eventId },
+        data: { event_id: eventId, bet_id: bet.id },
       }),
       notifyIds.length > 0 && sendWebPushToUsers(notifyIds, {
         title: "you've been added to a private bet 👀",
         body: "open the app to see it",
-        data: { event_id: eventId },
+        data: { event_id: eventId, bet_id: bet.id },
       }),
     ]);
   } else if (otherGuestIds.length > 0) {
@@ -194,12 +194,12 @@ export async function POST(
       sendPushToUsers(otherGuestIds, {
         title: `new bet in ${event.name} 🗳️`,
         body: "open the app to vote",
-        data: { event_id: eventId },
+        data: { event_id: eventId, bet_id: bet.id },
       }),
       sendWebPushToUsers(otherGuestIds, {
         title: `new bet in ${event.name} 🗳️`,
         body: "open the app to vote",
-        data: { event_id: eventId },
+        data: { event_id: eventId, bet_id: bet.id },
       }),
     ]);
   }
