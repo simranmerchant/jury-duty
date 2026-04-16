@@ -11,6 +11,7 @@ type BetInvite = { user_id: string };
 type Bet = {
   id: string;
   question: string;
+  question_tagged_user_ids: string[] | null;
   deadline: string;
   visibility: "public" | "private";
   status: "open" | "resolved";
@@ -681,6 +682,40 @@ function BetCard({
     onUpdate();
   }
 
+  // Tag users in question after creation
+  const [showQTagPicker, setShowQTagPicker] = useState(false);
+  const [qTagSearch, setQTagSearch] = useState("");
+  const [qTagging, setQTagging] = useState(false);
+  const qTagRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (qTagRef.current && !qTagRef.current.contains(e.target as Node)) {
+        setShowQTagPicker(false);
+        setQTagSearch("");
+      }
+    }
+    if (showQTagPicker) document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showQTagPicker]);
+
+  async function submitQTag(userId: string | null) {
+    if (qTagging) return;
+    setQTagging(true);
+    const current = bet.question_tagged_user_ids ?? [];
+    const next = userId === null ? [] : current.includes(userId) ? current.filter((id) => id !== userId) : [...current, userId];
+    const token = await getAccessToken();
+    await fetch(`/api/v1/bets/${bet.id}`, {
+      method: "PATCH",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ question_tagged_user_ids: next }),
+    });
+    setQTagging(false);
+    setShowQTagPicker(false);
+    setQTagSearch("");
+    onUpdate();
+  }
+
   // Tag option after creation
   const [tagPickerOptId, setTagPickerOptId] = useState<string | null>(null);
   const [tagPickerSearch, setTagPickerSearch] = useState("");
@@ -927,10 +962,72 @@ function BetCard({
 
       {/* Question + private badge */}
       <div className="flex items-start justify-between gap-2 mb-3">
-        <p className="font-extrabold text-[16px] leading-snug flex-1 flex items-center gap-2" style={{ fontFamily: "var(--font-nunito)" }}>
-          {bet.question}
-          {bet.isNew && <span className="w-2 h-2 rounded-full flex-shrink-0 inline-block" style={{ background: "var(--accent)" }} />}
-        </p>
+        <div className="flex-1 min-w-0">
+          <p className="font-extrabold text-[16px] leading-snug flex items-center gap-2" style={{ fontFamily: "var(--font-nunito)" }}>
+            {bet.question}
+            {bet.isNew && <span className="w-2 h-2 rounded-full flex-shrink-0 inline-block" style={{ background: "var(--accent)" }} />}
+          </p>
+          {/* Tagged users in question */}
+          {(bet.question_tagged_user_ids ?? []).length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-1.5">
+              {(bet.question_tagged_user_ids ?? []).map((uid) => {
+                const guest = eventGuests.find((g) => g.user_id === uid);
+                const name = guest?.balances?.display_name ?? "unknown";
+                return (
+                  <span key={uid} className="flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: "var(--accent-dim)", color: "var(--accent)", border: "1px solid var(--accent-border)" }}>
+                    @{name}
+                    {bet.creator_id === userId && isOpen && (
+                      <button onClick={() => submitQTag(uid)} className="ml-0.5" style={{ color: "var(--muted)" }}>✕</button>
+                    )}
+                  </span>
+                );
+              })}
+            </div>
+          )}
+          {/* Question tag picker — creator only, open bet */}
+          {bet.creator_id === userId && isOpen && (
+            <div className="relative mt-1.5" ref={qTagRef}>
+              <button
+                onClick={() => { setShowQTagPicker((v) => !v); setQTagSearch(""); }}
+                className="text-[11px] font-bold flex items-center gap-1"
+                style={{ color: showQTagPicker ? "var(--accent)" : "var(--dimmer)" }}
+              >
+                <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                tag someone
+              </button>
+              {showQTagPicker && (
+                <div className="absolute left-0 top-6 z-20 rounded-2xl shadow-lg p-2 flex flex-col gap-1 w-52" style={{ background: "var(--card)", border: "1px solid var(--border-soft)" }}>
+                  <input
+                    autoFocus
+                    value={qTagSearch}
+                    onChange={(e) => setQTagSearch(e.target.value)}
+                    placeholder="search guests"
+                    className="rounded-xl px-3 py-1.5 text-[13px] outline-none w-full"
+                    style={{ background: "rgba(255,255,255,0.06)", color: "var(--text)" }}
+                  />
+                  <div className="flex flex-col max-h-40 overflow-y-auto">
+                    {filterTagPickerGuests(eventGuests, userId, qTagSearch).map((g) => {
+                      const name = g.balances?.display_name ?? "unknown";
+                      const alreadyTagged = (bet.question_tagged_user_ids ?? []).includes(g.user_id);
+                      return (
+                        <button
+                          key={g.user_id}
+                          disabled={qTagging}
+                          onClick={() => submitQTag(g.user_id)}
+                          className="flex items-center gap-2 px-2 py-1.5 rounded-xl text-left text-[13px] font-bold"
+                          style={{ color: alreadyTagged ? "var(--accent)" : "var(--text)", background: alreadyTagged ? "var(--accent-dim)" : "transparent" }}
+                        >
+                          {alreadyTagged && <span style={{ color: "var(--accent)" }}>✓</span>}
+                          {name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
         {bet.visibility === "private" && (
           <button
             onClick={() => setRevealed((r) => !r)}

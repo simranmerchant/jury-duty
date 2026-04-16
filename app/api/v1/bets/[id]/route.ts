@@ -28,10 +28,22 @@ export async function PATCH(
   const isHost = (eventHost as { host_id: string } | null)?.host_id === user.userId;
   if (!isCreator && !isHost) return NextResponse.json({ error: "not authorized" }, { status: 403 });
 
-  const { deadline } = await req.json();
-  if (!deadline) return NextResponse.json({ error: "deadline required" }, { status: 400 });
+  const { deadline, question_tagged_user_ids } = await req.json();
 
-  const { error } = await supabase.from("bets").update({ deadline }).eq("id", id);
+  // Only the creator can update question tags
+  if (question_tagged_user_ids !== undefined && !isCreator) {
+    return NextResponse.json({ error: "only the bet creator can tag users in the question" }, { status: 403 });
+  }
+
+  const updates: Record<string, unknown> = {};
+  if (deadline) updates.deadline = deadline;
+  if (question_tagged_user_ids !== undefined) {
+    updates.question_tagged_user_ids = Array.isArray(question_tagged_user_ids) ? question_tagged_user_ids : [];
+  }
+
+  if (Object.keys(updates).length === 0) return NextResponse.json({ error: "nothing to update" }, { status: 400 });
+
+  const { error } = await supabase.from("bets").update(updates).eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   return NextResponse.json({ ok: true });

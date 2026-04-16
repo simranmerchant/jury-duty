@@ -125,7 +125,7 @@ export async function GET(
       id, name, ends_at, type, host_id, invite_token, cover_url,
       event_guests(user_id, balances(display_name, avatar_url, username)),
       bets(
-        id, question, deadline, visibility, status, winning_option_id, creator_id, created_at,
+        id, question, question_tagged_user_ids, deadline, visibility, status, winning_option_id, creator_id, created_at,
         bet_options!bet_options_bet_id_fkey(id, label, tagged_user_id, balances!bet_options_tagged_user_id_fkey(display_name, avatar_url, username)),
         bet_entries(id, user_id, option_id, points_staked, is_anonymous, balances(display_name, avatar_url)),
         bet_invites(user_id)
