@@ -461,9 +461,10 @@ export default function EventPage() {
           {event.name}
         </h1>
         <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-          <span className="text-[13px]" style={{ color: "var(--muted)" }}>
-            {guestCount} {guestCount === 1 ? "guest" : "guests"}
-          </span>
+          <button onClick={() => setShowInviteSheet(true)} className="flex items-center gap-1.5" style={{ color: "var(--muted)" }}>
+            <span className="text-[13px]">{guestCount} {guestCount === 1 ? "guest" : "guests"}</span>
+            <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid var(--border-soft)", color: "var(--dimmer)" }}>+ invite</span>
+          </button>
           <span style={{ color: "var(--border)" }}>·</span>
           <span
             className="text-[13px]"
@@ -544,17 +545,6 @@ export default function EventPage() {
                 </button>
               );
             })}
-            <button onClick={() => setShowInviteSheet(true)} className="flex flex-col items-center gap-1.5 flex-shrink-0">
-              <div
-                className="w-10 h-10 rounded-full flex items-center justify-center"
-                style={{ background: "rgba(255,255,255,0.06)", border: "1px dashed var(--border)", color: "var(--dimmer)" }}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 5v14M5 12h14" />
-                </svg>
-              </div>
-              <span className="text-[10px]" style={{ color: "var(--dimmer)" }}>invite</span>
-            </button>
           </div>
         </div>
 
