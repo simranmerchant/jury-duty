@@ -48,7 +48,7 @@ export default function EventPage() {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [codeCopied, setCodeCopied] = useState(false);
+  const [showInviteSheet, setShowInviteSheet] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [coverUploading, setCoverUploading] = useState(false);
@@ -191,8 +191,8 @@ export default function EventPage() {
 
   function copyInviteCode() {
     navigator.clipboard.writeText(event!.invite_token);
-    setCodeCopied(true);
-    setTimeout(() => setCodeCopied(false), 2000);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   }
 
   async function uploadCover(file: File) {
@@ -319,6 +319,65 @@ export default function EventPage() {
         );
       })()}
 
+      {/* Invite sheet */}
+      {showInviteSheet && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center"
+          style={{ background: "rgba(0,0,0,0.6)" }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowInviteSheet(false); }}
+        >
+          <div className="w-full max-w-lg rounded-t-3xl p-6 flex flex-col gap-2" style={{ background: "var(--card)", border: "1px solid var(--border-soft)" }}>
+            <div className="w-9 h-1 rounded-full mx-auto mb-3" style={{ background: "var(--border)" }} />
+            <button
+              onClick={() => { setShowInviteSheet(false); openAddGuests(); }}
+              className="flex items-center gap-4 px-4 py-4 rounded-2xl text-left w-full"
+              style={{ background: "rgba(255,255,255,0.04)" }}
+            >
+              <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "var(--accent-dim)" }}>
+                <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              </div>
+              <div>
+                <p className="text-[15px] font-bold">invite contacts</p>
+                <p className="text-[12px]" style={{ color: "var(--muted)" }}>add people already on jury duty</p>
+              </div>
+            </button>
+            <button
+              onClick={() => { setShowInviteSheet(false); shareInvite(); }}
+              className="flex items-center gap-4 px-4 py-4 rounded-2xl text-left w-full"
+              style={{ background: "rgba(255,255,255,0.04)" }}
+            >
+              <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "rgba(255,255,255,0.08)" }}>
+                <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+              </div>
+              <div>
+                <p className="text-[15px] font-bold">share link</p>
+                <p className="text-[12px]" style={{ color: "var(--muted)" }}>send via text, airdrop, or any app</p>
+              </div>
+            </button>
+            <button
+              onClick={() => { copyInviteCode(); setShowInviteSheet(false); }}
+              className="flex items-center gap-4 px-4 py-4 rounded-2xl text-left w-full"
+              style={{ background: "rgba(255,255,255,0.04)" }}
+            >
+              <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "rgba(255,255,255,0.08)" }}>
+                <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              </div>
+              <div>
+                <p className="text-[15px] font-bold">{copied ? "copied!" : "copy invite code"}</p>
+                <p className="text-[12px]" style={{ color: "var(--muted)" }}>paste it in the join screen</p>
+              </div>
+            </button>
+            <button
+              onClick={() => setShowInviteSheet(false)}
+              className="mt-2 w-full py-3.5 rounded-2xl font-bold text-[15px]"
+              style={{ background: "rgba(255,255,255,0.05)", color: "var(--muted)" }}
+            >
+              cancel
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Edit event modal */}
       {showEditEvent && (
         <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,0.6)" }}
@@ -424,62 +483,35 @@ export default function EventPage() {
           )}
         </div>
 
-        <div className="mt-3 flex items-center gap-2 flex-wrap">
-        <button
-          onClick={shareInvite}
-          className="text-[12px] font-bold px-3 py-1.5 rounded-full"
-          style={{
-            background: "var(--accent-dim)",
-            color: copied ? "var(--win)" : "var(--accent)",
-            border: `1px solid ${copied ? "rgba(48,209,88,0.3)" : "var(--accent-border)"}`,
-            transition: "color 0.2s, border-color 0.2s",
-          }}
-        >
-          {copied ? "copied!" : "invite friends"}
-        </button>
-        <button
-          onClick={copyInviteCode}
-          className="flex items-center gap-1.5 text-[12px] font-bold px-3 py-1.5 rounded-full"
-          style={{
-            background: "rgba(255,255,255,0.05)",
-            color: codeCopied ? "var(--win)" : "var(--muted)",
-            border: `1px solid ${codeCopied ? "rgba(48,209,88,0.3)" : "var(--border-soft)"}`,
-            transition: "color 0.2s, border-color 0.2s",
-            fontFamily: "monospace",
-          }}
-        >
-          {codeCopied ? "✓ copied" : event.invite_token.slice(0, 8) + "..."}
-        </button>
         {isHost && (
-          <button
-            onClick={() => { setEditName(event.name); setEditEndsAt(event.ends_at ? new Date(event.ends_at).toISOString().slice(0,16) : ""); setShowEditEvent(true); }}
-            className="text-[12px] font-bold px-3 py-1.5 rounded-full"
-            style={{ background: "rgba(255,255,255,0.05)", color: "var(--muted)", border: "1px solid var(--border-soft)" }}
-          >
-            edit
-          </button>
-        )}
-        {isHost && (
-          confirmDelete ? (
+          <div className="mt-3 flex items-center gap-2 flex-wrap">
             <button
-              onClick={deleteEvent}
-              disabled={deleting}
+              onClick={() => { setEditName(event.name); setEditEndsAt(event.ends_at ? new Date(event.ends_at).toISOString().slice(0,16) : ""); setShowEditEvent(true); }}
               className="text-[12px] font-bold px-3 py-1.5 rounded-full"
-              style={{ background: "rgba(255,60,60,0.15)", color: "#ff3c3c", border: "1px solid rgba(255,60,60,0.3)" }}
+              style={{ background: "rgba(255,255,255,0.05)", color: "var(--muted)", border: "1px solid var(--border-soft)" }}
             >
-              {deleting ? "deleting..." : "tap again to confirm"}
+              edit
             </button>
-          ) : (
-            <button
-              onClick={() => setConfirmDelete(true)}
-              className="text-[12px] font-bold px-3 py-1.5 rounded-full"
-              style={{ background: "rgba(255,255,255,0.04)", color: "var(--dimmer)", border: "1px solid var(--border-soft)" }}
-            >
-              delete {isGroup ? "group" : "event"}
-            </button>
-          )
+            {confirmDelete ? (
+              <button
+                onClick={deleteEvent}
+                disabled={deleting}
+                className="text-[12px] font-bold px-3 py-1.5 rounded-full"
+                style={{ background: "rgba(255,60,60,0.15)", color: "#ff3c3c", border: "1px solid rgba(255,60,60,0.3)" }}
+              >
+                {deleting ? "deleting..." : "tap again to confirm"}
+              </button>
+            ) : (
+              <button
+                onClick={() => setConfirmDelete(true)}
+                className="text-[12px] font-bold px-3 py-1.5 rounded-full"
+                style={{ background: "rgba(255,255,255,0.04)", color: "var(--dimmer)", border: "1px solid var(--border-soft)" }}
+              >
+                delete {isGroup ? "group" : "event"}
+              </button>
+            )}
+          </div>
         )}
-        </div>
       </div>
 
       {/* Guest list */}
@@ -512,16 +544,16 @@ export default function EventPage() {
                 </button>
               );
             })}
-            <button onClick={openAddGuests} className="flex flex-col items-center gap-1.5 flex-shrink-0">
+            <button onClick={() => setShowInviteSheet(true)} className="flex flex-col items-center gap-1.5 flex-shrink-0">
               <div
                 className="w-10 h-10 rounded-full flex items-center justify-center"
-                style={{ background: "rgba(255,255,255,0.06)", color: "var(--dimmer)" }}
+                style={{ background: "rgba(255,255,255,0.06)", border: "1px dashed var(--border)", color: "var(--dimmer)" }}
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M12 5v14M5 12h14" />
                 </svg>
               </div>
-              <span className="text-[10px]" style={{ color: "var(--dimmer)" }}>add</span>
+              <span className="text-[10px]" style={{ color: "var(--dimmer)" }}>invite</span>
             </button>
           </div>
         </div>
