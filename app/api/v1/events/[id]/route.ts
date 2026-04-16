@@ -134,7 +134,8 @@ export async function GET(
     .eq("id", id)
     .single();
 
-  if (error || !event) return NextResponse.json({ error: "not found" }, { status: 404 });
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (!event) return NextResponse.json({ error: "not found" }, { status: 404 });
 
   const { data: lastSeen } = await supabase
     .from("event_last_seen")
