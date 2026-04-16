@@ -461,9 +461,9 @@ export default function EventPage() {
           {event.name}
         </h1>
         <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-          <button onClick={() => setShowInviteSheet(true)} className="flex items-center gap-1.5" style={{ color: "var(--muted)" }}>
-            <span className="text-[13px]">{guestCount} {guestCount === 1 ? "guest" : "guests"}</span>
-            <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid var(--border-soft)", color: "var(--dimmer)" }}>+ invite</span>
+          <button onClick={() => setShowInviteSheet(true)} className="flex items-center gap-1.5">
+            <span className="text-[13px]" style={{ color: "var(--dimmer)" }}>{guestCount} {guestCount === 1 ? "guest" : "guests"}</span>
+            <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid var(--border-soft)", color: "var(--muted)" }}>+ invite</span>
           </button>
           <span style={{ color: "var(--border)" }}>·</span>
           <span
