@@ -361,11 +361,11 @@ export default function EventsPage() {
             <div className="w-9 h-1 rounded-full mx-auto mb-1" style={{ background: "var(--border)" }} />
             <h2 className="text-xl font-black" style={{ fontFamily: "var(--font-nunito)" }}>Join</h2>
             <div className="flex flex-col gap-1">
-              <label className="text-[12px] font-semibold" style={{ color: "var(--muted)" }}>Paste invite link</label>
+              <label className="text-[12px] font-semibold" style={{ color: "var(--muted)" }}>Paste invite link or code</label>
               <input
                 className="rounded-2xl px-4 py-3 text-[15px] outline-none"
                 style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--accent-border)", color: "var(--text)" }}
-                placeholder="juryduty.app/join/..."
+                placeholder="juryduty.app/join/... or paste code"
                 value={joinInput}
                 onChange={(e) => setJoinInput(e.target.value)}
                 autoFocus

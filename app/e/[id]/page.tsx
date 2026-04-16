@@ -48,6 +48,7 @@ export default function EventPage() {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [codeCopied, setCodeCopied] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [coverUploading, setCoverUploading] = useState(false);
@@ -186,6 +187,12 @@ export default function EventPage() {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
+  }
+
+  function copyInviteCode() {
+    navigator.clipboard.writeText(event!.invite_token);
+    setCodeCopied(true);
+    setTimeout(() => setCodeCopied(false), 2000);
   }
 
   async function uploadCover(file: File) {
@@ -429,6 +436,19 @@ export default function EventPage() {
           }}
         >
           {copied ? "copied!" : "invite friends"}
+        </button>
+        <button
+          onClick={copyInviteCode}
+          className="flex items-center gap-1.5 text-[12px] font-bold px-3 py-1.5 rounded-full"
+          style={{
+            background: "rgba(255,255,255,0.05)",
+            color: codeCopied ? "var(--win)" : "var(--muted)",
+            border: `1px solid ${codeCopied ? "rgba(48,209,88,0.3)" : "var(--border-soft)"}`,
+            transition: "color 0.2s, border-color 0.2s",
+            fontFamily: "monospace",
+          }}
+        >
+          {codeCopied ? "✓ copied" : event.invite_token.slice(0, 8) + "..."}
         </button>
         {isHost && (
           <button

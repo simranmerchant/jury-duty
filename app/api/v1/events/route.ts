@@ -60,7 +60,7 @@ export async function GET(req: NextRequest) {
       .select(`
         id, name, ends_at, type, host_id, invite_token, cover_url,
         event_guests!inner(user_id),
-        bets(id, status, visibility, created_at)
+        bets(id, status, visibility, creator_id, created_at, bet_invites(user_id))
       `)
       .eq("event_guests.user_id", user.userId)
       .order("created_at", { ascending: false }),
@@ -75,11 +75,17 @@ export async function GET(req: NextRequest) {
   const seenMap = new Map((lastSeenRows ?? []).map((r) => [r.event_id, r.seen_at]));
 
   const eventsWithNew = (events ?? []).map((event) => {
+    // Only count bets the user can actually see (public, or private where they're creator/invited)
+    const visibleBets = (event.bets ?? []).filter((b: any) => {
+      if (b.visibility !== "private") return true;
+      if (b.creator_id === user.userId) return true;
+      return (b.bet_invites ?? []).some((inv: any) => inv.user_id === user.userId);
+    });
     const seenAt = seenMap.get(event.id);
-    const hasNew = (event.bets ?? []).some(
-      (b: any) => !seenAt || new Date(b.created_at) > new Date(seenAt)
+    const hasNew = visibleBets.some(
+      (b: any) => b.creator_id !== user.userId && (!seenAt || new Date(b.created_at) > new Date(seenAt))
     );
-    return { ...event, hasNew };
+    return { ...event, bets: visibleBets, hasNew };
   });
 
   return NextResponse.json({ events: eventsWithNew });

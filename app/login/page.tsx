@@ -27,6 +27,15 @@ function LoginInner() {
     });
   }, [ready, authenticated, getAccessToken, router, searchParams]);
 
+  // Auto-open login modal when coming from an invite link — skip the extra tap
+  useEffect(() => {
+    if (!ready || authenticated) return;
+    const redirect = searchParams.get("redirect");
+    if (redirect?.startsWith("/join/")) {
+      login();
+    }
+  }, [ready, authenticated, login, searchParams]);
+
   if (!ready) return null;
 
   return (
