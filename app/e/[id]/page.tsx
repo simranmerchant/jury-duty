@@ -192,7 +192,8 @@ export default function EventPage() {
   }
 
   function copyInviteCode() {
-    navigator.clipboard.writeText(event!.invite_token);
+    const url = `${window.location.origin}/join/${event!.invite_token}`;
+    navigator.clipboard.writeText(url);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
@@ -365,8 +366,8 @@ export default function EventPage() {
                 <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
               </div>
               <div>
-                <p className="text-[15px] font-bold">{copied ? "copied!" : "copy invite code"}</p>
-                <p className="text-[12px]" style={{ color: "var(--muted)" }}>paste it in the join screen</p>
+                <p className="text-[15px] font-bold">{copied ? "copied!" : "copy link"}</p>
+                <p className="text-[12px]" style={{ color: "var(--muted)" }}>copy the invite link to your clipboard</p>
               </div>
             </button>
             <button
@@ -634,6 +635,7 @@ function BetCard({
   onUpdate: () => void;
 }) {
   const { getAccessToken } = usePrivy();
+  const router = useRouter();
 
   // Blur/reveal state — private bets start blurred
   const [revealed, setRevealed] = useState(bet.visibility !== "private");
