@@ -156,9 +156,15 @@ function JoinPageInner() {
         )}
 
         {!authenticated && (
-          <p className="text-[12px]" style={{ color: "var(--dimmer)" }}>
-            you'll be asked for your phone number — that's it
-          </p>
+          <div className="flex flex-col items-center gap-1.5">
+            <p className="text-[12px]" style={{ color: "var(--dimmer)" }}>
+              you'll be asked for your phone number — that's it
+            </p>
+            <p className="text-[11px] text-center" style={{ color: "var(--dimmer)", opacity: 0.6 }}>
+              if login doesn't work, tap the share icon and choose{" "}
+              <span style={{ fontWeight: 600 }}>Open in Safari</span>
+            </p>
+          </div>
         )}
       </div>
     </div>

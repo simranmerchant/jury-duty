@@ -2,7 +2,7 @@
 
 import { usePrivy } from "@privy-io/react-auth";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, Suspense } from "react";
+import { useEffect, useRef, Suspense } from "react";
 
 function LoginInner() {
   const { ready, authenticated, login, getAccessToken } = usePrivy();
@@ -28,10 +28,14 @@ function LoginInner() {
   }, [ready, authenticated, getAccessToken, router, searchParams]);
 
   // Auto-open login modal when coming from an invite link — skip the extra tap
+  // Use a ref so login() is only called once; Privy updates the login reference
+  // during the auth flow which would otherwise re-trigger this and reset the modal.
+  const loginCalled = useRef(false);
   useEffect(() => {
-    if (!ready || authenticated) return;
+    if (!ready || authenticated || loginCalled.current) return;
     const redirect = searchParams.get("redirect");
     if (redirect?.startsWith("/join/")) {
+      loginCalled.current = true;
       login();
     }
   }, [ready, authenticated, login, searchParams]);
