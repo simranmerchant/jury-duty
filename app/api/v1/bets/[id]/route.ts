@@ -28,16 +28,17 @@ export async function PATCH(
   const isHost = (eventHost as { host_id: string } | null)?.host_id === user.userId;
   if (!isCreator && !isHost) return NextResponse.json({ error: "not authorized" }, { status: 403 });
 
-  const { deadline, question_tagged_user_ids } = await req.json();
+  const { deadline, question, question_tagged_user_ids } = await req.json();
 
-  // Only the creator can update question tags
-  if (question_tagged_user_ids !== undefined && !isCreator) {
+  // Only the creator can update question text / tags
+  if ((question !== undefined || question_tagged_user_ids !== undefined) && !isCreator) {
     return NextResponse.json({ error: "only the bet creator can tag users in the question" }, { status: 403 });
   }
 
   const updates: Record<string, unknown> = {};
   if (deadline) updates.deadline = deadline;
-  if (question_tagged_user_ids !== undefined) {
+  if (question !== undefined && isCreator) updates.question = question;
+  if (question_tagged_user_ids !== undefined && isCreator) {
     updates.question_tagged_user_ids = Array.isArray(question_tagged_user_ids) ? question_tagged_user_ids : [];
   }
 

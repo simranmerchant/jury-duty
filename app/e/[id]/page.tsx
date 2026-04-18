@@ -4,6 +4,7 @@ import { usePrivy } from "@privy-io/react-auth";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { filterTagPickerGuests } from "../../../lib/tag-picker";
+import { parseQuestion, extractTaggedUserIds, insertMentionAt, removeMention, getWordTokens } from "../../../lib/question-tags";
 
 type BetOption = { id: string; label: string; tagged_user_id?: string | null; balances?: { display_name: string | null; avatar_url: string | null; username?: string | null } | null };
 type BetEntry = { id: string; user_id: string; option_id: string; points_staked: number; is_anonymous: boolean; balances?: { display_name: string | null; avatar_url: string | null } };
@@ -682,7 +683,9 @@ function BetCard({
     onUpdate();
   }
 
-  // Tag users in question after creation
+  // Inline question tagging
+  const [qTagMode, setQTagMode] = useState(false); // word-selection mode
+  const [qPendingWord, setQPendingWord] = useState<{ start: number; end: number; label: string } | null>(null);
   const [showQTagPicker, setShowQTagPicker] = useState(false);
   const [qTagSearch, setQTagSearch] = useState("");
   const [qTagging, setQTagging] = useState(false);
@@ -693,26 +696,44 @@ function BetCard({
       if (qTagRef.current && !qTagRef.current.contains(e.target as Node)) {
         setShowQTagPicker(false);
         setQTagSearch("");
+        setQPendingWord(null);
       }
     }
     if (showQTagPicker) document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [showQTagPicker]);
 
-  async function submitQTag(userId: string | null) {
-    if (qTagging) return;
+  async function applyQTag(userId: string) {
+    if (!qPendingWord || qTagging) return;
     setQTagging(true);
-    const current = bet.question_tagged_user_ids ?? [];
-    const next = userId === null ? [] : current.includes(userId) ? current.filter((id) => id !== userId) : [...current, userId];
+    const newQuestion = insertMentionAt(bet.question, qPendingWord.start, qPendingWord.end, userId);
+    const newTaggedIds = extractTaggedUserIds(newQuestion);
     const token = await getAccessToken();
     await fetch(`/api/v1/bets/${bet.id}`, {
       method: "PATCH",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ question_tagged_user_ids: next }),
+      body: JSON.stringify({ question: newQuestion, question_tagged_user_ids: newTaggedIds }),
     });
     setQTagging(false);
     setShowQTagPicker(false);
+    setQPendingWord(null);
     setQTagSearch("");
+    setQTagMode(false);
+    onUpdate();
+  }
+
+  async function removeQTag(userId: string) {
+    if (qTagging) return;
+    setQTagging(true);
+    const newQuestion = removeMention(bet.question, userId);
+    const newTaggedIds = extractTaggedUserIds(newQuestion);
+    const token = await getAccessToken();
+    await fetch(`/api/v1/bets/${bet.id}`, {
+      method: "PATCH",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ question: newQuestion, question_tagged_user_ids: newTaggedIds }),
+    });
+    setQTagging(false);
     onUpdate();
   }
 
@@ -963,40 +984,69 @@ function BetCard({
       {/* Question + private badge */}
       <div className="flex items-start justify-between gap-2 mb-3">
         <div className="flex-1 min-w-0">
-          <p className="font-extrabold text-[16px] leading-snug flex items-center gap-2" style={{ fontFamily: "var(--font-nunito)" }}>
-            {bet.question}
-            {bet.isNew && <span className="w-2 h-2 rounded-full flex-shrink-0 inline-block" style={{ background: "var(--accent)" }} />}
-          </p>
-          {/* Tagged users in question */}
-          {(bet.question_tagged_user_ids ?? []).length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mt-1.5">
-              {(bet.question_tagged_user_ids ?? []).map((uid) => {
-                const guest = eventGuests.find((g) => g.user_id === uid);
-                const name = guest?.balances?.display_name ?? "unknown";
+          {/* Question text — word-select mode or inline render */}
+          {qTagMode ? (
+            <div className="flex flex-wrap gap-1 mb-1">
+              {getWordTokens(parseQuestion(bet.question)).map((t) =>
+                t.isMention ? (
+                  <span key={t.key} className="text-[16px] font-extrabold" style={{ color: "var(--accent)", fontFamily: "var(--font-nunito)" }}>
+                    @{t.label.slice(1)}
+                  </span>
+                ) : (
+                  <button
+                    key={t.key}
+                    onClick={() => { setQPendingWord({ start: t.start, end: t.end, label: t.label }); setShowQTagPicker(true); setQTagMode(false); setQTagSearch(""); }}
+                    className="text-[16px] font-extrabold px-1.5 py-0.5 rounded-lg"
+                    style={{ fontFamily: "var(--font-nunito)", background: "rgba(255,255,255,0.08)", border: "1px solid var(--border-soft)" }}
+                  >
+                    {t.label}
+                  </button>
+                )
+              )}
+              <button onClick={() => setQTagMode(false)} className="text-[11px] self-center ml-1" style={{ color: "var(--dimmer)" }}>cancel</button>
+            </div>
+          ) : (
+            <p className="font-extrabold text-[16px] leading-snug" style={{ fontFamily: "var(--font-nunito)" }}>
+              {parseQuestion(bet.question).map((seg, i) => {
+                if (seg.type === "text") return <span key={i}>{seg.text}</span>;
+                const guest = eventGuests.find((g) => g.user_id === seg.userId);
+                const name = guest?.balances?.display_name ?? seg.original;
+                const username = guest?.balances?.username;
                 return (
-                  <span key={uid} className="flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: "var(--accent-dim)", color: "var(--accent)", border: "1px solid var(--accent-border)" }}>
-                    @{name}
+                  <span key={i} className="inline-flex items-center gap-0.5">
+                    <button
+                      onClick={() => router.push(username ? `/u/${username}` : "/people")}
+                      className="font-extrabold"
+                      style={{ color: "var(--accent)" }}
+                    >
+                      @{name}
+                    </button>
                     {bet.creator_id === userId && isOpen && (
-                      <button onClick={() => submitQTag(uid)} className="ml-0.5" style={{ color: "var(--muted)" }}>✕</button>
+                      <button onClick={() => removeQTag(seg.userId)} className="text-[10px] leading-none" style={{ color: "var(--dimmer)" }}>✕</button>
                     )}
                   </span>
                 );
               })}
-            </div>
+              {bet.isNew && <span className="w-2 h-2 rounded-full flex-shrink-0 inline-block ml-1.5" style={{ background: "var(--accent)" }} />}
+            </p>
           )}
-          {/* Question tag picker — creator only, open bet */}
-          {bet.creator_id === userId && isOpen && (
-            <div className="relative mt-1.5" ref={qTagRef}>
+          {/* Tag someone button — creator only, open bet */}
+          {bet.creator_id === userId && isOpen && !qTagMode && (
+            <div className="relative mt-1" ref={qTagRef}>
               <button
-                onClick={() => { setShowQTagPicker((v) => !v); setQTagSearch(""); }}
+                onClick={() => { setQTagMode(true); setShowQTagPicker(false); }}
                 className="text-[11px] font-bold flex items-center gap-1"
-                style={{ color: showQTagPicker ? "var(--accent)" : "var(--dimmer)" }}
+                style={{ color: "var(--dimmer)" }}
               >
                 <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                 tag someone
               </button>
-              {showQTagPicker && (
+              {/* User picker after word is selected */}
+              {showQTagPicker && qPendingWord && (
                 <div className="absolute left-0 top-6 z-20 rounded-2xl shadow-lg p-2 flex flex-col gap-1 w-52" style={{ background: "var(--card)", border: "1px solid var(--border-soft)" }}>
+                  <p className="text-[11px] px-2 pt-1 pb-0.5" style={{ color: "var(--dimmer)" }}>
+                    replacing <span className="font-bold" style={{ color: "var(--text)" }}>{qPendingWord.label}</span> with...
+                  </p>
                   <input
                     autoFocus
                     value={qTagSearch}
@@ -1008,16 +1058,14 @@ function BetCard({
                   <div className="flex flex-col max-h-40 overflow-y-auto">
                     {filterTagPickerGuests(eventGuests, userId, qTagSearch).map((g) => {
                       const name = g.balances?.display_name ?? "unknown";
-                      const alreadyTagged = (bet.question_tagged_user_ids ?? []).includes(g.user_id);
                       return (
                         <button
                           key={g.user_id}
                           disabled={qTagging}
-                          onClick={() => submitQTag(g.user_id)}
+                          onClick={() => applyQTag(g.user_id)}
                           className="flex items-center gap-2 px-2 py-1.5 rounded-xl text-left text-[13px] font-bold"
-                          style={{ color: alreadyTagged ? "var(--accent)" : "var(--text)", background: alreadyTagged ? "var(--accent-dim)" : "transparent" }}
+                          style={{ color: "var(--text)" }}
                         >
-                          {alreadyTagged && <span style={{ color: "var(--accent)" }}>✓</span>}
                           {name}
                         </button>
                       );
