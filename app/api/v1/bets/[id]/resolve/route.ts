@@ -28,7 +28,7 @@ export async function POST(
   if (error) {
     const msg = error.message;
     if (msg.includes("already resolved")) return NextResponse.json({ error: "already resolved" }, { status: 422 });
-    if (msg.includes("not authorized")) return NextResponse.json({ error: "not authorized" }, { status: 403 });
+    if (msg.includes("not authorized")) return NextResponse.json({ error: "only the creator can resolve this bet until 24h after it closes" }, { status: 403 });
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 

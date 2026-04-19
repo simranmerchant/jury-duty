@@ -841,7 +841,8 @@ function BetCard({
   const isOpen = bet.status === "open";
   const isPast = new Date(bet.deadline) < new Date();
   const canBet = isOpen && !isPast && !myEntry && !resolving;
-  const canResolve = isOpen && bet.creator_id === userId;
+  const past24h = isPast && new Date() > new Date(new Date(bet.deadline).getTime() + 24 * 60 * 60 * 1000);
+  const canResolve = isOpen && (bet.creator_id === userId || (past24h && !!userId));
 
   async function placeBet() {
     if (!selectedOption || placing) return;
