@@ -8,8 +8,9 @@ export async function POST(req: NextRequest) {
   const token = req.headers.get("authorization")?.replace("Bearer ", "");
   if (!token) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  const user = await requireUser(token).catch(() => null);
-  if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  let verifyError: string | null = null;
+  const user = await requireUser(token).catch((e: any) => { verifyError = e?.message ?? String(e); return null; });
+  if (!user) return NextResponse.json({ error: "unauthorized", detail: verifyError }, { status: 401 });
 
   const { error } = await supabase
     .from("balances")
