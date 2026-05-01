@@ -9,7 +9,8 @@ import { parseQuestion, extractTaggedUserIds, insertMentionAt, removeMention, ge
 type BetOption = { id: string; label: string; tagged_user_id?: string | null; balances?: { display_name: string | null; avatar_url: string | null; username?: string | null } | null };
 type BetEntry = { id: string; user_id: string; option_id: string; points_staked: number; is_anonymous: boolean; balances?: { display_name: string | null; avatar_url: string | null } };
 type BetInvite = { user_id: string };
-type BetComment = { id: string; body: string; created_at: string; user_id: string; balances?: { display_name: string | null; avatar_url: string | null; username?: string | null } | null };
+type BetComment = { id: string; body: string; created_at: string; user_id: string; parent_id?: string | null; balances?: { display_name: string | null; avatar_url: string | null; username?: string | null } | null; comment_likes?: { user_id: string }[] };
+type BetReaction = { user_id: string; emoji: string };
 type Bet = {
   id: string;
   question: string;
@@ -24,6 +25,7 @@ type Bet = {
   bet_options: BetOption[];
   bet_entries: BetEntry[];
   bet_invites: BetInvite[];
+  bet_reactions: BetReaction[];
 };
 type Guest = { user_id: string; balances?: { display_name: string | null; avatar_url: string | null; username?: string | null } };
 type Event = {
@@ -648,7 +650,14 @@ function BetCard({
   const [commentInput, setCommentInput] = useState("");
   const [submittingComment, setSubmittingComment] = useState(false);
   const [commentMentionSearch, setCommentMentionSearch] = useState<string | null>(null);
+  const [replyingTo, setReplyingTo] = useState<{ id: string; name: string } | null>(null);
+  const [expandedThreads, setExpandedThreads] = useState<Set<string>>(new Set());
   const commentInputRef = useRef<HTMLInputElement>(null);
+
+  // Reactions
+  const [reactions, setReactions] = useState<BetReaction[]>(bet.bet_reactions ?? []);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const EMOJIS = ["🔥", "👀", "💀", "😂", "🤝", "🫡"];
 
   async function fetchComments() {
     setCommentsLoading(true);
@@ -667,13 +676,50 @@ function BetCard({
     const res = await fetch(`/api/v1/bets/${bet.id}/comments`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ body: commentInput.trim() }),
+      body: JSON.stringify({ body: commentInput.trim(), parentId: replyingTo?.id ?? null }),
     });
     if (res.ok) {
       setCommentInput("");
+      setReplyingTo(null);
+      if (replyingTo) setExpandedThreads((s) => new Set([...s, replyingTo.id]));
       fetchComments();
     }
     setSubmittingComment(false);
+  }
+
+  async function toggleReaction(emoji: string) {
+    const token = await getAccessToken();
+    const res = await fetch(`/api/v1/bets/${bet.id}/reactions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ emoji }),
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.action === "removed") {
+      setReactions((r) => r.filter((x) => !(x.user_id === userId && x.emoji === emoji)));
+    } else {
+      setReactions((r) => [...r.filter((x) => x.user_id !== userId), { user_id: userId, emoji }]);
+    }
+    setShowEmojiPicker(false);
+  }
+
+  async function toggleCommentLike(commentId: string) {
+    const token = await getAccessToken();
+    await fetch(`/api/v1/comments/${commentId}/likes`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    setComments((prev) => prev.map((c) => {
+      if (c.id !== commentId) return c;
+      const liked = c.comment_likes?.some((l) => l.user_id === userId);
+      return {
+        ...c,
+        comment_likes: liked
+          ? (c.comment_likes ?? []).filter((l) => l.user_id !== userId)
+          : [...(c.comment_likes ?? []), { user_id: userId }],
+      };
+    }));
   }
 
   async function deleteComment(commentId: string) {
@@ -1520,6 +1566,46 @@ function BetCard({
         </div>
       )}
 
+      {/* Reactions */}
+      {(() => {
+        const grouped = EMOJIS.map((e) => ({ emoji: e, users: reactions.filter((r) => r.emoji === e) })).filter((g) => g.users.length > 0);
+        const myReaction = reactions.find((r) => r.user_id === userId)?.emoji ?? null;
+        return (
+          <div className="mt-4 flex items-center gap-2 flex-wrap relative">
+            {grouped.map(({ emoji, users }) => (
+              <button
+                key={emoji}
+                onClick={() => toggleReaction(emoji)}
+                className="flex items-center gap-1 px-2 py-1 rounded-full text-[13px] font-bold transition-all"
+                style={{
+                  background: myReaction === emoji ? "var(--accent-dim)" : "rgba(255,255,255,0.05)",
+                  border: `1px solid ${myReaction === emoji ? "var(--accent-border)" : "var(--border-soft)"}`,
+                  color: myReaction === emoji ? "var(--accent)" : "var(--muted)",
+                }}
+              >
+                {emoji} {users.length}
+              </button>
+            ))}
+            <div className="relative">
+              <button
+                onClick={() => setShowEmojiPicker((s) => !s)}
+                className="flex items-center gap-1 px-2 py-1 rounded-full text-[13px] transition-all"
+                style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--border-soft)", color: "var(--dimmer)" }}
+              >
+                {myReaction ?? "＋"} {myReaction ? "change" : "react"}
+              </button>
+              {showEmojiPicker && (
+                <div className="absolute bottom-8 left-0 z-20 flex gap-1 p-2 rounded-2xl shadow-xl" style={{ background: "var(--card)", border: "1px solid var(--border-soft)" }}>
+                  {EMOJIS.map((e) => (
+                    <button key={e} onClick={() => toggleReaction(e)} className="text-[20px] hover:scale-125 transition-transform px-1">{e}</button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Comments */}
       <div className="mt-4 pt-4" style={{ borderTop: "1px solid var(--border-soft)" }}>
         <button
@@ -1533,54 +1619,105 @@ function BetCard({
           <div className="mt-3 flex flex-col gap-3">
             {commentsLoading ? (
               <p className="text-[12px]" style={{ color: "var(--dimmer)" }}>loading...</p>
-            ) : comments.length === 0 ? (
+            ) : comments.filter((c) => !c.parent_id).length === 0 ? (
               <p className="text-[12px]" style={{ color: "var(--dimmer)" }}>no comments yet — be first</p>
             ) : (
-              comments.map((c) => (
-                <div key={c.id} className="flex gap-2 items-start group">
-                  <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-[11px] font-black overflow-hidden" style={{ background: "var(--accent-dim)", color: "var(--accent)" }}>
-                    {c.balances?.avatar_url
-                      ? <img src={c.balances.avatar_url} className="w-7 h-7 rounded-full object-cover" />
-                      : (c.balances?.display_name?.[0] ?? "?").toUpperCase()}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <span className="text-[12px] font-bold" style={{ color: "var(--muted)" }}>{c.balances?.display_name ?? "unknown"} </span>
-                    <span className="text-[13px]" style={{ color: "var(--text)" }}>
-                      {c.body.split(/(@\w+)/g).map((part, i) =>
-                        part.startsWith("@") ? (
-                          <span key={i} className="font-bold" style={{ color: "var(--accent)" }}>{part}</span>
-                        ) : part
+              comments.filter((c) => !c.parent_id).map((c) => {
+                const replies = comments.filter((r) => r.parent_id === c.id);
+                const isExpanded = expandedThreads.has(c.id);
+                return (
+                  <div key={c.id}>
+                    {/* Top-level comment */}
+                    <div className="flex gap-2 items-start group">
+                      <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-[11px] font-black overflow-hidden" style={{ background: "var(--accent-dim)", color: "var(--accent)" }}>
+                        {c.balances?.avatar_url
+                          ? <img src={c.balances.avatar_url} className="w-7 h-7 rounded-full object-cover" />
+                          : (c.balances?.display_name?.[0] ?? "?").toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-[12px] font-bold" style={{ color: "var(--muted)" }}>{c.balances?.display_name ?? "unknown"} </span>
+                        <span className="text-[13px]" style={{ color: "var(--text)" }}>
+                          {c.body.split(/(@\w+)/g).map((part, i) =>
+                            part.startsWith("@") ? <span key={i} className="font-bold" style={{ color: "var(--accent)" }}>{part}</span> : part
+                          )}
+                        </span>
+                        <div className="flex items-center gap-3 mt-1">
+                          <button
+                            onClick={() => toggleCommentLike(c.id)}
+                            className="text-[11px] font-bold flex items-center gap-1"
+                            style={{ color: c.comment_likes?.some((l) => l.user_id === userId) ? "var(--accent)" : "var(--dimmer)" }}
+                          >
+                            ♥ {c.comment_likes?.length ?? 0 || ""}
+                          </button>
+                          <button
+                            onClick={() => {
+                              const username = c.balances?.username ?? c.balances?.display_name?.replace(/\s+/g, "") ?? "unknown";
+                              setReplyingTo({ id: c.id, name: username });
+                              setCommentInput(`@${username} `);
+                              setCommentMentionSearch(null);
+                              commentInputRef.current?.focus();
+                            }}
+                            className="text-[11px] font-bold"
+                            style={{ color: "var(--dimmer)" }}
+                          >
+                            reply
+                          </button>
+                          {replies.length > 0 && (
+                            <button
+                              onClick={() => setExpandedThreads((s) => { const n = new Set(s); n.has(c.id) ? n.delete(c.id) : n.add(c.id); return n; })}
+                              className="text-[11px] font-bold"
+                              style={{ color: "var(--dimmer)" }}
+                            >
+                              {isExpanded ? "hide" : `${replies.length} repl${replies.length === 1 ? "y" : "ies"}`}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      {c.user_id === userId && (
+                        <button onClick={() => deleteComment(c.id)} className="flex-shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity" title="delete">
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--dimmer)" }}>
+                            <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
+                          </svg>
+                        </button>
                       )}
-                    </span>
+                    </div>
+                    {/* Replies */}
+                    {isExpanded && replies.map((r) => (
+                      <div key={r.id} className="flex gap-2 items-start group ml-9 mt-2">
+                        <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-black overflow-hidden" style={{ background: "var(--accent-dim)", color: "var(--accent)" }}>
+                          {r.balances?.avatar_url
+                            ? <img src={r.balances.avatar_url} className="w-6 h-6 rounded-full object-cover" />
+                            : (r.balances?.display_name?.[0] ?? "?").toUpperCase()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <span className="text-[12px] font-bold" style={{ color: "var(--muted)" }}>{r.balances?.display_name ?? "unknown"} </span>
+                          <span className="text-[13px]" style={{ color: "var(--text)" }}>
+                            {r.body.split(/(@\w+)/g).map((part, i) =>
+                              part.startsWith("@") ? <span key={i} className="font-bold" style={{ color: "var(--accent)" }}>{part}</span> : part
+                            )}
+                          </span>
+                          <div className="flex items-center gap-3 mt-1">
+                            <button
+                              onClick={() => toggleCommentLike(r.id)}
+                              className="text-[11px] font-bold flex items-center gap-1"
+                              style={{ color: r.comment_likes?.some((l) => l.user_id === userId) ? "var(--accent)" : "var(--dimmer)" }}
+                            >
+                              ♥ {r.comment_likes?.length ?? 0 || ""}
+                            </button>
+                          </div>
+                        </div>
+                        {r.user_id === userId && (
+                          <button onClick={() => deleteComment(r.id)} className="flex-shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity" title="delete">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--dimmer)" }}>
+                              <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                    ))}
                   </div>
-                  <div className="flex items-center gap-2 flex-shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                    {c.user_id !== userId && (
-                      <button
-                        onClick={() => {
-                          const username = c.balances?.username ?? c.balances?.display_name?.replace(/\s+/g, "") ?? "unknown";
-                          setCommentInput(`@${username} `);
-                          setCommentMentionSearch(null);
-                          commentInputRef.current?.focus();
-                        }}
-                        className="text-[11px] font-bold"
-                        style={{ color: "var(--dimmer)" }}
-                      >
-                        reply
-                      </button>
-                    )}
-                    {c.user_id === userId && (
-                      <button
-                        onClick={() => deleteComment(c.id)}
-                        title="delete comment"
-                      >
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--dimmer)" }}>
-                          <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
-                        </svg>
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))
+                );
+              })
             )}
             {/* Mention dropdown */}
             {commentMentionSearch !== null && (() => {
@@ -1615,6 +1752,12 @@ function BetCard({
                 </div>
               );
             })()}
+            {replyingTo && (
+              <div className="flex items-center gap-2 px-1">
+                <span className="text-[12px]" style={{ color: "var(--dimmer)" }}>replying to @{replyingTo.name}</span>
+                <button onClick={() => { setReplyingTo(null); setCommentInput(""); }} className="text-[11px]" style={{ color: "var(--dimmer)" }}>×</button>
+              </div>
+            )}
             <form onSubmit={submitComment} className="flex gap-2 mt-1">
               <input
                 ref={commentInputRef}
@@ -1629,8 +1772,8 @@ function BetCard({
                     setCommentMentionSearch(null);
                   }
                 }}
-                onKeyDown={(e) => { if (e.key === "Escape") setCommentMentionSearch(null); }}
-                placeholder="add a comment... (@ to mention)"
+                onKeyDown={(e) => { if (e.key === "Escape") { setCommentMentionSearch(null); setReplyingTo(null); setCommentInput(""); } }}
+                placeholder={replyingTo ? `reply to @${replyingTo.name}...` : "add a comment... (@ to mention)"}
                 maxLength={500}
                 className="flex-1 text-[13px] px-3 py-2 rounded-2xl outline-none"
                 style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--border-soft)", color: "var(--text)" }}

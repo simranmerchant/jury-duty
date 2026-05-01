@@ -16,7 +16,7 @@ export async function GET(
 
   const { data, error } = await supabase
     .from("bet_comments")
-    .select("id, body, created_at, user_id, balances(display_name, avatar_url, username)")
+    .select("id, body, created_at, user_id, parent_id, balances(display_name, avatar_url, username), comment_likes(user_id)")
     .eq("bet_id", betId)
     .order("created_at", { ascending: true });
 
@@ -36,15 +36,18 @@ export async function POST(
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const { id: betId } = await params;
-  const { body } = await req.json();
+  const { body, parentId } = await req.json();
 
   if (!body?.trim()) return NextResponse.json({ error: "comment required" }, { status: 400 });
   if (body.trim().length > 500) return NextResponse.json({ error: "max 500 chars" }, { status: 400 });
 
+  const insert: Record<string, unknown> = { bet_id: betId, user_id: user.userId, body: body.trim() };
+  if (parentId) insert.parent_id = parentId;
+
   const { data, error } = await supabase
     .from("bet_comments")
-    .insert({ bet_id: betId, user_id: user.userId, body: body.trim() })
-    .select("id, body, created_at, user_id, balances(display_name, avatar_url, username)")
+    .insert(insert)
+    .select("id, body, created_at, user_id, parent_id, balances(display_name, avatar_url, username), comment_likes(user_id)")
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -67,7 +70,6 @@ export async function DELETE(
   const commentId = searchParams.get("commentId");
   if (!commentId) return NextResponse.json({ error: "commentId required" }, { status: 400 });
 
-  // Only allow deleting own comments
   const { error } = await supabase
     .from("bet_comments")
     .delete()
