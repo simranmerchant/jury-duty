@@ -1575,7 +1575,7 @@ function BetCard({
             {grouped.map(({ emoji, users }) => (
               <button
                 key={emoji}
-                onClick={() => toggleReaction(emoji)}
+                onClick={() => myReaction === emoji ? toggleReaction(emoji) : setShowEmojiPicker((s) => !s)}
                 className="flex items-center gap-1 px-2 py-1 rounded-full text-[13px] font-bold transition-all"
                 style={{
                   background: myReaction === emoji ? "var(--accent-dim)" : "rgba(255,255,255,0.05)",
@@ -1592,12 +1592,12 @@ function BetCard({
                 className="flex items-center gap-1 px-2 py-1 rounded-full text-[13px] transition-all"
                 style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--border-soft)", color: "var(--dimmer)" }}
               >
-                {myReaction ?? "＋"} {myReaction ? "change" : "react"}
+                ＋ react
               </button>
               {showEmojiPicker && (
                 <div className="absolute bottom-8 left-0 z-20 flex gap-1 p-2 rounded-2xl shadow-xl" style={{ background: "var(--card)", border: "1px solid var(--border-soft)" }}>
                   {EMOJIS.map((e) => (
-                    <button key={e} onClick={() => toggleReaction(e)} className="text-[20px] hover:scale-125 transition-transform px-1">{e}</button>
+                    <button key={e} onClick={() => toggleReaction(e)} className="text-[20px] hover:scale-125 transition-transform px-1" style={{ opacity: myReaction === e ? 1 : 0.6 }}>{e}</button>
                   ))}
                 </div>
               )}
