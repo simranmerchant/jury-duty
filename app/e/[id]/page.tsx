@@ -1553,17 +1553,32 @@ function BetCard({
                       )}
                     </span>
                   </div>
-                  {c.user_id === userId && (
-                    <button
-                      onClick={() => deleteComment(c.id)}
-                      className="flex-shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                      title="delete comment"
-                    >
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--dimmer)" }}>
-                        <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
-                      </svg>
-                    </button>
-                  )}
+                  <div className="flex items-center gap-2 flex-shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {c.user_id !== userId && (
+                      <button
+                        onClick={() => {
+                          const username = c.balances?.username ?? c.balances?.display_name?.replace(/\s+/g, "") ?? "unknown";
+                          setCommentInput(`@${username} `);
+                          setCommentMentionSearch(null);
+                          commentInputRef.current?.focus();
+                        }}
+                        className="text-[11px] font-bold"
+                        style={{ color: "var(--dimmer)" }}
+                      >
+                        reply
+                      </button>
+                    )}
+                    {c.user_id === userId && (
+                      <button
+                        onClick={() => deleteComment(c.id)}
+                        title="delete comment"
+                      >
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--dimmer)" }}>
+                          <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
+                        </svg>
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))
             )}
