@@ -647,6 +647,8 @@ function BetCard({
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentInput, setCommentInput] = useState("");
   const [submittingComment, setSubmittingComment] = useState(false);
+  const [commentMentionSearch, setCommentMentionSearch] = useState<string | null>(null);
+  const commentInputRef = useRef<HTMLInputElement>(null);
 
   async function fetchComments() {
     setCommentsLoading(true);
@@ -1535,27 +1537,85 @@ function BetCard({
               <p className="text-[12px]" style={{ color: "var(--dimmer)" }}>no comments yet — be first</p>
             ) : (
               comments.map((c) => (
-                <div key={c.id} className="flex gap-2 items-start">
-                  <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-[11px] font-black" style={{ background: "var(--accent-dim)", color: "var(--accent)" }}>
+                <div key={c.id} className="flex gap-2 items-start group">
+                  <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-[11px] font-black overflow-hidden" style={{ background: "var(--accent-dim)", color: "var(--accent)" }}>
                     {c.balances?.avatar_url
                       ? <img src={c.balances.avatar_url} className="w-7 h-7 rounded-full object-cover" />
                       : (c.balances?.display_name?.[0] ?? "?").toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
                     <span className="text-[12px] font-bold" style={{ color: "var(--muted)" }}>{c.balances?.display_name ?? "unknown"} </span>
-                    <span className="text-[13px]" style={{ color: "var(--text)" }}>{c.body}</span>
+                    <span className="text-[13px]" style={{ color: "var(--text)" }}>
+                      {c.body.split(/(@\w+)/g).map((part, i) =>
+                        part.startsWith("@") ? (
+                          <span key={i} className="font-bold" style={{ color: "var(--accent)" }}>{part}</span>
+                        ) : part
+                      )}
+                    </span>
                   </div>
                   {c.user_id === userId && (
-                    <button onClick={() => deleteComment(c.id)} className="text-[11px] flex-shrink-0 mt-0.5" style={{ color: "var(--dimmer)" }}>×</button>
+                    <button
+                      onClick={() => deleteComment(c.id)}
+                      className="flex-shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                      title="delete comment"
+                    >
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--dimmer)" }}>
+                        <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
+                      </svg>
+                    </button>
                   )}
                 </div>
               ))
             )}
+            {/* Mention dropdown */}
+            {commentMentionSearch !== null && (() => {
+              const filtered = filterTagPickerGuests(eventGuests, userId, commentMentionSearch);
+              if (filtered.length === 0) return null;
+              return (
+                <div className="rounded-2xl overflow-hidden" style={{ border: "1px solid var(--border-soft)", background: "var(--card)" }}>
+                  {filtered.slice(0, 5).map((g) => (
+                    <button
+                      key={g.user_id}
+                      type="button"
+                      className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-white/5"
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        const username = g.balances?.username ?? g.balances?.display_name ?? "unknown";
+                        const atIdx = commentInput.lastIndexOf("@");
+                        const newVal = commentInput.slice(0, atIdx) + `@${username} `;
+                        setCommentInput(newVal);
+                        setCommentMentionSearch(null);
+                        commentInputRef.current?.focus();
+                      }}
+                    >
+                      <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black flex-shrink-0 overflow-hidden" style={{ background: "var(--accent-dim)", color: "var(--accent)" }}>
+                        {g.balances?.avatar_url
+                          ? <img src={g.balances.avatar_url} className="w-6 h-6 object-cover" />
+                          : (g.balances?.display_name?.[0] ?? "?").toUpperCase()}
+                      </div>
+                      <span className="text-[13px] font-semibold" style={{ color: "var(--text)" }}>{g.balances?.display_name ?? "unknown"}</span>
+                      {g.balances?.username && <span className="text-[12px]" style={{ color: "var(--dimmer)" }}>@{g.balances.username}</span>}
+                    </button>
+                  ))}
+                </div>
+              );
+            })()}
             <form onSubmit={submitComment} className="flex gap-2 mt-1">
               <input
+                ref={commentInputRef}
                 value={commentInput}
-                onChange={(e) => setCommentInput(e.target.value)}
-                placeholder="add a comment..."
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setCommentInput(val);
+                  const atIdx = val.lastIndexOf("@");
+                  if (atIdx !== -1 && (atIdx === 0 || val[atIdx - 1] === " ")) {
+                    setCommentMentionSearch(val.slice(atIdx + 1));
+                  } else {
+                    setCommentMentionSearch(null);
+                  }
+                }}
+                onKeyDown={(e) => { if (e.key === "Escape") setCommentMentionSearch(null); }}
+                placeholder="add a comment... (@ to mention)"
                 maxLength={500}
                 className="flex-1 text-[13px] px-3 py-2 rounded-2xl outline-none"
                 style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--border-soft)", color: "var(--text)" }}
