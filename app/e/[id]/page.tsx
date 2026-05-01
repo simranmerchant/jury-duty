@@ -1647,7 +1647,7 @@ function BetCard({
                             className="text-[11px] font-bold flex items-center gap-1"
                             style={{ color: c.comment_likes?.some((l) => l.user_id === userId) ? "var(--accent)" : "var(--dimmer)" }}
                           >
-                            ♥ {c.comment_likes?.length ?? 0 || ""}
+                            ♥ {(c.comment_likes?.length ?? 0) || ""}
                           </button>
                           <button
                             onClick={() => {
@@ -1702,7 +1702,7 @@ function BetCard({
                               className="text-[11px] font-bold flex items-center gap-1"
                               style={{ color: r.comment_likes?.some((l) => l.user_id === userId) ? "var(--accent)" : "var(--dimmer)" }}
                             >
-                              ♥ {r.comment_likes?.length ?? 0 || ""}
+                              ♥ {(r.comment_likes?.length ?? 0) || ""}
                             </button>
                           </div>
                         </div>

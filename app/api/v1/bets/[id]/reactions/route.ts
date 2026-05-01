@@ -25,7 +25,7 @@ export async function POST(
     .eq("user_id", user.userId)
     .single();
 
-  if (existing?.emoji === emoji) {
+  if (existing && existing.emoji === emoji) {
     await supabase.from("bet_reactions").delete().eq("id", existing.id);
     return NextResponse.json({ ok: true, action: "removed" });
   }

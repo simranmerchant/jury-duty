@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/privy";
 import { supabase } from "@/lib/supabase";
+import { sendPushToUsers } from "@/lib/push";
 
 export async function GET(
   req: NextRequest,
@@ -51,6 +52,45 @@ export async function POST(
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Notify @mentioned users (don't block response)
+  const mentionedUsernames = [...body.trim().matchAll(/@(\w+)/g)].map((m) => m[1]);
+  if (mentionedUsernames.length > 0) {
+    const { data: senderProfile } = await supabase
+      .from("balances")
+      .select("display_name, username")
+      .eq("user_id", user.userId)
+      .single();
+    const senderName = senderProfile?.display_name ?? senderProfile?.username ?? "someone";
+
+    const { data: mentioned } = await supabase
+      .from("balances")
+      .select("user_id, username")
+      .in("username", mentionedUsernames);
+
+    const mentionedIds = (mentioned ?? [])
+      .map((m) => m.user_id)
+      .filter((id) => id !== user.userId);
+
+    if (mentionedIds.length > 0) {
+      await Promise.all([
+        supabase.from("notifications").insert(
+          mentionedIds.map((uid) => ({
+            user_id: uid,
+            type: "comment_mention",
+            title: `${senderName} mentioned you`,
+            body: body.trim().slice(0, 80),
+            data: { bet_id: betId },
+          }))
+        ),
+        sendPushToUsers(mentionedIds, {
+          title: `${senderName} mentioned you in a comment`,
+          body: body.trim().slice(0, 80),
+          data: { bet_id: betId },
+        }),
+      ]);
+    }
+  }
 
   return NextResponse.json({ comment: data }, { status: 201 });
 }
