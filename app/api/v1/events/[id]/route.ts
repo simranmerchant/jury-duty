@@ -80,7 +80,7 @@ export async function DELETE(
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   // Claw back the creation reward from the host
-  await supabase.rpc("increment_balance", { p_user_id: user.userId, p_amount: -200 });
+  await supabase.rpc("increment_balance", { p_user_id: user.userId, p_amount: -100 });
 
   return NextResponse.json({ ok: true });
 }

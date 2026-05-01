@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
   if (is_anonymous) {
     const { error: anonError } = await supabase
       .from("bet_entries")
-      .update({ is_anonymous: true, is_hidden_from_profile: true })
+      .update({ is_anonymous: true })
       .eq("bet_id", bet_id)
       .eq("user_id", user.userId);
 

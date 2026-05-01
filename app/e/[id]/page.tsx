@@ -9,6 +9,7 @@ import { parseQuestion, extractTaggedUserIds, insertMentionAt, removeMention, ge
 type BetOption = { id: string; label: string; tagged_user_id?: string | null; balances?: { display_name: string | null; avatar_url: string | null; username?: string | null } | null };
 type BetEntry = { id: string; user_id: string; option_id: string; points_staked: number; is_anonymous: boolean; balances?: { display_name: string | null; avatar_url: string | null } };
 type BetInvite = { user_id: string };
+type BetComment = { id: string; body: string; created_at: string; user_id: string; balances?: { display_name: string | null; avatar_url: string | null; username?: string | null } | null };
 type Bet = {
   id: string;
   question: string;
@@ -240,8 +241,8 @@ export default function EventPage() {
   const isGroup = event.type === "group";
   const isClosed = !isGroup && !!event.ends_at && new Date(event.ends_at) < new Date();
   const guestCount = event.event_guests?.length ?? 0;
-  const openBets = event.bets?.filter((b) => b.status === "open") ?? [];
-  const resolvedBets = event.bets?.filter((b) => b.status === "resolved") ?? [];
+  const openBets = (event.bets?.filter((b) => b.status === "open") ?? []).slice().reverse();
+  const resolvedBets = (event.bets?.filter((b) => b.status === "resolved") ?? []).slice().reverse();
 
   return (
     <div className="min-h-screen" style={{ background: "var(--bg)", color: "var(--text)" }}>
@@ -639,6 +640,48 @@ function BetCard({
 
   // Blur/reveal state — private bets start blurred
   const [revealed, setRevealed] = useState(bet.visibility !== "private");
+
+  // Comments
+  const [showComments, setShowComments] = useState(false);
+  const [comments, setComments] = useState<BetComment[]>([]);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [commentInput, setCommentInput] = useState("");
+  const [submittingComment, setSubmittingComment] = useState(false);
+
+  async function fetchComments() {
+    setCommentsLoading(true);
+    const token = await getAccessToken();
+    const res = await fetch(`/api/v1/bets/${bet.id}/comments`, { headers: { Authorization: `Bearer ${token}` } });
+    const data = await res.json().catch(() => ({}));
+    setComments(data.comments ?? []);
+    setCommentsLoading(false);
+  }
+
+  async function submitComment(e: React.FormEvent) {
+    e.preventDefault();
+    if (!commentInput.trim() || submittingComment) return;
+    setSubmittingComment(true);
+    const token = await getAccessToken();
+    const res = await fetch(`/api/v1/bets/${bet.id}/comments`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ body: commentInput.trim() }),
+    });
+    if (res.ok) {
+      setCommentInput("");
+      fetchComments();
+    }
+    setSubmittingComment(false);
+  }
+
+  async function deleteComment(commentId: string) {
+    const token = await getAccessToken();
+    await fetch(`/api/v1/bets/${bet.id}/comments?commentId=${commentId}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    setComments((c) => c.filter((x) => x.id !== commentId));
+  }
 
   // Bet placement state
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
@@ -1474,6 +1517,61 @@ function BetCard({
           </button>
         </div>
       )}
+
+      {/* Comments */}
+      <div className="mt-4 pt-4" style={{ borderTop: "1px solid var(--border-soft)" }}>
+        <button
+          className="text-[12px] font-bold"
+          style={{ color: "var(--dimmer)" }}
+          onClick={() => { if (!showComments) fetchComments(); setShowComments((s) => !s); }}
+        >
+          {showComments ? "hide comments" : `comments${comments.length > 0 ? ` (${comments.length})` : ""}`}
+        </button>
+        {showComments && (
+          <div className="mt-3 flex flex-col gap-3">
+            {commentsLoading ? (
+              <p className="text-[12px]" style={{ color: "var(--dimmer)" }}>loading...</p>
+            ) : comments.length === 0 ? (
+              <p className="text-[12px]" style={{ color: "var(--dimmer)" }}>no comments yet — be first</p>
+            ) : (
+              comments.map((c) => (
+                <div key={c.id} className="flex gap-2 items-start">
+                  <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-[11px] font-black" style={{ background: "var(--accent-dim)", color: "var(--accent)" }}>
+                    {c.balances?.avatar_url
+                      ? <img src={c.balances.avatar_url} className="w-7 h-7 rounded-full object-cover" />
+                      : (c.balances?.display_name?.[0] ?? "?").toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-[12px] font-bold" style={{ color: "var(--muted)" }}>{c.balances?.display_name ?? "unknown"} </span>
+                    <span className="text-[13px]" style={{ color: "var(--text)" }}>{c.body}</span>
+                  </div>
+                  {c.user_id === userId && (
+                    <button onClick={() => deleteComment(c.id)} className="text-[11px] flex-shrink-0 mt-0.5" style={{ color: "var(--dimmer)" }}>×</button>
+                  )}
+                </div>
+              ))
+            )}
+            <form onSubmit={submitComment} className="flex gap-2 mt-1">
+              <input
+                value={commentInput}
+                onChange={(e) => setCommentInput(e.target.value)}
+                placeholder="add a comment..."
+                maxLength={500}
+                className="flex-1 text-[13px] px-3 py-2 rounded-2xl outline-none"
+                style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--border-soft)", color: "var(--text)" }}
+              />
+              <button
+                type="submit"
+                disabled={!commentInput.trim() || submittingComment}
+                className="px-3 py-2 rounded-2xl text-[13px] font-bold"
+                style={{ background: "var(--accent)", color: "#fff", opacity: !commentInput.trim() || submittingComment ? 0.4 : 1 }}
+              >
+                post
+              </button>
+            </form>
+          </div>
+        )}
+      </div>
 
       {/* Resolve trigger + delete + invite */}
       {!resolving && (canResolve || isHost || bet.creator_id === userId || (bet.visibility === "private" && isInvolved)) && (

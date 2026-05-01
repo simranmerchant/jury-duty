@@ -58,6 +58,54 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ points: balance?.points ?? 0, display_name: balance?.display_name ?? null, avatar_url: balance?.avatar_url ?? null, username: balance?.username ?? null, history, stats });
 }
 
+export async function DELETE(req: NextRequest) {
+  const token = req.headers.get("authorization")?.replace("Bearer ", "");
+  if (!token) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+  const user = await requireUser(token).catch(() => null);
+  if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+  const uid = user.userId;
+
+  // 1. Refund any open bet entries (return staked points before deleting)
+  const { data: openEntries } = await supabase
+    .from("bet_entries")
+    .select("id, points_staked, bets(status)")
+    .eq("user_id", uid);
+
+  const openStaked = (openEntries ?? [])
+    .filter((e: any) => e.bets?.status === "open")
+    .reduce((sum: number, e: any) => sum + e.points_staked, 0);
+
+  if (openStaked > 0) {
+    const { data: bal } = await supabase
+      .from("balances")
+      .select("points")
+      .eq("user_id", uid)
+      .single();
+    if (bal) {
+      await supabase
+        .from("balances")
+        .update({ points: (bal.points ?? 0) + openStaked })
+        .eq("user_id", uid);
+    }
+  }
+
+  // 2. Delete user's bet entries and event guest rows
+  await Promise.all([
+    supabase.from("bet_entries").delete().eq("user_id", uid),
+    supabase.from("event_guests").delete().eq("user_id", uid),
+  ]);
+
+  // 3. Anonymize the balances row (keep it for FK integrity — events/bets reference it)
+  await supabase
+    .from("balances")
+    .update({ display_name: "Deleted User", username: null, avatar_url: null, points: 0 })
+    .eq("user_id", uid);
+
+  return NextResponse.json({ ok: true });
+}
+
 export async function PATCH(req: NextRequest) {
   const token = req.headers.get("authorization")?.replace("Bearer ", "");
   if (!token) return NextResponse.json({ error: "unauthorized" }, { status: 401 });

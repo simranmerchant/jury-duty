@@ -14,8 +14,9 @@
   --text: #f5f0ff;
   --muted: #9990aa;
   --dimmer: #5a5368;
-  --win: #30D158;
-  --win-dim: rgba(48, 209, 88, 0.13);
+  --win: #38bdf8;
+  --win-dim: rgba(56, 189, 248, 0.12);
+  --win-border: rgba(56, 189, 248, 0.30);
 }
 
 @theme inline {

@@ -17,6 +17,7 @@ export default function NewBetPage() {
   const [options, setOptions] = useState<BetOption[]>([{ label: "" }, { label: "" }]);
   const [visibility, setVisibility] = useState<"public" | "private">("public");
   const [guests, setGuests] = useState<Guest[]>([]);
+  const [myUserId, setMyUserId] = useState<string | null>(null);
   const [invitedIds, setInvitedIds] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,12 +47,13 @@ export default function NewBetPage() {
     const res = await fetch(`/api/v1/events/${eventId}`, { headers: { Authorization: `Bearer ${token}` } });
     const data = await res.json();
     if (data.event?.type === "group") setIsGroup(true);
+    setMyUserId(data.userId ?? null);
     const gs: Guest[] = (data.event?.event_guests ?? []).map((g: any) => ({
       user_id: g.user_id,
       display_name: g.balances?.display_name ?? null,
       username: g.balances?.username ?? null,
       avatar_url: g.balances?.avatar_url ?? null,
-    }));
+    })).filter((g: Guest) => g.user_id !== data.userId);
     setGuests(gs);
   }, [eventId, getAccessToken]);
 
