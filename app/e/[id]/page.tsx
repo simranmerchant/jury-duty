@@ -1408,7 +1408,6 @@ function BetCard({
             )}
           </div>
         ))}
-      </div>
 
       {/* Stake input — mobile-style quick picks + custom */}
       {canBet && selectedOption && (
