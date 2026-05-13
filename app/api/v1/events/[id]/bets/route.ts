@@ -204,16 +204,7 @@ export async function POST(
     ]);
   }
 
-  await Promise.all([
-    supabase.rpc("increment_balance", { p_user_id: user.userId, p_amount: 50 }),
-    supabase.from("notifications").insert({
-      user_id: user.userId,
-      type: "points_earned",
-      title: "+50 pts",
-      body: "you earned 50 points for creating a bet. keep the jury busy.",
-      data: { bet_id: bet.id },
-    }),
-  ]);
+  await supabase.rpc("increment_balance", { p_user_id: user.userId, p_amount: 25 });
 
   return NextResponse.json({ betId: bet.id }, { status: 201 });
 }

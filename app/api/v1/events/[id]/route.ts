@@ -80,7 +80,7 @@ export async function DELETE(
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   // Claw back the creation reward from the host
-  await supabase.rpc("increment_balance", { p_user_id: user.userId, p_amount: -100 });
+  await supabase.rpc("increment_balance", { p_user_id: user.userId, p_amount: -50 });
 
   return NextResponse.json({ ok: true });
 }
@@ -122,14 +122,15 @@ export async function GET(
   const { data: event, error } = await supabase
     .from("events")
     .select(`
-      id, name, ends_at, type, host_id, invite_token, cover_url,
+      id, name, ends_at, type, host_id, invite_token, cover_url, cover_original_url,
       event_guests(user_id, balances(display_name, avatar_url, username)),
       bets(
         id, question, question_tagged_user_ids, deadline, visibility, status, winning_option_id, creator_id, created_at,
         bet_options!bet_options_bet_id_fkey(id, label, tagged_user_id, balances!bet_options_tagged_user_id_fkey(display_name, avatar_url, username)),
         bet_entries(id, user_id, option_id, points_staked, is_anonymous, balances(display_name, avatar_url)),
         bet_invites(user_id),
-        bet_reactions(user_id, emoji)
+        bet_reactions(user_id, emoji),
+        bet_comments!bet_comments_bet_id_fkey(id)
       )
     `)
     .eq("id", id)

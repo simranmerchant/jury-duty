@@ -35,14 +35,7 @@ export async function POST(req: NextRequest) {
   await supabase.from("events").update({ invite_token }).eq("id", event.id);
   await supabase.from("event_guests").insert({ event_id: event.id, user_id: user.userId });
 
-  await supabase.rpc("increment_balance", { p_user_id: user.userId, p_amount: 100 });
-  await supabase.from("notifications").insert({
-    user_id: user.userId,
-    type: "points_earned",
-    title: "+100 pts",
-    body: `you earned 100 points for creating "${name.trim()}". keep it up.`,
-    data: { event_id: event.id },
-  });
+  await supabase.rpc("increment_balance", { p_user_id: user.userId, p_amount: 50 });
 
   return NextResponse.json({ eventId: event.id, invite_token });
 }

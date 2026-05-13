@@ -382,10 +382,20 @@ export default function ProfilePage() {
           </p>
         )}
 
+        {/* How it works */}
+        <button
+          onClick={() => router.push("/how-it-works")}
+          className="flex items-center justify-between px-5 py-4 rounded-2xl font-semibold text-[14px]"
+          style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-soft)", color: "var(--muted)" }}
+        >
+          <span>how it works</span>
+          <span style={{ color: "var(--dimmer)", fontSize: 18, fontWeight: 300 }}>›</span>
+        </button>
+
         {/* Log out */}
         <button
           onClick={() => logout().then(() => router.replace("/login"))}
-          className="mt-4 py-3.5 rounded-2xl font-bold text-[14px]"
+          className="py-3.5 rounded-2xl font-bold text-[14px]"
           style={{ background: "rgba(255,255,255,0.05)", color: "var(--muted)" }}
         >
           log out

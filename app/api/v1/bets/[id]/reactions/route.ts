@@ -3,7 +3,7 @@ import { requireUser } from "@/lib/privy";
 import { supabase } from "@/lib/supabase";
 import { sendPushToUsers } from "@/lib/push";
 
-const ALLOWED = ["🔥", "👀", "💀", "😂", "🤝", "🫡"];
+const ALLOWED = ["🔥", "👀", "💀", "😂", "🤝", "🫡", "🙏"];
 
 export async function POST(
   req: NextRequest,
@@ -39,7 +39,7 @@ export async function POST(
   // Notify bet creator (skip if reacting to own bet)
   const { data: bet } = await supabase
     .from("bets")
-    .select("creator_id, question")
+    .select("creator_id, question, event_id")
     .eq("id", betId)
     .single();
 
@@ -51,6 +51,7 @@ export async function POST(
       .single();
     const reactorName = reactor?.display_name ?? reactor?.username ?? "someone";
     const preview = bet.question.slice(0, 60);
+    const notifData = { bet_id: betId, ...(bet.event_id ? { event_id: bet.event_id } : {}) };
 
     await Promise.all([
       supabase.from("notifications").insert({
@@ -58,12 +59,12 @@ export async function POST(
         type: "bet_reaction",
         title: `${reactorName} reacted ${emoji}`,
         body: preview,
-        data: { bet_id: betId },
+        data: notifData,
       }),
       sendPushToUsers([bet.creator_id], {
         title: `${reactorName} reacted ${emoji} to your bet`,
         body: preview,
-        data: { bet_id: betId },
+        data: notifData,
       }),
     ]);
   }

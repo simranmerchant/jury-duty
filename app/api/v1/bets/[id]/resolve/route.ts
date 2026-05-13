@@ -35,16 +35,18 @@ export async function POST(
   // Send notifications to all participants
   const { data: bet } = await supabase
     .from("bets")
-    .select("question, winning_option_id, bet_entries(user_id, option_id)")
+    .select("question, winning_option_id, event_id, bet_entries(user_id, option_id)")
     .eq("id", betId)
     .single();
 
   if (bet) {
+    const eventId = bet.event_id ?? undefined;
     const notifications = buildResolveNotifications(
       betId,
       bet.question,
       bet.bet_entries as { user_id: string; option_id: string }[],
-      winning_option_id ?? null
+      winning_option_id ?? null,
+      eventId
     );
 
     if (notifications.length > 0) {
@@ -54,13 +56,14 @@ export async function POST(
       const wonIds = notifications.filter((n) => n.type === "bet_resolved_won").map((n) => n.user_id);
       const lostIds = notifications.filter((n) => n.type === "bet_resolved_lost").map((n) => n.user_id);
       const refundIds = notifications.filter((n) => n.type === "bet_resolved_refunded").map((n) => n.user_id);
+      const pushData = (outcome: string) => ({ bet_id: betId, outcome, ...(eventId ? { event_id: eventId } : {}) });
       await Promise.all([
-        wonIds.length > 0 && sendPushToUsers(wonIds, { title: "jury's in — you won 🎉", body: `you called it on "${bet.question}"`, data: { bet_id: betId, outcome: "won" } }),
-        lostIds.length > 0 && sendPushToUsers(lostIds, { title: "jury's in — you lost 💀", body: `the jury has spoken on "${bet.question}"`, data: { bet_id: betId, outcome: "lost" } }),
-        refundIds.length > 0 && sendPushToUsers(refundIds, { title: "case dismissed", body: `"${bet.question}" was called off`, data: { bet_id: betId, outcome: "refunded" } }),
-        wonIds.length > 0 && sendWebPushToUsers(wonIds, { title: "jury's in — you won 🎉", body: `you called it on "${bet.question}"`, data: { bet_id: betId, outcome: "won" } }),
-        lostIds.length > 0 && sendWebPushToUsers(lostIds, { title: "jury's in — you lost 💀", body: `the jury has spoken on "${bet.question}"`, data: { bet_id: betId, outcome: "lost" } }),
-        refundIds.length > 0 && sendWebPushToUsers(refundIds, { title: "case dismissed", body: `"${bet.question}" was called off`, data: { bet_id: betId, outcome: "refunded" } }),
+        wonIds.length > 0 && sendPushToUsers(wonIds, { title: "jury's in — you won 🎉", body: `you called it on "${bet.question}"`, data: pushData("won") }),
+        lostIds.length > 0 && sendPushToUsers(lostIds, { title: "jury's in — you lost 💀", body: `the jury has spoken on "${bet.question}"`, data: pushData("lost") }),
+        refundIds.length > 0 && sendPushToUsers(refundIds, { title: "case dismissed", body: `"${bet.question}" was called off`, data: pushData("refunded") }),
+        wonIds.length > 0 && sendWebPushToUsers(wonIds, { title: "jury's in — you won 🎉", body: `you called it on "${bet.question}"`, data: pushData("won") }),
+        lostIds.length > 0 && sendWebPushToUsers(lostIds, { title: "jury's in — you lost 💀", body: `the jury has spoken on "${bet.question}"`, data: pushData("lost") }),
+        refundIds.length > 0 && sendWebPushToUsers(refundIds, { title: "case dismissed", body: `"${bet.question}" was called off`, data: pushData("refunded") }),
       ]);
     }
   }

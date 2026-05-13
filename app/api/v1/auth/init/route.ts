@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
 
   const { data } = await supabase
     .from("balances")
-    .select("points, display_name")
+    .select("points, display_name, username")
     .eq("user_id", user.userId)
     .single();
 
@@ -28,5 +28,6 @@ export async function POST(req: NextRequest) {
     userId: user.userId,
     points: data?.points ?? 1000,
     hasName: !!data?.display_name,
+    hasUsername: !!data?.username,
   });
 }

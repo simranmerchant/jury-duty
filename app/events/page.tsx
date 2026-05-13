@@ -27,7 +27,7 @@ export default function EventsPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [showJoin, setShowJoin] = useState(false);
   const [showNotifs, setShowNotifs] = useState(false);
-  const [notifications, setNotifications] = useState<{ id: string; type: string; title: string; body: string; read: boolean; created_at: string; data: { bet_id?: string; event_id?: string; outcome?: string } | null }[]>([]);
+  const [notifications, setNotifications] = useState<{ id: string; type: string; title: string; body: string; read: boolean; created_at: string; data: { bet_id?: string; event_id?: string; outcome?: string; [key: string]: unknown } | null }[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [joinInput, setJoinInput] = useState("");
   const [name, setName] = useState("");

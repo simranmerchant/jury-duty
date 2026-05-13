@@ -26,6 +26,7 @@ type Bet = {
   bet_entries: BetEntry[];
   bet_invites: BetInvite[];
   bet_reactions: BetReaction[];
+  bet_comments?: { id: string }[];
 };
 type Guest = { user_id: string; balances?: { display_name: string | null; avatar_url: string | null; username?: string | null } };
 type Event = {
@@ -618,6 +619,25 @@ export default function EventPage() {
   );
 }
 
+function relativeDeadline(deadline: string): { label: string; urgency: "none" | "soon" | "critical" } {
+  const d = new Date(deadline);
+  const diffMs = d.getTime() - Date.now();
+  if (diffMs <= 0) {
+    const agoH = Math.floor(Math.abs(diffMs) / 3600000);
+    const agoD = Math.floor(Math.abs(diffMs) / 86400000);
+    if (agoD >= 1) return { label: `closed ${agoD}d ago`, urgency: "none" };
+    if (agoH >= 1) return { label: `closed ${agoH}h ago`, urgency: "none" };
+    return { label: "just closed", urgency: "none" };
+  }
+  const mins = Math.floor(diffMs / 60000);
+  const hours = Math.floor(diffMs / 3600000);
+  const days = Math.floor(diffMs / 86400000);
+  if (mins < 60) return { label: `${mins}m left`, urgency: "critical" };
+  if (hours < 24) return { label: `${hours}h left`, urgency: "soon" };
+  if (days === 1) return { label: "closes tomorrow", urgency: "none" };
+  return { label: `${days}d left`, urgency: "none" };
+}
+
 function BetCard({
   bet,
   userId,
@@ -646,6 +666,7 @@ function BetCard({
   // Comments
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState<BetComment[]>([]);
+  const [commentCount, setCommentCount] = useState(bet.bet_comments?.length ?? 0);
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentInput, setCommentInput] = useState("");
   const [submittingComment, setSubmittingComment] = useState(false);
@@ -657,14 +678,16 @@ function BetCard({
   // Reactions
   const [reactions, setReactions] = useState<BetReaction[]>(bet.bet_reactions ?? []);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const EMOJIS = ["🔥", "👀", "💀", "😂", "🤝", "🫡"];
+  const EMOJIS = ["🔥", "👀", "💀", "😂", "🤝", "🫡", "🙏"];
 
   async function fetchComments() {
     setCommentsLoading(true);
     const token = await getAccessToken();
     const res = await fetch(`/api/v1/bets/${bet.id}/comments`, { headers: { Authorization: `Bearer ${token}` } });
     const data = await res.json().catch(() => ({}));
-    setComments(data.comments ?? []);
+    const fetched = data.comments ?? [];
+    setComments(fetched);
+    setCommentCount(fetched.length);
     setCommentsLoading(false);
   }
 
@@ -931,6 +954,8 @@ function BetCard({
   const totalPot = bet.bet_entries.reduce((s, e) => s + e.points_staked, 0);
   const isOpen = bet.status === "open";
   const isPast = new Date(bet.deadline) < new Date();
+  const { label: deadlineLabel, urgency } = relativeDeadline(bet.deadline);
+  const winOpt = bet.winning_option_id ? bet.bet_options.find((o) => o.id === bet.winning_option_id) : null;
   const canBet = isOpen && !isPast && !myEntry && !resolving;
   const past24h = isPast && new Date() > new Date(new Date(bet.deadline).getTime() + 24 * 60 * 60 * 1000);
   const canResolve = isOpen && (bet.creator_id === userId || (past24h && !!userId));
@@ -1056,7 +1081,7 @@ function BetCard({
       className="rounded-3xl p-5 relative"
       style={{
         background: "var(--card)",
-        border: "1px solid var(--border-soft)",
+        border: `1px solid ${isOpen && urgency === "critical" ? "rgba(239,68,68,0.35)" : isOpen && urgency === "soon" ? "rgba(245,158,11,0.35)" : "var(--border-soft)"}`,
         opacity: bet.status === "resolved" || isPast ? 0.45 : 1,
       }}
     >
@@ -1191,22 +1216,29 @@ function BetCard({
         )}
       </div>
 
-      {/* Per-bet deadline for groups */}
-      {isGroup && bet.deadline && (
-        <p className="text-[11px] mb-2" style={{ color: isPast ? "var(--muted)" : "var(--dimmer)" }}>
-          {isPast
-            ? "closed"
-            : `closes ${new Date(bet.deadline).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`}
-        </p>
-      )}
-
-      {/* Pot summary */}
-      {totalPot > 0 && (
-        <p className="text-[12px] mb-3" style={{ color: "var(--muted)" }}>
-          {totalPot.toLocaleString()} pts in the pot · {bet.bet_entries.length}{" "}
-          {bet.bet_entries.length === 1 ? "entry" : "entries"}
-        </p>
-      )}
+      {/* Status row — deadline pill + pot */}
+      <div className="flex items-center gap-2 mb-3 flex-wrap">
+        {bet.status === "resolved" && winOpt && (
+          <span className="text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: "rgba(48,209,88,0.15)", color: "var(--win)", border: "1px solid rgba(48,209,88,0.3)" }}>
+            ✓ {winOpt.label}
+          </span>
+        )}
+        {isOpen && (() => {
+          const bg = urgency === "critical" ? "rgba(239,68,68,0.15)" : urgency === "soon" ? "rgba(245,158,11,0.15)" : "transparent";
+          const borderColor = urgency === "critical" ? "rgba(239,68,68,0.4)" : urgency === "soon" ? "rgba(245,158,11,0.4)" : "transparent";
+          const color = urgency === "critical" ? "#ef4444" : urgency === "soon" ? "#f59e0b" : "var(--dimmer)";
+          return (
+            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ background: bg, border: urgency !== "none" ? `1px solid ${borderColor}` : "none", color }}>
+              {deadlineLabel}
+            </span>
+          );
+        })()}
+        {totalPot > 0 && (
+          <span className="text-[11px]" style={{ color: "var(--dimmer)" }}>
+            {totalPot.toLocaleString()} pts · {bet.bet_entries.length} {bet.bet_entries.length === 1 ? "entry" : "entries"}
+          </span>
+        )}
+      </div>
 
       {/* Options */}
       <div className="flex flex-col gap-2">
@@ -1406,32 +1438,43 @@ function BetCard({
         })}
       </div>
 
-      {/* Stake input */}
+      {/* Stake input — mobile-style quick picks + custom */}
       {canBet && selectedOption && (
         <div className="mt-3 flex flex-col gap-2">
+          <span className="text-[12px] font-semibold" style={{ color: "var(--muted)" }}>points</span>
           <div className="flex gap-2">
+            {[50, 100, 200].map((v) => (
+              <button
+                key={v}
+                onClick={() => setStakeInput(String(v))}
+                className="flex-1 py-2.5 rounded-2xl text-[14px] font-bold"
+                style={{
+                  background: stakeInput === String(v) ? "var(--accent-dim)" : "rgba(255,255,255,0.04)",
+                  border: `1px solid ${stakeInput === String(v) ? "var(--accent-border)" : "var(--border-soft)"}`,
+                  color: stakeInput === String(v) ? "var(--accent)" : "var(--muted)",
+                }}
+              >
+                {v}
+              </button>
+            ))}
             <input
               type="number"
               min="1"
-              value={stakeInput}
+              value={[50, 100, 200].map(String).includes(stakeInput) ? "" : stakeInput}
               onChange={(e) => setStakeInput(e.target.value)}
-              className="flex-1 rounded-2xl px-4 py-2.5 text-[15px] outline-none"
-              style={{
-                background: "rgba(255,255,255,0.05)",
-                border: "1px solid var(--accent-border)",
-                color: "var(--text)",
-              }}
-              placeholder="points"
+              placeholder="custom"
+              className="flex-1 rounded-2xl px-3 py-2.5 text-[14px] outline-none text-center"
+              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-soft)", color: "var(--text)" }}
             />
-            <button
-              onClick={placeBet}
-              disabled={placing}
-              className="px-5 py-2.5 rounded-2xl font-bold text-[14px] text-white disabled:opacity-40"
-              style={{ background: "var(--accent)", fontFamily: "var(--font-nunito)" }}
-            >
-              {placing ? "..." : "bet"}
-            </button>
           </div>
+          <button
+            onClick={placeBet}
+            disabled={!stakeInput || placing}
+            className="w-full py-3.5 rounded-2xl font-bold text-[16px] text-white disabled:opacity-40"
+            style={{ background: "var(--accent)", fontFamily: "var(--font-nunito)" }}
+          >
+            {placing ? "placing..." : "bet it"}
+          </button>
           {placeError && (
             <p className="text-[12px] font-bold" style={{ color: "var(--accent)" }}>{placeError}</p>
           )}
@@ -1439,7 +1482,7 @@ function BetCard({
             onClick={() => setIsAnonymous((a) => !a)}
             className="flex items-center gap-1.5 self-start text-[12px] font-bold px-3 py-1.5 rounded-full"
             style={{
-              background: isAnonymous ? "rgba(255,255,255,0.08)" : "transparent",
+              background: isAnonymous ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.04)",
               border: `1px solid ${isAnonymous ? "var(--border)" : "var(--border-soft)"}`,
               color: isAnonymous ? "var(--text)" : "var(--dimmer)",
             }}
@@ -1606,190 +1649,141 @@ function BetCard({
         );
       })()}
 
-      {/* Comments */}
-      <div className="mt-4 pt-4" style={{ borderTop: "1px solid var(--border-soft)" }}>
+      {/* Comments — button only, opens slide-up sheet */}
+      <div className="mt-4 pt-4 flex items-center gap-2" style={{ borderTop: "1px solid var(--border-soft)" }}>
         <button
           className="text-[12px] font-bold"
           style={{ color: "var(--dimmer)" }}
-          onClick={() => { if (!showComments) fetchComments(); setShowComments((s) => !s); }}
+          onClick={() => { fetchComments(); setShowComments(true); }}
         >
-          {showComments ? "hide comments" : `comments${comments.length > 0 ? ` (${comments.length})` : ""}`}
+          {commentCount > 0 ? `comments ${commentCount}` : "comment"}
         </button>
-        {showComments && (
-          <div className="mt-3 flex flex-col gap-3">
-            {commentsLoading ? (
-              <p className="text-[12px]" style={{ color: "var(--dimmer)" }}>loading...</p>
-            ) : comments.filter((c) => !c.parent_id).length === 0 ? (
-              <p className="text-[12px]" style={{ color: "var(--dimmer)" }}>no comments yet — be first</p>
-            ) : (
-              comments.filter((c) => !c.parent_id).map((c) => {
-                const replies = comments.filter((r) => r.parent_id === c.id);
-                const isExpanded = expandedThreads.has(c.id);
-                return (
-                  <div key={c.id}>
-                    {/* Top-level comment */}
-                    <div className="flex gap-2 items-start group">
-                      <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-[11px] font-black overflow-hidden" style={{ background: "var(--accent-dim)", color: "var(--accent)" }}>
-                        {c.balances?.avatar_url
-                          ? <img src={c.balances.avatar_url} className="w-7 h-7 rounded-full object-cover" />
-                          : (c.balances?.display_name?.[0] ?? "?").toUpperCase()}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <span className="text-[12px] font-bold" style={{ color: "var(--muted)" }}>{c.balances?.display_name ?? "unknown"} </span>
-                        <span className="text-[13px]" style={{ color: "var(--text)" }}>
-                          {c.body.split(/(@\w+)/g).map((part, i) =>
-                            part.startsWith("@") ? <span key={i} className="font-bold" style={{ color: "var(--accent)" }}>{part}</span> : part
-                          )}
-                        </span>
-                        <div className="flex items-center gap-3 mt-1">
-                          <button
-                            onClick={() => toggleCommentLike(c.id)}
-                            className="text-[11px] font-bold flex items-center gap-1"
-                            style={{ color: c.comment_likes?.some((l) => l.user_id === userId) ? "var(--accent)" : "var(--dimmer)" }}
-                          >
-                            ♥ {(c.comment_likes?.length ?? 0) || ""}
-                          </button>
-                          <button
-                            onClick={() => {
-                              const username = c.balances?.username ?? c.balances?.display_name?.replace(/\s+/g, "") ?? "unknown";
-                              setReplyingTo({ id: c.id, name: username });
-                              setCommentInput(`@${username} `);
-                              setCommentMentionSearch(null);
-                              commentInputRef.current?.focus();
-                            }}
-                            className="text-[11px] font-bold"
-                            style={{ color: "var(--dimmer)" }}
-                          >
-                            reply
-                          </button>
-                          {replies.length > 0 && (
-                            <button
-                              onClick={() => setExpandedThreads((s) => { const n = new Set(s); n.has(c.id) ? n.delete(c.id) : n.add(c.id); return n; })}
-                              className="text-[11px] font-bold"
-                              style={{ color: "var(--dimmer)" }}
-                            >
-                              {isExpanded ? "hide" : `${replies.length} repl${replies.length === 1 ? "y" : "ies"}`}
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                      {c.user_id === userId && (
-                        <button onClick={() => deleteComment(c.id)} className="flex-shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity" title="delete">
-                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--dimmer)" }}>
-                            <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
-                          </svg>
-                        </button>
-                      )}
-                    </div>
-                    {/* Replies */}
-                    {isExpanded && replies.map((r) => (
-                      <div key={r.id} className="flex gap-2 items-start group ml-9 mt-2">
-                        <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-black overflow-hidden" style={{ background: "var(--accent-dim)", color: "var(--accent)" }}>
-                          {r.balances?.avatar_url
-                            ? <img src={r.balances.avatar_url} className="w-6 h-6 rounded-full object-cover" />
-                            : (r.balances?.display_name?.[0] ?? "?").toUpperCase()}
+      </div>
+
+      {/* Comments sheet */}
+      {showComments && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center"
+          style={{ background: "rgba(0,0,0,0.6)" }}
+          onClick={(e) => { if (e.target === e.currentTarget) { setShowComments(false); setReplyingTo(null); setCommentInput(""); setCommentMentionSearch(null); } }}
+        >
+          <div className="w-full max-w-lg rounded-t-3xl flex flex-col" style={{ background: "var(--card)", border: "1px solid var(--border-soft)", maxHeight: "75vh" }}>
+            <div className="px-6 pt-5 pb-3 flex items-center justify-between flex-shrink-0" style={{ borderBottom: "1px solid var(--border-soft)" }}>
+              <p className="font-extrabold text-[16px]" style={{ fontFamily: "var(--font-nunito)" }}>comments</p>
+              <button onClick={() => { setShowComments(false); setReplyingTo(null); setCommentInput(""); setCommentMentionSearch(null); }} className="text-[14px] font-bold" style={{ color: "var(--dimmer)" }}>done</button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-4">
+              {commentsLoading ? (
+                <p className="text-[13px] text-center py-6" style={{ color: "var(--dimmer)" }}>loading...</p>
+              ) : comments.filter((c) => !c.parent_id).length === 0 ? (
+                <p className="text-[13px] text-center py-6" style={{ color: "var(--dimmer)" }}>no comments yet — be first</p>
+              ) : (
+                comments.filter((c) => !c.parent_id).map((c) => {
+                  const replies = comments.filter((r) => r.parent_id === c.id);
+                  const isExpanded = expandedThreads.has(c.id);
+                  return (
+                    <div key={c.id}>
+                      <div className="flex gap-3 items-start group">
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-[12px] font-black overflow-hidden" style={{ background: "var(--accent-dim)", color: "var(--accent)" }}>
+                          {c.balances?.avatar_url
+                            ? <img src={c.balances.avatar_url} className="w-8 h-8 rounded-full object-cover" />
+                            : (c.balances?.display_name?.[0] ?? "?").toUpperCase()}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <span className="text-[12px] font-bold" style={{ color: "var(--muted)" }}>{r.balances?.display_name ?? "unknown"} </span>
-                          <span className="text-[13px]" style={{ color: "var(--text)" }}>
-                            {r.body.split(/(@\w+)/g).map((part, i) =>
-                              part.startsWith("@") ? <span key={i} className="font-bold" style={{ color: "var(--accent)" }}>{part}</span> : part
-                            )}
-                          </span>
-                          <div className="flex items-center gap-3 mt-1">
-                            <button
-                              onClick={() => toggleCommentLike(r.id)}
-                              className="text-[11px] font-bold flex items-center gap-1"
-                              style={{ color: r.comment_likes?.some((l) => l.user_id === userId) ? "var(--accent)" : "var(--dimmer)" }}
-                            >
-                              ♥ {(r.comment_likes?.length ?? 0) || ""}
+                          <div className="flex items-baseline gap-1.5 flex-wrap">
+                            <span className="text-[13px] font-bold" style={{ color: "var(--muted)" }}>{c.balances?.display_name ?? "unknown"}</span>
+                            <span className="text-[14px]" style={{ color: "var(--text)" }}>
+                              {c.body.split(/(@\w+)/g).map((part, i) =>
+                                part.startsWith("@") ? <span key={i} className="font-bold" style={{ color: "var(--accent)" }}>{part}</span> : part
+                              )}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-4 mt-1.5">
+                            <button onClick={() => toggleCommentLike(c.id)} className="text-[12px] font-bold flex items-center gap-1" style={{ color: c.comment_likes?.some((l) => l.user_id === userId) ? "var(--accent)" : "var(--dimmer)" }}>
+                              ♥ {(c.comment_likes?.length ?? 0) || ""}
                             </button>
+                            <button onClick={() => { const u = c.balances?.username ?? c.balances?.display_name?.replace(/\s+/g, "") ?? "unknown"; setReplyingTo({ id: c.id, name: u }); setCommentInput(`@${u} `); setCommentMentionSearch(null); setTimeout(() => commentInputRef.current?.focus(), 50); }} className="text-[12px] font-bold" style={{ color: "var(--dimmer)" }}>reply</button>
+                            {replies.length > 0 && (
+                              <button onClick={() => setExpandedThreads((s) => { const n = new Set(s); n.has(c.id) ? n.delete(c.id) : n.add(c.id); return n; })} className="text-[12px] font-bold" style={{ color: "var(--dimmer)" }}>
+                                {isExpanded ? "hide" : `${replies.length} repl${replies.length === 1 ? "y" : "ies"}`}
+                              </button>
+                            )}
+                            {c.user_id === userId && <button onClick={() => deleteComment(c.id)} className="text-[12px] font-bold" style={{ color: "var(--dimmer)" }}>delete</button>}
                           </div>
                         </div>
-                        {r.user_id === userId && (
-                          <button onClick={() => deleteComment(r.id)} className="flex-shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity" title="delete">
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--dimmer)" }}>
-                              <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
-                            </svg>
-                          </button>
-                        )}
                       </div>
-                    ))}
-                  </div>
-                );
-              })
-            )}
+                      {isExpanded && replies.map((r) => (
+                        <div key={r.id} className="flex gap-3 items-start mt-3 ml-11">
+                          <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-[11px] font-black overflow-hidden" style={{ background: "var(--accent-dim)", color: "var(--accent)" }}>
+                            {r.balances?.avatar_url
+                              ? <img src={r.balances.avatar_url} className="w-7 h-7 rounded-full object-cover" />
+                              : (r.balances?.display_name?.[0] ?? "?").toUpperCase()}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-baseline gap-1.5 flex-wrap">
+                              <span className="text-[12px] font-bold" style={{ color: "var(--muted)" }}>{r.balances?.display_name ?? "unknown"}</span>
+                              <span className="text-[13px]" style={{ color: "var(--text)" }}>
+                                {r.body.split(/(@\w+)/g).map((part, i) =>
+                                  part.startsWith("@") ? <span key={i} className="font-bold" style={{ color: "var(--accent)" }}>{part}</span> : part
+                                )}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-4 mt-1.5">
+                              <button onClick={() => toggleCommentLike(r.id)} className="text-[12px] font-bold flex items-center gap-1" style={{ color: r.comment_likes?.some((l) => l.user_id === userId) ? "var(--accent)" : "var(--dimmer)" }}>
+                                ♥ {(r.comment_likes?.length ?? 0) || ""}
+                              </button>
+                              {r.user_id === userId && <button onClick={() => deleteComment(r.id)} className="text-[12px] font-bold" style={{ color: "var(--dimmer)" }}>delete</button>}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })
+              )}
+            </div>
             {/* Mention dropdown */}
             {commentMentionSearch !== null && (() => {
               const filtered = filterTagPickerGuests(eventGuests, userId, commentMentionSearch);
               if (filtered.length === 0) return null;
               return (
-                <div className="rounded-2xl overflow-hidden" style={{ border: "1px solid var(--border-soft)", background: "var(--card)" }}>
+                <div className="mx-6 mb-2 rounded-2xl overflow-hidden flex-shrink-0" style={{ border: "1px solid var(--border-soft)", background: "var(--card)" }}>
                   {filtered.slice(0, 5).map((g) => (
-                    <button
-                      key={g.user_id}
-                      type="button"
-                      className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-white/5"
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        const username = g.balances?.username ?? g.balances?.display_name ?? "unknown";
-                        const atIdx = commentInput.lastIndexOf("@");
-                        const newVal = commentInput.slice(0, atIdx) + `@${username} `;
-                        setCommentInput(newVal);
-                        setCommentMentionSearch(null);
-                        commentInputRef.current?.focus();
-                      }}
-                    >
+                    <button key={g.user_id} type="button" className="w-full flex items-center gap-2 px-3 py-2 text-left"
+                      onMouseDown={(e) => { e.preventDefault(); const u = g.balances?.username ?? g.balances?.display_name ?? "unknown"; const atIdx = commentInput.lastIndexOf("@"); setCommentInput(commentInput.slice(0, atIdx) + `@${u} `); setCommentMentionSearch(null); commentInputRef.current?.focus(); }}>
                       <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black flex-shrink-0 overflow-hidden" style={{ background: "var(--accent-dim)", color: "var(--accent)" }}>
-                        {g.balances?.avatar_url
-                          ? <img src={g.balances.avatar_url} className="w-6 h-6 object-cover" />
-                          : (g.balances?.display_name?.[0] ?? "?").toUpperCase()}
+                        {g.balances?.avatar_url ? <img src={g.balances.avatar_url} className="w-6 h-6 object-cover" /> : (g.balances?.display_name?.[0] ?? "?").toUpperCase()}
                       </div>
                       <span className="text-[13px] font-semibold" style={{ color: "var(--text)" }}>{g.balances?.display_name ?? "unknown"}</span>
-                      {g.balances?.username && <span className="text-[12px]" style={{ color: "var(--dimmer)" }}>@{g.balances.username}</span>}
                     </button>
                   ))}
                 </div>
               );
             })()}
             {replyingTo && (
-              <div className="flex items-center gap-2 px-1">
+              <div className="flex items-center gap-2 px-6 pb-1 flex-shrink-0">
                 <span className="text-[12px]" style={{ color: "var(--dimmer)" }}>replying to @{replyingTo.name}</span>
                 <button onClick={() => { setReplyingTo(null); setCommentInput(""); }} className="text-[11px]" style={{ color: "var(--dimmer)" }}>×</button>
               </div>
             )}
-            <form onSubmit={submitComment} className="flex gap-2 mt-1">
+            <form onSubmit={submitComment} className="flex gap-2 px-6 py-4 flex-shrink-0" style={{ borderTop: "1px solid var(--border-soft)" }}>
               <input
                 ref={commentInputRef}
                 value={commentInput}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setCommentInput(val);
-                  const atIdx = val.lastIndexOf("@");
-                  if (atIdx !== -1 && (atIdx === 0 || val[atIdx - 1] === " ")) {
-                    setCommentMentionSearch(val.slice(atIdx + 1));
-                  } else {
-                    setCommentMentionSearch(null);
-                  }
-                }}
+                onChange={(e) => { const val = e.target.value; setCommentInput(val); const atIdx = val.lastIndexOf("@"); if (atIdx !== -1 && (atIdx === 0 || val[atIdx - 1] === " ")) { setCommentMentionSearch(val.slice(atIdx + 1)); } else { setCommentMentionSearch(null); } }}
                 onKeyDown={(e) => { if (e.key === "Escape") { setCommentMentionSearch(null); setReplyingTo(null); setCommentInput(""); } }}
                 placeholder={replyingTo ? `reply to @${replyingTo.name}...` : "add a comment... (@ to mention)"}
                 maxLength={500}
-                className="flex-1 text-[13px] px-3 py-2 rounded-2xl outline-none"
+                className="flex-1 text-[14px] px-4 py-3 rounded-2xl outline-none"
                 style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--border-soft)", color: "var(--text)" }}
               />
-              <button
-                type="submit"
-                disabled={!commentInput.trim() || submittingComment}
-                className="px-3 py-2 rounded-2xl text-[13px] font-bold"
-                style={{ background: "var(--accent)", color: "#fff", opacity: !commentInput.trim() || submittingComment ? 0.4 : 1 }}
-              >
+              <button type="submit" disabled={!commentInput.trim() || submittingComment} className="px-4 py-3 rounded-2xl text-[14px] font-bold text-white disabled:opacity-40" style={{ background: "var(--accent)" }}>
                 post
               </button>
             </form>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Resolve trigger + delete + invite */}
       {!resolving && (canResolve || isHost || bet.creator_id === userId || (bet.visibility === "private" && isInvolved)) && (

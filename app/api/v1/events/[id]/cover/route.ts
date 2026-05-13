@@ -29,24 +29,44 @@ export async function POST(
   if (!file.type.startsWith("image/")) return NextResponse.json({ error: "must be an image" }, { status: 400 });
   if (file.size > 5 * 1024 * 1024) return NextResponse.json({ error: "max 5MB" }, { status: 400 });
 
-  const path = `${id}.jpg`;
   const buffer = Buffer.from(await file.arrayBuffer());
+  const ts = Date.now();
 
+  // Upload the cropped/display image
+  const path = `${id}.jpg`;
   const { error: uploadError } = await supabase.storage
     .from("covers")
     .upload(path, buffer, { contentType: "image/jpeg", upsert: true });
 
   if (uploadError) return NextResponse.json({ error: uploadError.message }, { status: 500 });
 
+  // Also store the original (uncropped) when provided as a separate field
+  const originalFile = formData.get("original") as File | null;
+  let coverOriginalUrl: string | null = null;
+  if (originalFile && originalFile.type.startsWith("image/")) {
+    const originalPath = `originals/${id}.jpg`;
+    const originalBuffer = Buffer.from(await originalFile.arrayBuffer());
+    const { error: origError } = await supabase.storage
+      .from("covers")
+      .upload(originalPath, originalBuffer, { contentType: "image/jpeg", upsert: true });
+    if (!origError) {
+      const { data: { publicUrl: origPub } } = supabase.storage.from("covers").getPublicUrl(originalPath);
+      coverOriginalUrl = `${origPub}?t=${ts}`;
+    }
+  }
+
   const { data: { publicUrl } } = supabase.storage.from("covers").getPublicUrl(path);
-  const coverUrl = `${publicUrl}?t=${Date.now()}`;
+  const coverUrl = `${publicUrl}?t=${ts}`;
+
+  const updates: Record<string, string> = { cover_url: coverUrl };
+  if (coverOriginalUrl) updates.cover_original_url = coverOriginalUrl;
 
   const { error: updateError } = await supabase
     .from("events")
-    .update({ cover_url: coverUrl })
+    .update(updates)
     .eq("id", id);
 
   if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
 
-  return NextResponse.json({ cover_url: coverUrl });
+  return NextResponse.json({ cover_url: coverUrl, cover_original_url: coverOriginalUrl });
 }

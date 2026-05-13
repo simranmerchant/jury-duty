@@ -56,19 +56,16 @@ export async function POST(
   // Notify @mentioned users (don't block response)
   const mentionedUsernames = [...body.trim().matchAll(/@(\w+)/g)].map((m) => m[1]);
   if (mentionedUsernames.length > 0) {
-    const { data: senderProfile } = await supabase
-      .from("balances")
-      .select("display_name, username")
-      .eq("user_id", user.userId)
-      .single();
-    const senderName = senderProfile?.display_name ?? senderProfile?.username ?? "someone";
+    const [senderProfileRes, betRes, mentionedRes] = await Promise.all([
+      supabase.from("balances").select("display_name, username").eq("user_id", user.userId).single(),
+      supabase.from("bets").select("event_id").eq("id", betId).single(),
+      supabase.from("balances").select("user_id, username").in("username", mentionedUsernames),
+    ]);
+    const senderName = senderProfileRes.data?.display_name ?? senderProfileRes.data?.username ?? "someone";
+    const eventId = betRes.data?.event_id ?? null;
+    const notifData = { bet_id: betId, ...(eventId ? { event_id: eventId } : {}) };
 
-    const { data: mentioned } = await supabase
-      .from("balances")
-      .select("user_id, username")
-      .in("username", mentionedUsernames);
-
-    const mentionedIds = (mentioned ?? [])
+    const mentionedIds = (mentionedRes.data ?? [])
       .map((m) => m.user_id)
       .filter((id) => id !== user.userId);
 
@@ -80,13 +77,13 @@ export async function POST(
             type: "comment_mention",
             title: `${senderName} mentioned you`,
             body: body.trim().slice(0, 80),
-            data: { bet_id: betId },
+            data: notifData,
           }))
         ),
         sendPushToUsers(mentionedIds, {
           title: `${senderName} mentioned you in a comment`,
           body: body.trim().slice(0, 80),
-          data: { bet_id: betId },
+          data: notifData,
         }),
       ]);
     }

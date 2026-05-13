@@ -18,7 +18,7 @@ export interface ResolveNotification {
   type: ResolveNotificationType;
   title: string;
   body: string;
-  data: { bet_id: string };
+  data: { bet_id: string; event_id?: string };
 }
 
 /**
@@ -33,7 +33,8 @@ export function buildResolveNotifications(
   betId: string,
   question: string,
   entries: BetEntry[],
-  winningOptionId: string | null
+  winningOptionId: string | null,
+  eventId?: string
 ): ResolveNotification[] {
   const isRefund = winningOptionId === null;
 
@@ -57,6 +58,6 @@ export function buildResolveNotifications(
       ? `you called it on "${question}". points incoming.`
       : `you were wrong about "${question}". the jury has spoken.`;
 
-    return { user_id: entry.user_id, type, title, body, data: { bet_id: betId } };
+    return { user_id: entry.user_id, type, title, body, data: { bet_id: betId, ...(eventId ? { event_id: eventId } : {}) } };
   });
 }
