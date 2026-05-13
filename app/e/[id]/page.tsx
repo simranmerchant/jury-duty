@@ -460,100 +460,85 @@ export default function EventPage() {
       </div>
 
       {/* Header */}
-      <div className="px-5 pt-5 pb-4">
+      <div className="px-5 pt-5 pb-2">
         <h1
-          className="text-[28px] font-black tracking-tight leading-tight"
+          className="text-[28px] font-black tracking-tight leading-tight mb-1"
           style={{ fontFamily: "var(--font-nunito)" }}
         >
           {event.name}
         </h1>
-        <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-          <button onClick={() => setShowInviteSheet(true)} className="flex items-center gap-1.5">
-            <span className="text-[13px]" style={{ color: "var(--dimmer)" }}>{guestCount} {guestCount === 1 ? "guest" : "guests"}</span>
-            <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid var(--border-soft)", color: "var(--muted)" }}>+ invite</span>
-          </button>
-          <span style={{ color: "var(--border)" }}>·</span>
-          <span
-            className="text-[13px]"
-            style={{ color: isClosed ? "var(--muted)" : isGroup ? "var(--dimmer)" : "var(--accent)" }}
-          >
-            {isGroup
-              ? "ongoing"
-              : isClosed
-                ? "closed"
-                : `closes ${new Date(event.ends_at!).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}`}
+        <div className="flex items-center gap-2">
+          <span className="text-[13px]" style={{ color: "var(--dimmer)" }}>
+            {isGroup ? "ongoing" : isClosed ? "closed" : `closes ${new Date(event.ends_at!).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`}
           </span>
-          {isHost && (
-            <>
-              <span style={{ color: "var(--border)" }}>·</span>
-              <span className="text-[13px] font-bold" style={{ color: "var(--accent)" }}>host</span>
-            </>
-          )}
+          {isHost && <span className="text-[13px] font-bold" style={{ color: "var(--accent)" }}>· host</span>}
         </div>
-
-        {isHost && (
-          <div className="mt-3 flex items-center gap-2 flex-wrap">
-            <button
-              onClick={() => { setEditName(event.name); setEditEndsAt(event.ends_at ? new Date(event.ends_at).toISOString().slice(0,16) : ""); setShowEditEvent(true); }}
-              className="text-[12px] font-bold px-3 py-1.5 rounded-full"
-              style={{ background: "rgba(255,255,255,0.05)", color: "var(--muted)", border: "1px solid var(--border-soft)" }}
-            >
-              edit
-            </button>
-            {confirmDelete ? (
-              <button
-                onClick={deleteEvent}
-                disabled={deleting}
-                className="text-[12px] font-bold px-3 py-1.5 rounded-full"
-                style={{ background: "rgba(255,60,60,0.15)", color: "#ff3c3c", border: "1px solid rgba(255,60,60,0.3)" }}
-              >
-                {deleting ? "deleting..." : "tap again to confirm"}
-              </button>
-            ) : (
-              <button
-                onClick={() => setConfirmDelete(true)}
-                className="text-[12px] font-bold px-3 py-1.5 rounded-full"
-                style={{ background: "rgba(255,255,255,0.04)", color: "var(--dimmer)", border: "1px solid var(--border-soft)" }}
-              >
-                delete {isGroup ? "group" : "event"}
-              </button>
-            )}
-          </div>
-        )}
       </div>
 
-      {/* Guest list */}
-      <div className="px-5 pb-3">
+      {/* Guests row */}
+      <div className="px-5 pt-3 pb-1">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-[13px]" style={{ color: "var(--dimmer)" }}>{guestCount} {guestCount === 1 ? "guest" : "guests"}</span>
+          <button
+            onClick={() => setShowInviteSheet(true)}
+            className="text-[12px] font-bold px-3 py-1.5 rounded-full"
+            style={{ background: "var(--accent-dim)", color: "var(--accent)", border: "1px solid var(--accent-border)" }}
+          >
+            + invite
+          </button>
+        </div>
         <div className="flex gap-3 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
           {event.event_guests.map((g) => {
-              const name = g.balances?.display_name;
-              const avatar = g.balances?.avatar_url;
-              const isMe = g.user_id === userId;
-              const label = isMe ? "you" : (name ?? "?");
-              return (
-                <button
-                  key={g.user_id}
-                  onClick={() => g.balances?.username && router.push(`/u/${g.balances.username}`)}
-                  className="flex flex-col items-center gap-1.5 flex-shrink-0"
-                >
-                  {avatar ? (
-                    <img src={avatar} alt={label} className="w-10 h-10 rounded-full object-cover" />
-                  ) : (
-                    <div
-                      className="w-10 h-10 rounded-full flex items-center justify-center text-[13px] font-black"
-                      style={{ background: isMe ? "var(--accent-dim)" : "rgba(255,255,255,0.08)", color: isMe ? "var(--accent)" : "var(--muted)" }}
-                    >
-                      {label[0]?.toUpperCase() ?? "?"}
-                    </div>
-                  )}
-                  <span className="text-[10px] max-w-[52px] text-center truncate" style={{ color: "var(--muted)" }}>
-                    {label}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+            const name = g.balances?.display_name;
+            const avatar = g.balances?.avatar_url;
+            const isMe = g.user_id === userId;
+            const label = isMe ? "you" : (name ?? "?");
+            return (
+              <button
+                key={g.user_id}
+                onClick={() => g.balances?.username && router.push(`/u/${g.balances.username}`)}
+                className="flex flex-col items-center gap-1.5 flex-shrink-0"
+              >
+                {avatar ? (
+                  <img src={avatar} alt={label} className="w-12 h-12 rounded-full object-cover" />
+                ) : (
+                  <div
+                    className="w-12 h-12 rounded-full flex items-center justify-center text-[14px] font-black"
+                    style={{ background: isMe ? "var(--accent-dim)" : "rgba(255,255,255,0.08)", color: isMe ? "var(--accent)" : "var(--muted)" }}
+                  >
+                    {label[0]?.toUpperCase() ?? "?"}
+                  </div>
+                )}
+                <span className="text-[11px] max-w-[52px] text-center truncate" style={{ color: "var(--muted)" }}>
+                  {label}
+                </span>
+              </button>
+            );
+          })}
         </div>
+      </div>
+
+      {/* Host actions */}
+      {isHost && (
+        <div className="px-5 pt-2 pb-1 flex items-center gap-2">
+          <button
+            onClick={() => { setEditName(event.name); setEditEndsAt(event.ends_at ? new Date(event.ends_at).toISOString().slice(0,16) : ""); setShowEditEvent(true); }}
+            className="text-[12px] font-bold px-3 py-1.5 rounded-full"
+            style={{ background: "rgba(255,255,255,0.05)", color: "var(--muted)", border: "1px solid var(--border-soft)" }}
+          >
+            edit
+          </button>
+          {confirmDelete ? (
+            <button onClick={deleteEvent} disabled={deleting} className="text-[12px] font-bold px-3 py-1.5 rounded-full" style={{ background: "rgba(255,60,60,0.15)", color: "#ff3c3c", border: "1px solid rgba(255,60,60,0.3)" }}>
+              {deleting ? "deleting..." : "tap again to confirm"}
+            </button>
+          ) : (
+            <button onClick={() => setConfirmDelete(true)} className="text-[12px] font-bold px-3 py-1.5 rounded-full" style={{ background: "rgba(255,255,255,0.04)", color: "var(--dimmer)", border: "1px solid var(--border-soft)" }}>
+              delete {isGroup ? "group" : "event"}
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Bets list */}
       <div className="px-3 pb-32 flex flex-col gap-3">
@@ -565,9 +550,18 @@ export default function EventPage() {
 
         {openBets.length > 0 && (
           <>
-            <p className="text-[12px] font-semibold px-2 pt-2" style={{ color: "var(--dimmer)" }}>
-              open
-            </p>
+            <div className="flex items-center justify-between px-2 pt-2">
+              <p className="text-[12px] font-semibold" style={{ color: "var(--dimmer)" }}>open</p>
+              {!isClosed && (
+                <button
+                  onClick={() => router.push(`/e/${eventId}/new-bet`)}
+                  className="text-[12px] font-bold px-3 py-1.5 rounded-full"
+                  style={{ background: "var(--accent-dim)", color: "var(--accent)", border: "1px solid var(--accent-border)" }}
+                >
+                  + add bet
+                </button>
+              )}
+            </div>
             {openBets.map((bet) => (
               <BetCard
                 key={bet.id}
@@ -1216,32 +1210,29 @@ function BetCard({
         )}
       </div>
 
-      {/* Status row — deadline pill + pot */}
-      <div className="flex items-center gap-2 mb-3 flex-wrap">
+      {/* Status — deadline + votes */}
+      <div className="mb-4">
         {bet.status === "resolved" && winOpt && (
-          <span className="text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: "rgba(48,209,88,0.15)", color: "var(--win)", border: "1px solid rgba(48,209,88,0.3)" }}>
+          <span className="inline-flex text-[11px] font-bold px-2.5 py-1 rounded-full mb-2" style={{ background: "rgba(56,189,248,0.12)", color: "var(--win)", border: "1px solid rgba(56,189,248,0.25)" }}>
             ✓ {winOpt.label}
           </span>
         )}
         {isOpen && (() => {
-          const bg = urgency === "critical" ? "rgba(239,68,68,0.15)" : urgency === "soon" ? "rgba(245,158,11,0.15)" : "transparent";
-          const borderColor = urgency === "critical" ? "rgba(239,68,68,0.4)" : urgency === "soon" ? "rgba(245,158,11,0.4)" : "transparent";
           const color = urgency === "critical" ? "#ef4444" : urgency === "soon" ? "#f59e0b" : "var(--dimmer)";
-          return (
-            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ background: bg, border: urgency !== "none" ? `1px solid ${borderColor}` : "none", color }}>
-              {deadlineLabel}
-            </span>
-          );
+          return <p className="text-[12px] font-semibold mb-1" style={{ color }}>{deadlineLabel}</p>;
         })()}
-        {totalPot > 0 && (
-          <span className="text-[11px]" style={{ color: "var(--dimmer)" }}>
-            {totalPot.toLocaleString()} pts · {bet.bet_entries.length} {bet.bet_entries.length === 1 ? "entry" : "entries"}
-          </span>
+        {bet.bet_entries.length > 0 && (
+          <p className="text-[13px]" style={{ color: "var(--muted)" }}>
+            {bet.bet_entries.length} {bet.bet_entries.length === 1 ? "vote" : "votes"} · {totalPot.toLocaleString()} pts
+          </p>
+        )}
+        {bet.bet_entries.length === 0 && isOpen && !isPast && (
+          <p className="text-[12px]" style={{ color: "var(--dimmer)" }}>no votes yet — be first</p>
         )}
       </div>
 
-      {/* Options */}
-      <div className="flex flex-col gap-2">
+      {/* Options — flat rows */}
+      <div className="flex flex-col">
         {bet.bet_options.map((opt) => {
           const optTotal = bet.bet_entries
             .filter((e) => e.option_id === opt.id)
@@ -1250,9 +1241,14 @@ function BetCard({
           const myPick = myEntry?.option_id === opt.id;
           const pct = totalPot > 0 ? Math.round((optTotal / totalPot) * 100) : 0;
           const isSelectedForResolve = resolveOption === opt.id;
+          const pickers = bet.bet_entries.filter((e) => e.option_id === opt.id);
 
-          return (<div key={opt.id} className="relative">
-            <button
+          const label = opt.tagged_user_id ? (opt.balances?.display_name ?? opt.label) : opt.label;
+
+          return (
+            <div
+              key={opt.id}
+              className="relative py-2.5 cursor-pointer"
               onClick={() => {
                 if (resolving) {
                   setResolveOption(isSelectedForResolve ? null : opt.id);
@@ -1260,135 +1256,112 @@ function BetCard({
                   setSelectedOption(selectedOption === opt.id ? null : opt.id);
                 }
               }}
-              className="w-full text-left rounded-2xl px-4 py-3 relative overflow-hidden"
-              style={{
-                background: isWinner
-                  ? "rgba(48,209,88,0.12)"
-                  : isSelectedForResolve
-                  ? "rgba(48,209,88,0.1)"
-                  : selectedOption === opt.id
-                  ? "var(--accent-dim)"
-                  : "rgba(255,255,255,0.04)",
-                border: `1px solid ${
-                  isWinner
-                    ? "rgba(48,209,88,0.3)"
-                    : isSelectedForResolve
-                    ? "rgba(48,209,88,0.4)"
-                    : selectedOption === opt.id
-                    ? "var(--accent-border)"
-                    : myPick
-                    ? "var(--accent-border)"
-                    : "transparent"
-                }`,
-              }}
+              style={{ opacity: resolving && !isSelectedForResolve && resolveOption !== null ? 0.5 : 1 }}
             >
-              {totalPot > 0 && (
-                <div
-                  className="absolute inset-0 rounded-2xl"
-                  style={{
-                    width: `${pct}%`,
-                    background: isWinner ? "rgba(48,209,88,0.08)" : "rgba(255,255,255,0.03)",
-                  }}
-                />
-              )}
-              <div className="relative flex items-center justify-between gap-2">
-                <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                  {opt.tagged_user_id ? (
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black flex-shrink-0 overflow-hidden" style={{ background: "var(--accent-dim)", color: "var(--accent)" }}>
-                        {opt.balances?.display_name?.[0]?.toUpperCase() ?? opt.label[0]?.toUpperCase() ?? "?"}
-                      </div>
-                      <span className="text-[14px] font-bold truncate">
-                        {opt.balances?.display_name ?? opt.label}
-                      </span>
-                      {isWinner && <span className="text-[11px] font-bold flex-shrink-0" style={{ color: "var(--win)" }}>won</span>}
-                      {bet.creator_id === userId && isOpen && !resolving && (
-                        <span role="button" onClick={(e) => { e.stopPropagation(); submitTag(opt.id, null); }} className="text-[10px] flex-shrink-0 cursor-pointer" style={{ color: "var(--muted)" }}>✕</span>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                      <span className="text-[14px] font-bold truncate">
-                        {opt.label}
-                        {isWinner && <span className="ml-2 text-[11px] font-bold" style={{ color: "var(--win)" }}>won</span>}
-                      </span>
-                      {bet.creator_id === userId && isOpen && !resolving && eventGuests.length > 0 && (
-                        <span
-                          role="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (tagPickerOptId === opt.id) {
-                              setTagPickerOptId(null);
-                            } else {
-                              setTagPickerOptId(opt.id);
-                              setTagPickerSearch("");
-                              setTimeout(() => tagPickerInputRef.current?.focus(), 50);
-                            }
-                          }}
-                          className="flex-shrink-0 cursor-pointer"
-                          style={{ color: tagPickerOptId === opt.id ? "var(--accent)" : "var(--dimmer)" }}
-                        >
-                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                            <circle cx="12" cy="7" r="4" />
-                          </svg>
-                        </span>
-                      )}
-                    </div>
+              {/* Label row */}
+              <div className="flex items-center gap-2 mb-1.5">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <span
+                    className="text-[15px] font-bold truncate"
+                    style={{ color: isWinner ? "var(--win)" : isSelectedForResolve ? "var(--win)" : selectedOption === opt.id ? "var(--accent)" : "var(--text)" }}
+                  >
+                    {label}
+                  </span>
+                  {isWinner && <span className="text-[11px] font-bold flex-shrink-0" style={{ color: "var(--win)" }}>won</span>}
+                  {/* Tag / untag buttons */}
+                  {opt.tagged_user_id && bet.creator_id === userId && isOpen && !resolving && (
+                    <span role="button" onClick={(e) => { e.stopPropagation(); submitTag(opt.id, null); }} className="text-[10px] flex-shrink-0 cursor-pointer" style={{ color: "var(--dimmer)" }}>✕</span>
                   )}
-                </div>
-                <div className="flex items-center gap-1.5">
-                  {resolving && isSelectedForResolve && (
-                    <span className="text-[11px] font-bold" style={{ color: "var(--win)" }}>
-                      {winnerCount > 0 ? `${payoutEach.toLocaleString()} ea` : "pick"}
+                  {!opt.tagged_user_id && bet.creator_id === userId && isOpen && !resolving && eventGuests.length > 0 && (
+                    <span
+                      role="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (tagPickerOptId === opt.id) { setTagPickerOptId(null); } else { setTagPickerOptId(opt.id); setTagPickerSearch(""); setTimeout(() => tagPickerInputRef.current?.focus(), 50); }
+                      }}
+                      className="flex-shrink-0 cursor-pointer"
+                      style={{ color: tagPickerOptId === opt.id ? "var(--accent)" : "var(--dimmer)" }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
+                      </svg>
                     </span>
                   )}
-                  {/* Avatar stack for who picked this option */}
-                  {!resolving && (() => {
-                    const pickers = bet.bet_entries.filter((e) => e.option_id === opt.id);
-                    return pickers.length > 0 ? (
-                      <div className="flex items-center" style={{ gap: -4 }}>
-                        {pickers.slice(0, 4).map((e, i) => {
-                          const name = e.balances?.display_name;
-                          const avatar = e.balances?.avatar_url;
-                          const isMe = e.user_id === userId;
-                          const anonSelf = e.is_anonymous && isMe;
-                          const anonOther = e.is_anonymous && !isMe;
-                          return anonOther ? (
-                            <div key={e.id} className="w-5 h-5 rounded-full flex items-center justify-center border border-[var(--card)]" style={{ marginLeft: i === 0 ? 0 : -6, zIndex: pickers.length - i, background: "rgba(255,255,255,0.08)" }}>
-                              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--muted)" }}>
-                                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
-                                <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
-                                <line x1="1" y1="1" x2="23" y2="23"/>
-                              </svg>
-                            </div>
-                          ) : anonSelf ? (
-                            <div key={e.id} className="w-5 h-5 rounded-full flex items-center justify-center border border-[var(--card)]" style={{ marginLeft: i === 0 ? 0 : -6, zIndex: pickers.length - i, background: "var(--accent-dim)" }}>
-                              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--accent)" }}>
-                                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
-                                <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
-                                <line x1="1" y1="1" x2="23" y2="23"/>
-                              </svg>
-                            </div>
-                          ) : avatar ? (
-                            <img key={e.id} src={avatar} alt={name ?? ""} className="w-5 h-5 rounded-full object-cover border border-[var(--card)]" style={{ marginLeft: i === 0 ? 0 : -6, zIndex: pickers.length - i }} />
-                          ) : (
-                            <div key={e.id} className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black border border-[var(--card)]" style={{ marginLeft: i === 0 ? 0 : -6, zIndex: pickers.length - i, background: isMe ? "var(--accent)" : "var(--muted)", color: "#fff" }}>
-                              {isMe ? "me" : (name?.[0]?.toUpperCase() ?? "?")}
-                            </div>
-                          );
-                        })}
-                        {pickers.length > 4 && <span className="text-[10px] ml-1" style={{ color: "var(--muted)" }}>+{pickers.length - 4}</span>}
-                      </div>
-                    ) : null;
-                  })()}
-                  {totalPot > 0 && !resolving && (
-                    <span className="text-[12px]" style={{ color: "var(--muted)" }}>{pct}%</span>
+                  {/* Avatar stack */}
+                  {!resolving && pickers.length > 0 && (
+                    <div className="flex items-center flex-shrink-0">
+                      {pickers.slice(0, 4).map((e, i) => {
+                        const name = e.balances?.display_name;
+                        const avatar = e.balances?.avatar_url;
+                        const isMe = e.user_id === userId;
+                        const anonOther = e.is_anonymous && !isMe;
+                        const anonSelf = e.is_anonymous && isMe;
+                        return anonOther ? (
+                          <div key={e.id} className="w-5 h-5 rounded-full flex items-center justify-center border-2 border-[var(--card)]" style={{ marginLeft: i === 0 ? 0 : -6, zIndex: pickers.length - i, background: "rgba(255,255,255,0.08)" }}>
+                            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ color: "var(--muted)" }}><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                          </div>
+                        ) : anonSelf ? (
+                          <div key={e.id} className="w-5 h-5 rounded-full flex items-center justify-center border-2 border-[var(--card)]" style={{ marginLeft: i === 0 ? 0 : -6, zIndex: pickers.length - i, background: "var(--accent-dim)", opacity: 0.5 }}>
+                            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ color: "var(--accent)" }}><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                          </div>
+                        ) : avatar ? (
+                          <img key={e.id} src={avatar} alt={name ?? ""} className="w-5 h-5 rounded-full object-cover border-2 border-[var(--card)]" style={{ marginLeft: i === 0 ? 0 : -6, zIndex: pickers.length - i }} />
+                        ) : (
+                          <div key={e.id} className="w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-black border-2 border-[var(--card)]" style={{ marginLeft: i === 0 ? 0 : -6, zIndex: pickers.length - i, background: isMe ? "var(--accent)" : "rgba(255,255,255,0.15)", color: isMe ? "#fff" : "var(--text)" }}>
+                            {isMe ? "me" : (name?.[0]?.toUpperCase() ?? "?")}
+                          </div>
+                        );
+                      })}
+                      {pickers.length > 4 && <span className="text-[10px] ml-1.5" style={{ color: "var(--dimmer)" }}>+{pickers.length - 4}</span>}
+                    </div>
+                  )}
+                  {/* Double down inline */}
+                  {myPick && isOpen && !isPast && !resolving && !doubling && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setDoubling(true); }}
+                      className="text-[11px] font-bold px-2 py-0.5 rounded-full flex-shrink-0"
+                      style={{ background: "var(--accent-dim)", color: "var(--accent)", border: "1px solid var(--accent-border)" }}
+                    >
+                      double down
+                    </button>
+                  )}
+                  {/* Resolve payout hint */}
+                  {resolving && isSelectedForResolve && winnerCount > 0 && (
+                    <span className="text-[11px] font-bold flex-shrink-0" style={{ color: "var(--win)" }}>
+                      {payoutEach.toLocaleString()} ea
+                    </span>
                   )}
                 </div>
+                <span className="text-[13px] font-semibold flex-shrink-0" style={{ color: "var(--muted)" }}>
+                  {pct}%
+                </span>
               </div>
-            </button>
-            {tagPickerOptId === opt.id && (
+
+              {/* Progress bar */}
+              <div className="h-[1.5px] rounded-full w-full mb-1" style={{ background: "rgba(255,255,255,0.07)" }}>
+                <div
+                  className="h-full rounded-full"
+                  style={{
+                    width: `${pct}%`,
+                    background: isWinner ? "var(--win)" : isSelectedForResolve ? "var(--win)" : myPick ? "var(--accent)" : "rgba(255,255,255,0.25)",
+                    transition: "width 0.3s ease",
+                  }}
+                />
+              </div>
+
+              {/* Pts staked */}
+              <p className="text-[11px]" style={{ color: "var(--dimmer)" }}>
+                {optTotal > 0 ? `${optTotal.toLocaleString()} pts` : ""}
+              </p>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Tag picker (unaffected) */}
+      {bet.bet_options.map((opt) => (
+        <div key={opt.id} className="relative">
+        {tagPickerOptId === opt.id && (
               <div
                 ref={tagPickerRef}
                 className="absolute left-0 top-full mt-1 w-full rounded-2xl z-20 flex flex-col"
@@ -1434,8 +1407,7 @@ function BetCard({
               </div>
             )}
           </div>
-          );
-        })}
+        ))}
       </div>
 
       {/* Stake input — mobile-style quick picks + custom */}
@@ -1497,55 +1469,37 @@ function BetCard({
         </div>
       )}
 
-      {/* Already bet — show stake + double down */}
-      {myEntry && isOpen && !resolving && (
-        <div className="mt-3 flex flex-col gap-2">
-          <div className="flex items-center justify-between">
-            <p className="text-[12px]" style={{ color: "var(--muted)" }}>
-              you staked {myEntry.points_staked.toLocaleString()} pts
-            </p>
-            {!isPast && !doubling && (
-              <button
-                onClick={() => setDoubling(true)}
-                className="text-[11px] font-bold px-2.5 py-1 rounded-full"
-                style={{ background: "var(--accent-dim)", color: "var(--accent)", border: "1px solid var(--accent-border)" }}
-              >
-                double down
-              </button>
-            )}
+      {/* Double down input — shown when doubling */}
+      {myEntry && isOpen && !resolving && doubling && (
+        <div className="mt-3 flex flex-col gap-1.5">
+          <div className="flex gap-2">
+            <input
+              type="number"
+              min="1"
+              value={doubleInput}
+              onChange={(e) => setDoubleInput(e.target.value)}
+              className="flex-1 rounded-2xl px-4 py-2.5 text-[15px] outline-none"
+              style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--accent-border)", color: "var(--text)" }}
+              placeholder="points"
+              autoFocus
+            />
+            <button
+              onClick={submitDoubleDown}
+              disabled={doublingDown}
+              className="px-5 py-2.5 rounded-2xl font-bold text-[14px] text-white disabled:opacity-40"
+              style={{ background: "var(--accent)", fontFamily: "var(--font-nunito)" }}
+            >
+              {doublingDown ? "..." : "add"}
+            </button>
+            <button
+              onClick={() => { setDoubling(false); setDoubleError(null); }}
+              className="px-3 py-2.5 rounded-2xl font-bold text-[14px]"
+              style={{ background: "rgba(255,255,255,0.05)", color: "var(--muted)" }}
+            >
+              ✕
+            </button>
           </div>
-          {doubling && (
-            <div className="flex flex-col gap-1.5">
-              <div className="flex gap-2">
-                <input
-                  type="number"
-                  min="1"
-                  value={doubleInput}
-                  onChange={(e) => setDoubleInput(e.target.value)}
-                  className="flex-1 rounded-2xl px-4 py-2.5 text-[15px] outline-none"
-                  style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--accent-border)", color: "var(--text)" }}
-                  placeholder="points"
-                  autoFocus
-                />
-                <button
-                  onClick={submitDoubleDown}
-                  disabled={doublingDown}
-                  className="px-5 py-2.5 rounded-2xl font-bold text-[14px] text-white disabled:opacity-40"
-                  style={{ background: "var(--accent)", fontFamily: "var(--font-nunito)" }}
-                >
-                  {doublingDown ? "..." : "add"}
-                </button>
-                <button
-                  onClick={() => { setDoubling(false); setDoubleError(null); }}
-                  className="px-3 py-2.5 rounded-2xl font-bold text-[14px]"
-                  style={{ background: "rgba(255,255,255,0.05)", color: "var(--muted)" }}
-                >
-                  ✕
-                </button>
-              </div>
-              {doubleError && <p className="text-[12px] font-bold" style={{ color: "var(--accent)" }}>{doubleError}</p>}
-            </div>
-          )}
+          {doubleError && <p className="text-[12px] font-bold" style={{ color: "var(--accent)" }}>{doubleError}</p>}
         </div>
       )}
 
