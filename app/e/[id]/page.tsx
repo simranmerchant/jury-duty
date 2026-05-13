@@ -1609,12 +1609,58 @@ function BetCard({
         </div>
       )}
 
-      {/* Reactions */}
+      {/* Resolve trigger + delete + invite */}
+      {!resolving && (canResolve || isHost || bet.creator_id === userId || (bet.visibility === "private" && isInvolved)) && (
+        <div className="mt-4 flex items-center gap-4 flex-wrap">
+          {canResolve && (
+            <button onClick={() => setResolving(true)} className="text-[12px] font-bold" style={{ color: "var(--dimmer)" }}>
+              resolve bet →
+            </button>
+          )}
+          {isGroup && isOpen && !isPast && (isHost || bet.creator_id === userId) && (
+            <button onClick={() => { setDeadlineInput(new Date(bet.deadline).toISOString().slice(0,16)); setEditingDeadline(true); }} className="text-[12px] font-bold" style={{ color: "var(--dimmer)" }}>
+              edit deadline
+            </button>
+          )}
+          {bet.visibility === "private" && isInvolved && (
+            <>
+              <button onClick={() => setShowInvite(true)} className="text-[12px] font-bold" style={{ color: "var(--purple)" }}>
+                + add people
+              </button>
+              <button onClick={shareBet} className="text-[12px] font-bold" style={{ color: betSharedCopied ? "var(--win)" : "var(--purple)" }}>
+                {betSharedCopied ? "copied!" : "share"}
+              </button>
+            </>
+          )}
+          {(isHost || bet.creator_id === userId) && (
+            confirmDeleteBet ? (
+              <button
+                onClick={deleteBet}
+                disabled={deletingBet}
+                className="text-[12px] font-bold"
+                style={{ color: "#ff3c3c" }}
+              >
+                {deletingBet ? "deleting..." : "confirm delete"}
+              </button>
+            ) : (
+              <button
+                onClick={() => setConfirmDeleteBet(true)}
+                className="text-[12px] font-bold"
+                style={{ color: "var(--dimmer)" }}
+              >
+                delete
+              </button>
+            )
+          )}
+        </div>
+      )}
+
+      {/* Reactions + comment button — single row with border-top */}
       {(() => {
         const grouped = EMOJIS.map((e) => ({ emoji: e, users: reactions.filter((r) => r.emoji === e) })).filter((g) => g.users.length > 0);
         const myReaction = reactions.find((r) => r.user_id === userId)?.emoji ?? null;
         return (
-          <div className="mt-4 flex items-center gap-2 flex-wrap relative">
+          <div className="mt-4 pt-4 flex items-center gap-2 flex-wrap relative" style={{ borderTop: "1px solid var(--border-soft)" }}>
             {grouped.map(({ emoji, users }) => (
               <button
                 key={emoji}
@@ -1645,20 +1691,19 @@ function BetCard({
                 </div>
               )}
             </div>
+            <button
+              className="flex items-center gap-1.5 text-[12px] font-bold ml-auto"
+              style={{ color: "var(--dimmer)" }}
+              onClick={() => { fetchComments(); setShowComments(true); }}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              </svg>
+              {commentCount > 0 ? `comments ${commentCount}` : "comment"}
+            </button>
           </div>
         );
       })()}
-
-      {/* Comments — button only, opens slide-up sheet */}
-      <div className="mt-4 pt-4 flex items-center gap-2" style={{ borderTop: "1px solid var(--border-soft)" }}>
-        <button
-          className="text-[12px] font-bold"
-          style={{ color: "var(--dimmer)" }}
-          onClick={() => { fetchComments(); setShowComments(true); }}
-        >
-          {commentCount > 0 ? `comments ${commentCount}` : "comment"}
-        </button>
-      </div>
 
       {/* Comments sheet */}
       {showComments && (
@@ -1785,51 +1830,6 @@ function BetCard({
         </div>
       )}
 
-      {/* Resolve trigger + delete + invite */}
-      {!resolving && (canResolve || isHost || bet.creator_id === userId || (bet.visibility === "private" && isInvolved)) && (
-        <div className="mt-4 flex items-center gap-4 flex-wrap">
-          {canResolve && (
-            <button onClick={() => setResolving(true)} className="text-[12px] font-bold" style={{ color: "var(--dimmer)" }}>
-              resolve bet →
-            </button>
-          )}
-          {isGroup && isOpen && !isPast && (isHost || bet.creator_id === userId) && (
-            <button onClick={() => { setDeadlineInput(new Date(bet.deadline).toISOString().slice(0,16)); setEditingDeadline(true); }} className="text-[12px] font-bold" style={{ color: "var(--dimmer)" }}>
-              edit deadline
-            </button>
-          )}
-          {bet.visibility === "private" && isInvolved && (
-            <>
-              <button onClick={() => setShowInvite(true)} className="text-[12px] font-bold" style={{ color: "var(--purple)" }}>
-                + add people
-              </button>
-              <button onClick={shareBet} className="text-[12px] font-bold" style={{ color: betSharedCopied ? "var(--win)" : "var(--purple)" }}>
-                {betSharedCopied ? "copied!" : "share"}
-              </button>
-            </>
-          )}
-          {(isHost || bet.creator_id === userId) && (
-            confirmDeleteBet ? (
-              <button
-                onClick={deleteBet}
-                disabled={deletingBet}
-                className="text-[12px] font-bold"
-                style={{ color: "#ff3c3c" }}
-              >
-                {deletingBet ? "deleting..." : "confirm delete"}
-              </button>
-            ) : (
-              <button
-                onClick={() => setConfirmDeleteBet(true)}
-                className="text-[12px] font-bold"
-                style={{ color: "var(--dimmer)" }}
-              >
-                delete
-              </button>
-            )
-          )}
-        </div>
-      )}
     </div>
     </>
   );
