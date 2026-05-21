@@ -4,6 +4,9 @@ import { usePrivy } from "@privy-io/react-auth";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useEffect, useState, Suspense } from "react";
 
+const APP_STORE_ID = "6770705837";
+const APP_STORE_URL = `https://apps.apple.com/app/id${APP_STORE_ID}`;
+
 type EventPreview = {
   id: string;
   name: string;
@@ -23,6 +26,11 @@ function JoinPageInner() {
   const [notFound, setNotFound] = useState(false);
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isIOS, setIsIOS] = useState(false);
+
+  useEffect(() => {
+    setIsIOS(/iphone|ipad|ipod/i.test(navigator.userAgent));
+  }, []);
 
   // Always fetch preview — no auth needed
   useEffect(() => {
@@ -165,6 +173,16 @@ function JoinPageInner() {
               <span style={{ fontWeight: 600 }}>Open in Safari</span>
             </p>
           </div>
+        )}
+
+        {isIOS && (
+          <a
+            href={APP_STORE_URL}
+            className="w-full py-4 rounded-2xl font-black text-[16px] text-center block"
+            style={{ background: "var(--card)", border: "1px solid var(--border-soft)", color: "var(--text)", fontFamily: "var(--font-nunito)" }}
+          >
+            📲 get the app for the best experience
+          </a>
         )}
       </div>
     </div>

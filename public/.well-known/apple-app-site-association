@@ -1,0 +1,12 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["4MC9TD3647.com.jurydutyfriends.app"],
+        "components": [
+          { "/": "/join/*" }
+        ]
+      }
+    ]
+  }
+}
