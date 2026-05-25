@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { generateInviteToken } from "@/lib/invite";
 import { sendPushToUsers } from "@/lib/push";
 import { sendWebPushToUsers } from "@/lib/webpush";
+import { validateCreateBet } from "@/lib/standalone-bet";
 
 export async function POST(req: NextRequest) {
   const token = req.headers.get("authorization")?.replace("Bearer ", "");
@@ -14,22 +15,12 @@ export async function POST(req: NextRequest) {
 
   const { question, options, deadline, invitedUserIds, question_tagged_user_ids } = await req.json();
 
-  if (!question?.trim() || question.trim().length > 200) {
-    return NextResponse.json({ error: "question required (max 200 chars)" }, { status: 400 });
-  }
-  if (!Array.isArray(options) || options.length < 2) {
-    return NextResponse.json({ error: "at least 2 options required" }, { status: 400 });
-  }
-  const normalizedOptions: { label: string; tagged_user_id?: string }[] = options.map((o: any) =>
+  const validation = validateCreateBet({ question, options, deadline });
+  if (!validation.ok) return NextResponse.json({ error: validation.error }, { status: 400 });
+
+  const normalizedOptions: { label: string; tagged_user_id?: string }[] = (options as any[]).map((o: any) =>
     typeof o === "string" ? { label: o } : { label: o.label, tagged_user_id: o.tagged_user_id ?? undefined }
   );
-  if (normalizedOptions.some((o) => !o.label?.trim() || o.label.trim().length > 100)) {
-    return NextResponse.json({ error: "each option must be 1-100 chars" }, { status: 400 });
-  }
-  if (!deadline) return NextResponse.json({ error: "deadline required" }, { status: 400 });
-  if (new Date(deadline) <= new Date()) {
-    return NextResponse.json({ error: "deadline must be in the future" }, { status: 400 });
-  }
 
   const { data: bet, error: betError } = await supabase
     .from("bets")
