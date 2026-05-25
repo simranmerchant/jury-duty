@@ -59,5 +59,10 @@ export default async function BetPage({ params, searchParams }: Props) {
 
   const inviteToken = token ?? bet?.invite_token ?? null;
 
-  return <BetJoinClient bet={bet} betId={id} inviteToken={inviteToken} />;
+  const normalizedBet = bet ? {
+    ...bet,
+    balances: Array.isArray(bet.balances) ? (bet.balances[0] ?? null) : bet.balances,
+  } : null;
+
+  return <BetJoinClient bet={normalizedBet} betId={id} inviteToken={inviteToken} />;
 }
