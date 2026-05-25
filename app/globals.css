@@ -4,16 +4,16 @@
   --accent: #ff8fa3;
   --accent-dim: rgba(255, 143, 163, 0.13);
   --accent-border: rgba(255, 143, 163, 0.30);
-  --purple: #d8b4fe;
-  --purple-dim: rgba(216, 180, 254, 0.13);
-  --purple-border: rgba(216, 180, 254, 0.30);
-  --bg: #111113;
-  --card: #1c1c1f;
-  --border: rgba(255, 255, 255, 0.08);
-  --border-soft: rgba(255, 255, 255, 0.06);
-  --text: #f4f4f5;
-  --muted: #a1a1aa;
-  --dimmer: #52525b;
+  --purple: #a78bfa;
+  --purple-dim: rgba(167, 139, 250, 0.10);
+  --purple-border: rgba(167, 139, 250, 0.25);
+  --bg: #100e0c;
+  --card: #181512;
+  --border: rgba(255, 255, 255, 0.055);
+  --border-soft: rgba(255, 255, 255, 0.045);
+  --text: #ede8e0;
+  --muted: #6e6860;
+  --dimmer: #3d3830;
   --win: #38bdf8;
   --win-dim: rgba(56, 189, 248, 0.12);
   --win-border: rgba(56, 189, 248, 0.30);
@@ -34,3 +34,14 @@ body {
   color: var(--text);
   font-family: var(--font-dm-sans), system-ui, sans-serif;
 }
+
+@keyframes marquee-left {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+@keyframes marquee-right {
+  from { transform: translateX(-50%); }
+  to   { transform: translateX(0); }
+}
+.marquee-left  { animation: marquee-left  22s linear infinite; }
+.marquee-right { animation: marquee-right 28s linear infinite; }

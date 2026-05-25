@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 // SVG icons — all inline, no dependency
 function IconScale() {
@@ -114,12 +114,31 @@ const SLIDES: Slide[] = [
 export default function HowItWorksPage() {
   const router = useRouter();
   const [index, setIndex] = useState(0);
+  const touchStartX = useRef<number | null>(null);
+
+  function handleTouchStart(e: React.TouchEvent) {
+    touchStartX.current = e.touches[0].clientX;
+  }
+
+  function handleTouchEnd(e: React.TouchEvent) {
+    if (touchStartX.current === null) return;
+    const diff = touchStartX.current - e.changedTouches[0].clientX;
+    touchStartX.current = null;
+    if (Math.abs(diff) < 50) return;
+    if (diff > 0 && index < SLIDES.length - 1) setIndex(index + 1);
+    if (diff < 0 && index > 0) setIndex(index - 1);
+  }
 
   const slide = SLIDES[index];
   const isLast = index === SLIDES.length - 1;
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: "var(--bg)", color: "var(--text)" }}>
+    <div
+      className="min-h-screen flex flex-col"
+      style={{ background: "var(--bg)", color: "var(--text)" }}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
       {/* Header */}
       <div className="flex items-center justify-between px-5 pt-12 pb-5">
         <button
