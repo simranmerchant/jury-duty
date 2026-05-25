@@ -2,6 +2,49 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/privy";
 import { supabase } from "@/lib/supabase";
 
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const token = req.headers.get("authorization")?.replace("Bearer ", "");
+  if (!token) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+  const user = await requireUser(token).catch(() => null);
+  if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+  const { id } = await params;
+
+  const { data: bet } = await supabase
+    .from("bets")
+    .select(`
+      id, question, deadline, status, visibility, winning_option_id, creator_id, created_at, invite_token,
+      bet_options(id, label),
+      bet_entries(id, user_id, option_id, points_staked, is_anonymous, balances(display_name, avatar_url, username)),
+      bet_reactions(user_id, emoji),
+      bet_comments(id),
+      balances!bets_creator_id_fkey(display_name, avatar_url, username)
+    `)
+    .is("event_id", null)
+    .eq("id", id)
+    .single();
+
+  if (!bet) return NextResponse.json({ error: "not found" }, { status: 404 });
+
+  // Check access: creator or invited
+  const isCreator = bet.creator_id === user.userId;
+  const { count: inviteCount } = await supabase
+    .from("bet_invites")
+    .select("*", { count: "exact", head: true })
+    .eq("bet_id", id)
+    .eq("user_id", user.userId);
+
+  if (!isCreator && !inviteCount) {
+    return NextResponse.json({ error: "not authorized" }, { status: 403 });
+  }
+
+  return NextResponse.json({ bet, userId: user.userId });
+}
+
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }

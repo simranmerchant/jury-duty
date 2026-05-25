@@ -4,7 +4,7 @@ import { usePrivy } from "@privy-io/react-auth";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, Suspense } from "react";
 
-const ROW1 = ["weddings", "nights out", "birthdays", "bachelorettes", "poker night", "weddings", "nights out", "birthdays", "bachelorettes", "poker night"];
+const ROW1 = ["weddings", "nights out", "birthdays", "bachelorettes", "watch parties", "poker night", "weddings", "nights out", "birthdays", "bachelorettes", "watch parties", "poker night"];
 const ROW2 = ["playoffs", "karaoke", "road trips", "concerts", "game night", "playoffs", "karaoke", "road trips", "concerts", "game night"];
 
 function MarqueeRow({ items, reverse }: { items: string[]; reverse?: boolean }) {
