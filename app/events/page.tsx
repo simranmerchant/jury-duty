@@ -2,7 +2,14 @@
 
 import { usePrivy } from "@privy-io/react-auth";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
+
+type Tab = "events" | "groups" | "past";
+const TABS: { key: Tab; label: string }[] = [
+  { key: "events", label: "events" },
+  { key: "groups", label: "groups" },
+  { key: "past", label: "past" },
+];
 
 type Bet = { id: string; status: string; visibility: string };
 type Event = {
@@ -24,6 +31,8 @@ export default function EventsPage() {
   const [points, setPoints] = useState<number | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<Tab>("events");
+  const touchStartX = useRef<number | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [showJoin, setShowJoin] = useState(false);
   const [showNotifs, setShowNotifs] = useState(false);
@@ -130,7 +139,6 @@ export default function EventsPage() {
 
   if (!ready) return null;
 
-  const groups = events.filter((e) => e.type === "group");
   const now = new Date();
   const activeEventsList = events
     .filter((e) => e.type !== "group" && e.ends_at && new Date(e.ends_at) >= now)
@@ -138,86 +146,99 @@ export default function EventsPage() {
   const pastEventsList = events
     .filter((e) => e.type !== "group" && (!e.ends_at || new Date(e.ends_at) < now))
     .sort((a, b) => new Date(b.ends_at ?? 0).getTime() - new Date(a.ends_at ?? 0).getTime());
-  const eventsList = [...activeEventsList, ...pastEventsList];
-  const activeEvents = activeEventsList.length;
+  const groups = events.filter((e) => e.type === "group");
+  const featured = activeEventsList[0] ?? null;
+  const featuredNewCount = featured?.bets?.filter((b) => b.status === "open").length ?? 0;
 
-  function EventCard({ event }: { event: Event }) {
+  function handleTouchStart(e: React.TouchEvent) {
+    touchStartX.current = e.touches[0].clientX;
+  }
+  function handleTouchEnd(e: React.TouchEvent) {
+    if (touchStartX.current === null) return;
+    const diff = touchStartX.current - e.changedTouches[0].clientX;
+    touchStartX.current = null;
+    if (Math.abs(diff) < 50) return;
+    const idx = TABS.findIndex((t) => t.key === activeTab);
+    if (diff > 0 && idx < TABS.length - 1) setActiveTab(TABS[idx + 1].key);
+    if (diff < 0 && idx > 0) setActiveTab(TABS[idx - 1].key);
+  }
+
+  function EventRow({ event }: { event: Event }) {
     const totalBets = event.bets?.length ?? 0;
     const isGroup = event.type === "group";
-    const isPast = !isGroup && event.ends_at && new Date(event.ends_at) < new Date();
+    const isPast = !isGroup && event.ends_at && new Date(event.ends_at) < now;
     return (
       <button
         onClick={() => router.push(`/e/${event.id}`)}
-        className="w-full text-left rounded-2xl overflow-hidden"
+        className="w-full text-left flex items-center gap-3 px-3 py-[11px] rounded-[10px]"
         style={{
           background: "var(--card)",
-          border: `1px solid ${isGroup ? "var(--purple-border)" : "var(--border-soft)"}`,
-          opacity: isPast ? 0.4 : 1,
+          border: `1px solid var(--border)`,
+          borderLeft: isGroup ? "2px solid var(--purple-border)" : "1px solid var(--border)",
+          opacity: isPast ? 0.3 : 1,
         }}
       >
-        {event.cover_url && (
-          <div className="relative w-full" style={{ height: 130 }}>
-            <img src={event.cover_url} alt="" className="w-full h-full object-cover" />
-            <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, transparent 40%, rgba(0,0,0,0.55) 100%)" }} />
-          </div>
-        )}
-        <div className="px-4 py-4 flex items-center justify-between gap-3">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <p className="font-bold text-[16px] leading-tight truncate" style={{ fontFamily: "var(--font-nunito)" }}>
-                {event.name}
-              </p>
-              {event.hasNew && !isPast && (
-                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: "var(--accent)" }} />
-              )}
-            </div>
-            <p className="text-[12px] mt-0.5" style={{ color: "var(--dimmer)" }}>
-              {isGroup ? "group" : isPast ? "ended" : event.ends_at
-                ? new Date(event.ends_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })
-                : ""
-              }
-              {totalBets > 0 ? ` · ${totalBets} bet${totalBets !== 1 ? "s" : ""}` : " · no bets yet"}
-            </p>
-          </div>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--dimmer)", flexShrink: 0 }}>
-            <path d="M9 18l6-6-6-6" />
-          </svg>
+        {/* Thumb */}
+        <div className="flex-shrink-0 rounded-[8px] overflow-hidden flex items-center justify-center text-[18px]"
+          style={{ width: 42, height: 42, background: "rgba(255,255,255,0.03)", border: "1px solid var(--border)" }}>
+          {event.cover_url
+            ? <img src={event.cover_url} alt="" className="w-full h-full object-cover" />
+            : <span>🎲</span>
+          }
+        </div>
+        {/* Info */}
+        <div className="flex-1 min-w-0">
+          <p className="font-black text-[14px] leading-tight truncate" style={{ fontFamily: "var(--font-nunito)", letterSpacing: "-0.01em" }}>
+            {event.name}
+          </p>
+          <p className="text-[11px] mt-0.5 italic" style={{ color: "var(--muted)" }}>
+            {isGroup ? "ongoing" : isPast ? "ended" : event.ends_at
+              ? new Date(event.ends_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+              : ""}
+            {totalBets > 0 ? ` · ${totalBets} bet${totalBets !== 1 ? "s" : ""}` : " · no bets"}
+          </p>
+        </div>
+        {/* Right */}
+        <div className="flex flex-col items-end gap-1 flex-shrink-0">
+          {isGroup && (
+            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-[4px]"
+              style={{ background: "var(--purple-dim)", color: "var(--purple)", border: "1px solid var(--purple-border)", letterSpacing: "0.04em" }}>
+              group
+            </span>
+          )}
+          {!isGroup && event.hasNew && !isPast && (
+            <span className="text-[10px] font-bold" style={{ color: "var(--accent)", letterSpacing: "0.02em" }}>new</span>
+          )}
         </div>
       </button>
     );
   }
 
   return (
-    <div className="min-h-screen" style={{ background: "var(--bg)", color: "var(--text)" }}>
+    <div className="min-h-screen" style={{ background: "var(--bg)", color: "var(--text)" }} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+      {/* Header */}
       <div className="px-5 pt-14 pb-3 flex items-center justify-between">
-        <h1 className="text-[28px] font-black tracking-tight" style={{ fontFamily: "var(--font-nunito)" }}>
-          jury<span style={{ color: "var(--accent)" }}>duty</span>
+        <h1 className="font-black tracking-tight" style={{ fontFamily: "var(--font-nunito)", fontSize: 27, letterSpacing: "-0.035em", lineHeight: 1 }}>
+          <span style={{ color: "var(--text)" }}>jury</span>
+          <span style={{ color: "var(--dimmer)", fontWeight: 800 }}>·</span>
+          <span style={{ color: "var(--accent)", fontStyle: "italic" }}>duty</span>
         </h1>
         <div className="flex items-center gap-5">
-          <button onClick={() => router.push("/people")}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--muted)" }}>
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-              <circle cx="9" cy="7" r="4" />
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-            </svg>
-          </button>
           <button onClick={openNotifs} className="relative">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--muted)" }}>
+            <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--muted)" }}>
               <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
               <path d="M13.73 21a2 2 0 0 1-3.46 0" />
             </svg>
             {unreadCount > 0 && (
-              <span className="absolute -top-1 -right-1.5 min-w-[16px] h-4 rounded-full flex items-center justify-center text-[10px] font-black text-white px-1" style={{ background: "var(--accent)" }}>
-                {unreadCount > 9 ? "9+" : unreadCount}
-              </span>
+              <span className="absolute -top-1 -right-1" style={{ width: 9, height: 9, borderRadius: "50%", background: "var(--accent)", border: "1.5px solid var(--bg)", display: "block" }} />
             )}
           </button>
           <button onClick={() => router.push("/profile")}>
             {avatarUrl ? (
-              <img src={avatarUrl} alt="profile" className="w-8 h-8 rounded-full object-cover" />
+              <img src={avatarUrl} alt="profile" className="w-[30px] h-[30px] rounded-full object-cover" />
             ) : (
-              <div className="w-8 h-8 rounded-full flex items-center justify-center text-[13px] font-black" style={{ background: "var(--accent-dim)", color: "var(--accent)", fontFamily: "var(--font-nunito)" }}>
+              <div className="w-[30px] h-[30px] rounded-full flex items-center justify-center text-[12px] font-black"
+                style={{ background: "var(--accent-dim)", color: "var(--accent)", border: "1.5px solid var(--border)", fontFamily: "var(--font-nunito)" }}>
                 {displayName?.[0]?.toUpperCase() ?? "?"}
               </div>
             )}
@@ -225,46 +246,108 @@ export default function EventsPage() {
         </div>
       </div>
 
-      <div className="px-4 pt-1 pb-36 flex flex-col gap-2">
-        {/* Groups section */}
-        {groups.length > 0 && (
-          <>
-            <p className="text-[12px] font-semibold px-1 pt-3 pb-1" style={{ color: "var(--dimmer)" }}>Groups</p>
-            {groups.map((g) => <EventCard key={g.id} event={g} />)}
-          </>
-        )}
+      {/* Tab bar */}
+      <div className="flex gap-2 px-4 pb-3">
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setActiveTab(t.key)}
+            className="px-4 py-1.5 rounded-full text-[13px] font-bold"
+            style={{
+              background: activeTab === t.key ? "var(--accent-dim)" : "rgba(255,255,255,0.04)",
+              border: `1px solid ${activeTab === t.key ? "var(--accent-border)" : "rgba(255,255,255,0.06)"}`,
+              color: activeTab === t.key ? "var(--accent)" : "var(--muted)",
+            }}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
 
-        {/* Events section */}
-        {eventsList.length > 0 && (
+      <div className="pb-36 px-4 flex flex-col gap-2">
+        {/* Events tab */}
+        {activeTab === "events" && (
           <>
-            {groups.length > 0 && (
-              <p className="text-[12px] font-semibold px-1 pt-3 pb-1" style={{ color: "var(--dimmer)" }}>Events</p>
+            {featured && (
+              <>
+                <p className="text-[10px] font-semibold px-1 pt-1" style={{ color: "var(--dimmer)", letterSpacing: "0.14em", textTransform: "uppercase" }}>next up</p>
+                <button
+                  onClick={() => router.push(`/e/${featured.id}`)}
+                  className="w-full text-left rounded-[14px] overflow-hidden relative"
+                  style={{ height: 128, border: "1px solid rgba(255,143,163,0.12)" }}
+                >
+                  {featured.cover_url ? (
+                    <img src={featured.cover_url} alt="" className="w-full h-full object-cover absolute inset-0" style={{ filter: "brightness(0.5) saturate(0.75)" }} />
+                  ) : (
+                    <div className="absolute inset-0" style={{ background: "var(--card)" }} />
+                  )}
+                  <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, rgba(255,143,163,0.18) 0%, transparent 55%), linear-gradient(to top, rgba(16,14,12,0.75) 0%, transparent 60%)" }} />
+                  {featuredNewCount > 0 && (
+                    <span className="absolute top-2.5 right-2.5 text-[10px] font-bold text-white px-2.5 py-1 rounded-full" style={{ background: "var(--accent)" }}>
+                      {featuredNewCount} new
+                    </span>
+                  )}
+                  <div className="absolute bottom-0 left-0 right-0 p-3.5">
+                    <p className="font-black text-[19px] text-white leading-tight" style={{ fontFamily: "var(--font-nunito)", letterSpacing: "-0.02em" }}>{featured.name}</p>
+                    <p className="text-[11px] mt-0.5 italic" style={{ color: "rgba(255,255,255,0.55)" }}>
+                      {featured.ends_at ? new Date(featured.ends_at).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : ""}
+                      {(featured.bets?.length ?? 0) > 0 ? ` · ${featured.bets.length} bet${featured.bets.length !== 1 ? "s" : ""}` : ""}
+                    </p>
+                  </div>
+                </button>
+                {activeEventsList.slice(1).length > 0 && <p className="text-[10px] font-semibold px-1 pt-2" style={{ color: "var(--dimmer)", letterSpacing: "0.14em", textTransform: "uppercase" }}>all events</p>}
+              </>
             )}
-            {eventsList.map((e) => <EventCard key={e.id} event={e} />)}
+            {activeEventsList.slice(featured ? 1 : 0).map((e) => <EventRow key={e.id} event={e} />)}
+            {activeEventsList.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-20 gap-2">
+                <p className="text-[15px] font-semibold italic" style={{ color: "var(--muted)" }}>no active events</p>
+                <p className="text-[13px]" style={{ color: "var(--dimmer)" }}>tap + new to create one</p>
+              </div>
+            )}
           </>
         )}
 
-        {events.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-16 gap-2">
-            <p className="text-[15px] font-semibold" style={{ color: "var(--muted)" }}>nothing here yet</p>
-            <p className="text-[13px]" style={{ color: "var(--dimmer)" }}>create an event or join one with a link</p>
-          </div>
+        {/* Groups tab */}
+        {activeTab === "groups" && (
+          <>
+            {groups.map((e) => <EventRow key={e.id} event={e} />)}
+            {groups.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-20 gap-2">
+                <p className="text-[15px] font-semibold italic" style={{ color: "var(--muted)" }}>no groups yet</p>
+                <p className="text-[13px]" style={{ color: "var(--dimmer)" }}>groups are ongoing — each bet has its own deadline</p>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Past tab */}
+        {activeTab === "past" && (
+          <>
+            {pastEventsList.map((e) => <EventRow key={e.id} event={e} />)}
+            {pastEventsList.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-20 gap-2">
+                <p className="text-[15px] font-semibold italic" style={{ color: "var(--muted)" }}>no past events</p>
+                <p className="text-[13px]" style={{ color: "var(--dimmer)" }}>completed events show up here</p>
+              </div>
+            )}
+          </>
         )}
       </div>
 
       {/* Floating action buttons */}
-      <div className="fixed bottom-6 left-0 right-0 flex justify-center gap-3 px-6" style={{ zIndex: 10 }}>
+      <div className="fixed bottom-0 left-0 right-0 flex gap-2.5 px-4 pb-8 pt-3" style={{ zIndex: 10, background: "linear-gradient(to top, var(--bg) 65%, transparent 100%)" }}>
         <button
           onClick={() => setShowJoin(true)}
-          className="flex-1 py-3.5 rounded-2xl font-bold text-[15px]"
-          style={{ background: "var(--card)", border: "1px solid var(--border)", color: "var(--muted)" }}
+          className="flex-1 py-3.5 rounded-[12px] font-semibold text-[14px]"
+          style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border)", color: "var(--muted)" }}
         >
           join
         </button>
         <button
           onClick={() => setShowCreate(true)}
-          className="flex-1 py-3.5 rounded-2xl font-bold text-[15px] text-white"
-          style={{ background: "var(--accent)" }}
+          className="flex-[2] py-3.5 rounded-[12px] font-black text-[15px] text-white"
+          style={{ background: "var(--accent)", fontFamily: "var(--font-nunito)", letterSpacing: "-0.01em" }}
         >
           + new
         </button>
