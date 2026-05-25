@@ -4,14 +4,25 @@ import { usePrivy } from "@privy-io/react-auth";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback, useRef } from "react";
 
-type Tab = "events" | "groups" | "past";
+type Tab = "events" | "groups" | "past" | "bets";
 const TABS: { key: Tab; label: string }[] = [
   { key: "events", label: "events" },
   { key: "groups", label: "groups" },
   { key: "past", label: "past" },
+  { key: "bets", label: "bets" },
 ];
 
 type Bet = { id: string; status: string; visibility: string };
+type StandaloneBet = {
+  id: string;
+  question: string;
+  deadline: string;
+  status: "open" | "resolved";
+  winning_option_id: string | null;
+  invite_token: string | null;
+  bet_options: { id: string; label: string }[];
+  bet_entries: { user_id: string }[];
+};
 type Event = {
   id: string;
   name: string;
@@ -28,6 +39,7 @@ export default function EventsPage() {
   const { ready, authenticated, getAccessToken } = usePrivy();
   const router = useRouter();
   const [events, setEvents] = useState<Event[]>([]);
+  const [myBets, setMyBets] = useState<StandaloneBet[]>([]);
   const [points, setPoints] = useState<number | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState<string | null>(null);
@@ -47,15 +59,27 @@ export default function EventsPage() {
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushPrompted, setPushPrompted] = useState(false);
 
+  // Create standalone bet
+  const [showCreateBet, setShowCreateBet] = useState(false);
+  const [betQuestion, setBetQuestion] = useState("");
+  const [betOptions, setBetOptions] = useState(["", ""]);
+  const [betDeadline, setBetDeadline] = useState("");
+  const [creatingBet, setCreatingBet] = useState(false);
+  const [createBetError, setCreateBetError] = useState<string | null>(null);
+  const [createdBet, setCreatedBet] = useState<{ id: string; invite_token: string; question: string } | null>(null);
+
   const fetchEvents = useCallback(async () => {
     const token = await getAccessToken();
-    const [eventsRes, meRes] = await Promise.all([
+    const [eventsRes, meRes, betsRes] = await Promise.all([
       fetch("/api/v1/events", { headers: { Authorization: `Bearer ${token}` } }),
       fetch("/api/v1/me", { headers: { Authorization: `Bearer ${token}` } }),
+      fetch("/api/v1/bets/mine", { headers: { Authorization: `Bearer ${token}` } }),
     ]);
     const eventsData = await eventsRes.json();
     const meData = await meRes.json();
+    const betsData = await betsRes.json();
     setEvents(eventsData.events ?? []);
+    setMyBets(betsData.bets ?? []);
     setPoints(meData.points ?? null);
     setAvatarUrl(meData.avatar_url ?? null);
     setDisplayName(meData.display_name ?? null);
@@ -95,6 +119,33 @@ export default function EventsPage() {
     }
     setName(""); setEndsAt(""); setShowCreate(false); setCreating(false); setCreateType("event"); setCreateError(null);
     fetchEvents();
+  }
+
+  async function createBet() {
+    const validOptions = betOptions.filter((o) => o.trim());
+    if (!betQuestion.trim() || validOptions.length < 2 || !betDeadline) return;
+    setCreatingBet(true);
+    setCreateBetError(null);
+    const token = await getAccessToken();
+    const res = await fetch("/api/v1/bets", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ question: betQuestion.trim(), options: validOptions.map((o) => o.trim()), deadline: new Date(betDeadline).toISOString() }),
+    });
+    const data = await res.json();
+    setCreatingBet(false);
+    if (!res.ok) { setCreateBetError(data.error ?? "something went wrong"); return; }
+    setCreatedBet({ id: data.betId, invite_token: data.invite_token, question: betQuestion.trim() });
+    fetchEvents();
+  }
+
+  function resetCreateBet() {
+    setShowCreateBet(false);
+    setBetQuestion("");
+    setBetOptions(["", ""]);
+    setBetDeadline("");
+    setCreateBetError(null);
+    setCreatedBet(null);
   }
 
   async function subscribeToPush() {
@@ -333,6 +384,49 @@ export default function EventsPage() {
             )}
           </>
         )}
+
+        {/* Bets tab */}
+        {activeTab === "bets" && (
+          <>
+            {myBets.map((bet) => {
+              const isResolved = bet.status === "resolved";
+              const isClosed = !isResolved && new Date(bet.deadline) <= now;
+              return (
+                <button
+                  key={bet.id}
+                  onClick={() => router.push(`/bet/${bet.id}`)}
+                  className="w-full text-left flex items-center gap-3 px-3 py-[11px] rounded-[10px]"
+                  style={{ background: "var(--card)", border: "1px solid var(--border)" }}
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="font-black text-[14px] leading-tight" style={{ fontFamily: "var(--font-nunito)", letterSpacing: "-0.01em" }}>{bet.question}</p>
+                    <p className="text-[11px] mt-0.5 italic" style={{ color: "var(--muted)" }}>
+                      {bet.bet_options.map((o) => o.label).join(" vs ")}
+                      {" · "}
+                      {bet.bet_entries.length} player{bet.bet_entries.length !== 1 ? "s" : ""}
+                    </p>
+                  </div>
+                  <span
+                    className="text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0"
+                    style={{
+                      background: isResolved ? "rgba(52,199,89,0.12)" : isClosed ? "rgba(255,255,255,0.06)" : "var(--accent-dim)",
+                      color: isResolved ? "#34c759" : isClosed ? "var(--muted)" : "var(--accent)",
+                      border: `1px solid ${isResolved ? "rgba(52,199,89,0.25)" : isClosed ? "var(--border)" : "var(--accent-border)"}`,
+                    }}
+                  >
+                    {isResolved ? "resolved" : isClosed ? "closed" : new Date(bet.deadline).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                  </span>
+                </button>
+              );
+            })}
+            {myBets.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-20 gap-2">
+                <p className="text-[15px] font-semibold italic" style={{ color: "var(--muted)" }}>no bets yet</p>
+                <p className="text-[13px]" style={{ color: "var(--dimmer)" }}>tap + new to create a one-off bet</p>
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       {/* Floating action buttons */}
@@ -345,7 +439,7 @@ export default function EventsPage() {
           join
         </button>
         <button
-          onClick={() => setShowCreate(true)}
+          onClick={() => activeTab === "bets" ? setShowCreateBet(true) : setShowCreate(true)}
           className="flex-[2] py-3.5 rounded-[12px] font-black text-[15px] text-white"
           style={{ background: "var(--accent)", fontFamily: "var(--font-nunito)", letterSpacing: "-0.01em" }}
         >
@@ -476,6 +570,116 @@ export default function EventsPage() {
           </div>
         </div>
       )}
+      {/* Create bet modal */}
+      {showCreateBet && (
+        <div className="fixed inset-0 z-50 flex flex-col overflow-y-auto" style={{ background: "var(--bg)", color: "var(--text)" }}>
+          <div className="px-5 pt-14 pb-2">
+            <button onClick={resetCreateBet} className="text-sm mb-5 flex items-center gap-1" style={{ color: "var(--muted)" }}>← back</button>
+            <h1 className="text-[28px] font-black tracking-tight" style={{ fontFamily: "var(--font-nunito)" }}>
+              {createdBet ? "bet created" : "new bet"}
+            </h1>
+          </div>
+
+          {createdBet ? (
+            <div className="px-5 pt-4 pb-32 flex flex-col gap-4">
+              <div className="rounded-2xl p-5 flex flex-col gap-2" style={{ background: "var(--card)", border: "1px solid var(--accent-border)" }}>
+                <p className="text-[11px] font-bold uppercase tracking-widest" style={{ color: "var(--accent)" }}>ready to share</p>
+                <p className="text-[18px] font-black leading-snug" style={{ fontFamily: "var(--font-nunito)" }}>{createdBet.question}</p>
+              </div>
+              <button
+                onClick={() => {
+                  const url = `${window.location.origin}/bet/${createdBet.id}?token=${createdBet.invite_token}`;
+                  navigator.clipboard.writeText(url).catch(() => {});
+                  if (navigator.share) {
+                    navigator.share({ title: createdBet.question, url }).catch(() => {});
+                  }
+                }}
+                className="w-full py-4 rounded-2xl font-black text-[16px] text-white"
+                style={{ background: "var(--accent)", fontFamily: "var(--font-nunito)" }}
+              >
+                share link
+              </button>
+              <button
+                onClick={() => router.push(`/bet/${createdBet.id}`)}
+                className="w-full py-3.5 rounded-2xl font-bold text-[15px]"
+                style={{ background: "rgba(255,255,255,0.04)", color: "var(--muted)", border: "1px solid var(--border)" }}
+              >
+                view bet
+              </button>
+              <button onClick={resetCreateBet} className="text-center text-[13px] py-2" style={{ color: "var(--dimmer)" }}>done</button>
+            </div>
+          ) : (
+            <div className="px-5 pt-4 pb-32 flex flex-col gap-5">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[12px] font-semibold" style={{ color: "var(--muted)" }}>the question</label>
+                <textarea
+                  className="rounded-2xl px-4 py-3 text-[15px] outline-none resize-none"
+                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--accent-border)", color: "var(--text)", minHeight: 80 }}
+                  placeholder="will she actually show up?"
+                  value={betQuestion}
+                  onChange={(e) => setBetQuestion(e.target.value)}
+                  maxLength={200}
+                  autoFocus
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-[12px] font-semibold" style={{ color: "var(--muted)" }}>options</label>
+                {betOptions.map((opt, i) => (
+                  <div key={i} className="flex gap-2">
+                    <input
+                      className="flex-1 rounded-2xl px-4 py-3 text-[15px] outline-none"
+                      style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--accent-border)", color: "var(--text)" }}
+                      placeholder={i === 0 ? "yes" : i === 1 ? "no" : `option ${i + 1}`}
+                      value={opt}
+                      onChange={(e) => setBetOptions((prev) => prev.map((o, j) => j === i ? e.target.value : o))}
+                      maxLength={100}
+                    />
+                    {betOptions.length > 2 && (
+                      <button
+                        onClick={() => setBetOptions((prev) => prev.filter((_, j) => j !== i))}
+                        className="flex-shrink-0 rounded-xl flex items-center justify-center"
+                        style={{ width: 44, background: "rgba(255,255,255,0.05)", border: "1px solid var(--border)", color: "var(--muted)" }}
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                ))}
+                {betOptions.length < 6 && (
+                  <button
+                    onClick={() => setBetOptions((prev) => [...prev, ""])}
+                    className="w-full py-2.5 rounded-2xl text-[13px] font-semibold"
+                    style={{ border: "1px dashed rgba(255,255,255,0.1)", color: "var(--muted)" }}
+                  >
+                    + add option
+                  </button>
+                )}
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[12px] font-semibold" style={{ color: "var(--muted)" }}>closes at</label>
+                <input
+                  type="datetime-local"
+                  className="rounded-2xl px-4 py-3 text-[15px] outline-none"
+                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-soft)", color: "var(--text)" }}
+                  min={new Date(Date.now() + 60000 - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}
+                  value={betDeadline}
+                  onChange={(e) => setBetDeadline(e.target.value)}
+                />
+              </div>
+              {createBetError && <p className="text-[13px] font-bold" style={{ color: "var(--accent)" }}>{createBetError}</p>}
+              <button
+                onClick={createBet}
+                disabled={creatingBet || !betQuestion.trim() || betOptions.filter((o) => o.trim()).length < 2 || !betDeadline}
+                className="w-full py-4 rounded-2xl font-black text-[16px] text-white disabled:opacity-40"
+                style={{ background: "var(--accent)", fontFamily: "var(--font-nunito)" }}
+              >
+                {creatingBet ? "creating..." : "create & share"}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Notifications panel */}
       {showNotifs && (
         <div className="fixed inset-0 z-50 flex flex-col justify-end" style={{ background: "rgba(0,0,0,0.5)" }} onClick={() => setShowNotifs(false)}>
