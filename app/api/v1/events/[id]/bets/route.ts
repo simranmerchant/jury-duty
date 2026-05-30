@@ -168,17 +168,17 @@ export async function POST(
         user_id: uid,
         type: "bet_invited",
         title: "you've been added to a private bet 👀",
-        body: `${creatorName} added you. open the app to see it.`,
+        body: `${creatorName} added you. tap to view.`,
         data: { bet_id: bet.id, event_id: eventId },
       }))),
       notifyIds.length > 0 && sendPushToUsers(notifyIds, {
         title: "you've been added to a private bet 👀",
-        body: "open the app to see it",
+        body: "tap to view",
         data: { event_id: eventId, bet_id: bet.id },
       }),
       notifyIds.length > 0 && sendWebPushToUsers(notifyIds, {
         title: "you've been added to a private bet 👀",
-        body: "open the app to see it",
+        body: "tap to view",
         data: { event_id: eventId, bet_id: bet.id },
       }),
     ]);
@@ -188,17 +188,17 @@ export async function POST(
         user_id: uid,
         type: "new_bet",
         title: `new bet in ${event.name} 🗳️`,
-        body: `${creatorName} just posted a new bet. open the app to vote.`,
+        body: `${creatorName} just posted a new prediction. tap to vote.`,
         data: { bet_id: bet.id, event_id: eventId },
       }))),
       sendPushToUsers(otherGuestIds, {
         title: `new bet in ${event.name} 🗳️`,
-        body: "open the app to vote",
+        body: "tap to vote",
         data: { event_id: eventId, bet_id: bet.id },
       }),
       sendWebPushToUsers(otherGuestIds, {
         title: `new bet in ${event.name} 🗳️`,
-        body: "open the app to vote",
+        body: "tap to vote",
         data: { event_id: eventId, bet_id: bet.id },
       }),
     ]);

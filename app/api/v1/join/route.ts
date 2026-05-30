@@ -10,28 +10,7 @@ export async function POST(req: NextRequest) {
   const user = await requireUser(token).catch(() => null);
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  const { invite_token, bet_id, bet_invite_token } = await req.json();
-
-  // Standalone bet join: token on the bet itself
-  if (bet_invite_token) {
-    const { data: bet } = await supabase
-      .from("bets")
-      .select("id, question, creator_id")
-      .is("event_id", null)
-      .eq("invite_token", bet_invite_token)
-      .single();
-
-    if (!bet) return NextResponse.json({ error: "invalid bet invite link" }, { status: 404 });
-    if (!verifyInviteToken(bet.id, bet_invite_token)) {
-      return NextResponse.json({ error: "invalid bet invite link" }, { status: 404 });
-    }
-
-    await supabase
-      .from("bet_invites")
-      .upsert({ bet_id: bet.id, user_id: user.userId }, { onConflict: "bet_id,user_id", ignoreDuplicates: true });
-
-    return NextResponse.json({ betId: bet.id, question: bet.question });
-  }
+  const { invite_token, bet_id } = await req.json();
 
   if (!invite_token) return NextResponse.json({ error: "invite_token required" }, { status: 400 });
 
@@ -65,31 +44,9 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ eventId: event.id, eventName: event.name });
 }
 
-// Public: fetch event or standalone-bet preview by invite token (no auth required)
+// Public: fetch event preview by invite token (no auth required)
 export async function GET(req: NextRequest) {
   const invite_token = req.nextUrl.searchParams.get("token");
-  const bet_invite_token = req.nextUrl.searchParams.get("bet_token");
-
-  if (bet_invite_token) {
-    const { data: bet } = await supabase
-      .from("bets")
-      .select(`
-        id, question, deadline, status,
-        bet_options(id, label),
-        bet_entries(id, user_id),
-        balances!bets_creator_id_fkey(display_name)
-      `)
-      .is("event_id", null)
-      .eq("invite_token", bet_invite_token)
-      .single();
-
-    if (!bet) return NextResponse.json({ error: "not found" }, { status: 404 });
-    if (!verifyInviteToken(bet.id, bet_invite_token)) {
-      return NextResponse.json({ error: "not found" }, { status: 404 });
-    }
-
-    return NextResponse.json({ bet });
-  }
 
   if (!invite_token) return NextResponse.json({ error: "token required" }, { status: 400 });
 

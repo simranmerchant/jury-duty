@@ -58,7 +58,7 @@ export async function POST(
       user_id: uid,
       type: "bet_invited",
       title: "you've been added to a private bet 👀",
-      body: `${inviterName} added you. open the app to see it.`,
+      body: `${inviterName} added you. tap to view.`,
       data: { bet_id: id, event_id: bet.event_id },
     }));
 
@@ -66,7 +66,7 @@ export async function POST(
       supabase.from("notifications").insert(notifications),
       sendPushToUsers(newUserIds, {
         title: "you've been added to a private bet 👀",
-        body: "open the app to see it",
+        body: "tap to view",
         data: { event_id: bet.event_id },
       }),
     ]);
