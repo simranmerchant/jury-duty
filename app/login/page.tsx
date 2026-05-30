@@ -70,7 +70,7 @@ function LoginInner() {
         <h1 className="text-[42px] font-black tracking-tight leading-none" style={{ fontFamily: "var(--font-nunito)" }}>
           jury<span style={{ color: "var(--accent)", fontStyle: "italic" }}>duty</span>
         </h1>
-        <p style={{ color: "var(--muted)", fontSize: 14 }}>bet on anything with friends</p>
+        <p style={{ color: "var(--muted)", fontSize: 14 }}>predict anything with friends</p>
       </div>
 
       {/* Marquee */}

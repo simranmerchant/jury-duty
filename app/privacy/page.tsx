@@ -22,7 +22,7 @@ export default function PrivacyPage() {
         <div>
           <h2 className="text-lg font-bold text-[var(--text)] mb-3">What we collect</h2>
           <ul className="list-disc pl-5 space-y-2">
-            <li><strong className="text-[var(--text)]">Account info</strong> — your name, username, and email address provided during sign-up via Privy.</li>
+            <li><strong className="text-[var(--text)]">Account info</strong> — your name, username, and phone number provided during sign-up via Privy.</li>
             <li><strong className="text-[var(--text)]">Profile photo</strong> — if you choose to upload one.</li>
             <li><strong className="text-[var(--text)]">Usage data</strong> — bets you create or join, events you participate in, and reactions or comments you post.</li>
             <li><strong className="text-[var(--text)]">Push notification token</strong> — if you grant permission, so we can notify you about bet outcomes and activity in your events.</li>

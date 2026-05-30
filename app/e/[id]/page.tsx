@@ -1349,7 +1349,7 @@ function BetCard({
                 />
               </div>
 
-              {/* Pts staked */}
+              {/* Pts in pool */}
               <p className="text-[11px]" style={{ color: "var(--dimmer)" }}>
                 {optTotal > 0 ? `${optTotal.toLocaleString()} pts` : ""}
               </p>
@@ -1444,7 +1444,7 @@ function BetCard({
             className="w-full py-3.5 rounded-2xl font-bold text-[16px] text-white disabled:opacity-40"
             style={{ background: "var(--accent)", fontFamily: "var(--font-nunito)" }}
           >
-            {placing ? "placing..." : "bet it"}
+            {placing ? "locking in..." : "lock it in"}
           </button>
           {placeError && (
             <p className="text-[12px] font-bold" style={{ color: "var(--accent)" }}>{placeError}</p>
@@ -1463,7 +1463,7 @@ function BetCard({
               <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
               <line x1="1" y1="1" x2="23" y2="23"/>
             </svg>
-            {isAnonymous ? "ghost mode on" : "bet anonymously"}
+            {isAnonymous ? "ghost mode on" : "go anonymous"}
           </button>
         </div>
       )}

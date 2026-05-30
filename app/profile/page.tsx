@@ -279,7 +279,7 @@ export default function ProfilePage() {
           <p className="text-[13px]" style={{ color: "var(--dimmer)" }}>points available</p>
           {staked > 0 && (
             <p className="text-[12px] mt-1" style={{ color: "var(--muted)" }}>
-              + {staked.toLocaleString()} pts staked in {stats?.pending} open {stats?.pending === 1 ? "bet" : "bets"}
+              + {staked.toLocaleString()} pts in {stats?.pending} open {stats?.pending === 1 ? "prediction" : "predictions"}
             </p>
           )}
         </div>

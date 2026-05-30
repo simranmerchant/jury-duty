@@ -16,7 +16,7 @@ export default function TermsPage() {
       <section className="space-y-10 text-[15px] leading-7 text-[var(--muted)]">
         <div>
           <h2 className="text-lg font-bold text-[var(--text)] mb-3">The basics</h2>
-          <p>By using jury duty you agree to these terms. jury duty is a social entertainment app. All bets use virtual points — no real money, no gambling.</p>
+          <p>By using jury duty you agree to these terms. jury duty is a social entertainment app. All predictions use virtual points — no real money, no gambling.</p>
         </div>
 
         <div>
