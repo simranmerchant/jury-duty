@@ -266,7 +266,7 @@ function BetJoinInner({ bet: initialBet, betId, inviteToken }: { bet: BetData; b
                 className="w-full py-3.5 rounded-2xl font-black text-[15px] text-white disabled:opacity-60"
                 style={{ background: "var(--accent)", fontFamily: "var(--font-nunito)" }}
               >
-                {placing ? "locking in..." : `lock in ${points} pts`}
+                {placing ? "committing..." : `commit ${points} pts`}
               </button>
             </div>
           )}
@@ -382,7 +382,7 @@ function BetJoinInner({ bet: initialBet, betId, inviteToken }: { bet: BetData; b
         ) : !authenticated ? (
           <>
             <button onClick={handleGetStarted} className="w-full py-4 rounded-2xl font-black text-[16px] text-white" style={{ background: "var(--accent)", fontFamily: "var(--font-nunito)" }}>
-              make your pick
+              call it
             </button>
             <p className="text-[12px]" style={{ color: "var(--dimmer)" }}>we'll text a one-time code — no password needed</p>
           </>
@@ -393,7 +393,7 @@ function BetJoinInner({ bet: initialBet, betId, inviteToken }: { bet: BetData; b
           </div>
         ) : (
           <button onClick={joinBet} className="w-full py-4 rounded-2xl font-black text-[16px] text-white" style={{ background: "var(--accent)", fontFamily: "var(--font-nunito)" }}>
-            make your pick
+            call it
           </button>
         )}
 

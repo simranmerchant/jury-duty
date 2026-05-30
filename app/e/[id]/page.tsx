@@ -1444,7 +1444,7 @@ function BetCard({
             className="w-full py-3.5 rounded-2xl font-bold text-[16px] text-white disabled:opacity-40"
             style={{ background: "var(--accent)", fontFamily: "var(--font-nunito)" }}
           >
-            {placing ? "locking in..." : "lock it in"}
+            {placing ? "committing..." : "call it"}
           </button>
           {placeError && (
             <p className="text-[12px] font-bold" style={{ color: "var(--accent)" }}>{placeError}</p>
