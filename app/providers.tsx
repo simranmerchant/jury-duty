@@ -1,6 +1,7 @@
 "use client";
 
 import { PrivyProvider } from "@privy-io/react-auth";
+import TermsGate from "@/components/TermsGate";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   return (
@@ -21,7 +22,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
         },
       }}
     >
-      {children}
+      <TermsGate>{children}</TermsGate>
     </PrivyProvider>
   );
 }

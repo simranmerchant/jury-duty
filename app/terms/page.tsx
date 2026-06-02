@@ -45,6 +45,16 @@ export default function TermsPage() {
         </div>
 
         <div>
+          <h2 className="text-lg font-bold text-[var(--text)] mb-3">User-generated content</h2>
+          <p>jury duty allows users to create predictions, post comments, and interact with other users&apos; content. We have zero tolerance for objectionable content or abusive behavior. By using the app you agree that you will not post content that is harmful, harassing, obscene, hateful, or otherwise objectionable.</p>
+          <ul className="list-disc pl-5 space-y-2 mt-3">
+            <li>You can <strong className="text-[var(--text)]">report</strong> any prediction or user by tapping the report button on the content. We will review all reports within 24 hours and remove violating content and accounts.</li>
+            <li>You can <strong className="text-[var(--text)]">block</strong> any user from their profile page. Blocking removes their content from your view immediately and notifies us of potential abuse.</li>
+            <li>Accounts found to be posting objectionable content will be permanently removed.</li>
+          </ul>
+        </div>
+
+        <div>
           <h2 className="text-lg font-bold text-[var(--text)] mb-3">Your content</h2>
           <p>You own the content you post. By posting it, you give us a license to display it within the app. We don&apos;t claim ownership of your content and don&apos;t sell it.</p>
         </div>

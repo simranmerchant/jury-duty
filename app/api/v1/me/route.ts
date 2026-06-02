@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
   const user = await requireUser(token).catch(() => null);
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  const [{ data: balance }, { data: entries }] = await Promise.all([
+  const [{ data: balance }, { data: entries }, { data: agreementRow }, { data: blockRows }] = await Promise.all([
     supabase
       .from("balances")
       .select("points, display_name, avatar_url, username, referral_code")
@@ -29,6 +29,10 @@ export async function GET(req: NextRequest) {
       `)
       .eq("user_id", user.userId)
       .order("created_at", { ascending: false }),
+
+    supabase.from("user_agreements").select("user_id").eq("user_id", user.userId).single(),
+
+    supabase.from("blocked_users").select("blocked_id").eq("blocker_id", user.userId),
   ]);
 
   // Compute outcome for each entry
@@ -55,7 +59,17 @@ export async function GET(req: NextRequest) {
     pending: history.filter((h) => h.outcome === "pending").length,
   };
 
-  return NextResponse.json({ points: balance?.points ?? 0, display_name: balance?.display_name ?? null, avatar_url: balance?.avatar_url ?? null, username: balance?.username ?? null, referral_code: balance?.referral_code ?? null, history, stats });
+  return NextResponse.json({
+    points: balance?.points ?? 0,
+    display_name: balance?.display_name ?? null,
+    avatar_url: balance?.avatar_url ?? null,
+    username: balance?.username ?? null,
+    referral_code: balance?.referral_code ?? null,
+    history,
+    stats,
+    has_agreed_to_terms: !!agreementRow,
+    blocked_user_ids: (blockRows ?? []).map((r) => r.blocked_id),
+  });
 }
 
 export async function DELETE(req: NextRequest) {
