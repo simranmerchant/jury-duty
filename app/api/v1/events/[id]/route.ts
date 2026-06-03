@@ -119,32 +119,34 @@ export async function GET(
     if (!guest) return NextResponse.json({ error: "not found" }, { status: 404 });
   }
 
-  const { data: event, error } = await supabase
-    .from("events")
-    .select(`
-      id, name, ends_at, type, host_id, invite_token, cover_url, cover_original_url,
-      event_guests(user_id, balances(display_name, avatar_url, username)),
-      bets(
-        id, question, question_tagged_user_ids, deadline, visibility, status, winning_option_id, creator_id, created_at,
-        bet_options!bet_options_bet_id_fkey(id, label, tagged_user_id, balances!bet_options_tagged_user_id_fkey(display_name, avatar_url, username)),
-        bet_entries(id, user_id, option_id, points_staked, is_anonymous, balances(display_name, avatar_url)),
-        bet_invites(user_id),
-        bet_reactions(user_id, emoji),
-        bet_comments!bet_comments_bet_id_fkey(id)
-      )
-    `)
-    .eq("id", id)
-    .single();
+  const [{ data: event, error }, { data: lastSeen }] = await Promise.all([
+    supabase
+      .from("events")
+      .select(`
+        id, name, ends_at, type, host_id, invite_token, cover_url, cover_original_url,
+        host_balance:balances!events_host_id_fkey(display_name, avatar_url, username),
+        event_guests(user_id, balances(display_name, avatar_url, username)),
+        bets(
+          id, question, question_tagged_user_ids, deadline, visibility, status, winning_option_id, creator_id, created_at,
+          bet_options!bet_options_bet_id_fkey(id, label, tagged_user_id, balances!bet_options_tagged_user_id_fkey(display_name, avatar_url, username)),
+          bet_entries(id, user_id, option_id, points_staked, is_anonymous),
+          bet_invites(user_id),
+          bet_reactions(user_id, emoji),
+          bet_comments!bet_comments_bet_id_fkey(id)
+        )
+      `)
+      .eq("id", id)
+      .single(),
+    supabase
+      .from("event_last_seen")
+      .select("seen_at")
+      .eq("user_id", user.userId)
+      .eq("event_id", id)
+      .single(),
+  ]);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!event) return NextResponse.json({ error: "not found" }, { status: 404 });
-
-  const { data: lastSeen } = await supabase
-    .from("event_last_seen")
-    .select("seen_at")
-    .eq("user_id", user.userId)
-    .eq("event_id", id)
-    .single();
 
   const seenAt = lastSeen?.seen_at ?? null;
 
@@ -161,5 +163,16 @@ export async function GET(
       isNew: bet.creator_id !== user.userId && (!seenAt || new Date(bet.created_at) > new Date(seenAt)),
     }));
 
-  return NextResponse.json({ event: { ...event, bets: filteredBets }, userId: user.userId });
+  // Guarantee the host appears in event_guests so the mobile client can resolve
+  // voter display names without a separate balances join on bet_entries.
+  const { host_balance, ...eventFields } = event as any;
+  const hostInGuests = event.event_guests.some((g: any) => g.user_id === event.host_id);
+  const eventGuests = hostInGuests
+    ? event.event_guests
+    : [...event.event_guests, { user_id: event.host_id, balances: host_balance ?? null }];
+
+  return NextResponse.json({
+    event: { ...eventFields, event_guests: eventGuests, bets: filteredBets },
+    userId: user.userId,
+  });
 }
