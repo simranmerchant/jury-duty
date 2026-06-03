@@ -56,7 +56,7 @@ const SLIDES: Slide[] = [
     icon: <IconScale />,
     label: "overview",
     title: "what is jury duty?",
-    body: "predict anything with your friends. put points on outcomes only your group would care about.",
+    body: "predict anything with your friends. put points on things that only your group would care about.",
     bullets: [
       { text: "will she text back? who leaves first? does the trip make it out of the group chat?" },
       { text: "tied to real events — weddings, game nights, birthday dinners, concerts" },
@@ -70,7 +70,7 @@ const SLIDES: Slide[] = [
     body: "create a prediction, pick your options, put points in. when it settles, winners split the pool.",
     bullets: [
       { text: "create a prediction inside any event" },
-      { text: "put points on the option you think wins" },
+      { text: "put points on the option you think will win" },
       { text: "creator settles it — winner takes the pool" },
       { text: "after 24 hrs, anyone in the event can resolve it" },
     ],
