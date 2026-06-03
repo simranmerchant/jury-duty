@@ -8,7 +8,7 @@ export async function notifyAdmin(subject: string, body: string) {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      from: "noreply@juryduty.app",
+      from: "noreply@juryduty.xyz",
       to: "simranmerchant12@gmail.com",
       subject,
       text: body,

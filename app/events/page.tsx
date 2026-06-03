@@ -449,7 +449,7 @@ export default function EventsPage() {
               <input
                 className="rounded-2xl px-4 py-3 text-[15px] outline-none"
                 style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--accent-border)", color: "var(--text)" }}
-                placeholder="juryduty.app/join/... or paste code"
+                placeholder="juryduty.xyz/join/... or paste code"
                 value={joinInput}
                 onChange={(e) => setJoinInput(e.target.value)}
                 autoFocus
