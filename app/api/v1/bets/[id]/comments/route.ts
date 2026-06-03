@@ -53,40 +53,62 @@ export async function POST(
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Notify @mentioned users (don't block response)
+  // Fetch bet + sender profile for notifications (always needed now)
   const mentionedUsernames = [...body.trim().matchAll(/@(\w+)/g)].map((m) => m[1]);
-  if (mentionedUsernames.length > 0) {
-    const [senderProfileRes, betRes, mentionedRes] = await Promise.all([
-      supabase.from("balances").select("display_name, username").eq("user_id", user.userId).single(),
-      supabase.from("bets").select("event_id").eq("id", betId).single(),
-      supabase.from("balances").select("user_id, username").in("username", mentionedUsernames),
-    ]);
-    const senderName = senderProfileRes.data?.display_name ?? senderProfileRes.data?.username ?? "someone";
-    const eventId = betRes.data?.event_id ?? null;
-    const notifData = { bet_id: betId, ...(eventId ? { event_id: eventId } : {}) };
+  const [senderProfileRes, betRes, mentionedRes] = await Promise.all([
+    supabase.from("balances").select("display_name, username").eq("user_id", user.userId).single(),
+    supabase.from("bets").select("event_id, creator_id, question").eq("id", betId).single(),
+    mentionedUsernames.length > 0
+      ? supabase.from("balances").select("user_id, username").in("username", mentionedUsernames)
+      : Promise.resolve({ data: [] }),
+  ]);
 
-    const mentionedIds = (mentionedRes.data ?? [])
-      .map((m) => m.user_id)
-      .filter((id) => id !== user.userId);
+  const senderName = senderProfileRes.data?.display_name ?? senderProfileRes.data?.username ?? "someone";
+  const eventId = betRes.data?.event_id ?? null;
+  const creatorId = betRes.data?.creator_id ?? null;
+  const betQuestion = betRes.data?.question ?? "a prediction";
+  const notifData = { bet_id: betId, ...(eventId ? { event_id: eventId } : {}) };
 
-    if (mentionedIds.length > 0) {
-      await Promise.all([
-        supabase.from("notifications").insert(
-          mentionedIds.map((uid) => ({
-            user_id: uid,
-            type: "comment_mention",
-            title: `${senderName} mentioned you`,
-            body: body.trim().slice(0, 80),
-            data: notifData,
-          }))
-        ),
-        sendPushToUsers(mentionedIds, {
-          title: `${senderName} mentioned you in a comment`,
+  // Notify @mentioned users
+  const mentionedIds = ((mentionedRes as { data: { user_id: string }[] | null }).data ?? [])
+    .map((m) => m.user_id)
+    .filter((id) => id !== user.userId);
+
+  if (mentionedIds.length > 0) {
+    await Promise.all([
+      supabase.from("notifications").insert(
+        mentionedIds.map((uid) => ({
+          user_id: uid,
+          type: "comment_mention",
+          title: `${senderName} mentioned you`,
           body: body.trim().slice(0, 80),
           data: notifData,
-        }),
-      ]);
-    }
+        }))
+      ),
+      sendPushToUsers(mentionedIds, {
+        title: `${senderName} mentioned you in a comment`,
+        body: body.trim().slice(0, 80),
+        data: notifData,
+      }),
+    ]);
+  }
+
+  // Notify bet creator when someone else comments (skip if creator is the commenter or already mentioned)
+  if (creatorId && creatorId !== user.userId && !mentionedIds.includes(creatorId)) {
+    await Promise.all([
+      supabase.from("notifications").insert({
+        user_id: creatorId,
+        type: "comment_on_bet",
+        title: `${senderName} commented on your prediction`,
+        body: body.trim().slice(0, 80),
+        data: notifData,
+      }),
+      sendPushToUsers([creatorId], {
+        title: `${senderName} commented on your prediction`,
+        body: body.trim().slice(0, 80),
+        data: notifData,
+      }),
+    ]);
   }
 
   return NextResponse.json({ comment: data }, { status: 201 });
