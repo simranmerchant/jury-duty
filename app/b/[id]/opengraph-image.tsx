@@ -18,14 +18,22 @@ export default async function OgImage({ params }: { params: Promise<{ id: string
 
   const { data: bet } = await supabase
     .from("bets")
-    .select("question, status, winning_option_id, bet_options(id, label), bet_entries(option_id), events(name)")
+    .select("question, status, winning_option_id, event_id")
     .eq("id", id)
     .single();
 
+  const [{ data: rawOptions }, { data: rawEntries }, { data: event }] = bet
+    ? await Promise.all([
+        supabase.from("bet_options").select("id, label").eq("bet_id", id),
+        supabase.from("bet_entries").select("option_id").eq("bet_id", id),
+        supabase.from("events").select("name").eq("id", bet.event_id).single(),
+      ])
+    : [{ data: null }, { data: null }, { data: null }];
+
   const question = bet?.question ?? "jury duty";
-  const eventName = (bet?.events as any)?.name ?? "";
-  const options = ((bet?.bet_options ?? []) as Option[]).slice(0, 4);
-  const entries = (bet?.bet_entries ?? []) as Entry[];
+  const eventName = event?.name ?? "";
+  const options = ((rawOptions ?? []) as Option[]).slice(0, 4);
+  const entries = (rawEntries ?? []) as Entry[];
   const total = entries.length;
   const isResolved = bet?.status === "resolved";
   const winningOptionId = bet?.winning_option_id;

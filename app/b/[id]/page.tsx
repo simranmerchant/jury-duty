@@ -5,19 +5,27 @@ type Option = { id: string; label: string };
 type Entry = { option_id: string };
 
 async function getBet(id: string) {
-  const { data } = await supabase
+  const { data: bet } = await supabase
     .from("bets")
-    .select("id, question, status, winning_option_id, event_id, bet_options(id, label), bet_entries(option_id), events(name)")
+    .select("id, question, status, winning_option_id, event_id")
     .eq("id", id)
     .single();
-  return data;
+  if (!bet) return null;
+
+  const [{ data: options }, { data: entries }, { data: event }] = await Promise.all([
+    supabase.from("bet_options").select("id, label").eq("bet_id", id),
+    supabase.from("bet_entries").select("option_id").eq("bet_id", id),
+    supabase.from("events").select("name").eq("id", bet.event_id).single(),
+  ]);
+
+  return { ...bet, bet_options: options ?? [], bet_entries: entries ?? [], eventName: event?.name ?? "" };
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const bet = await getBet(id);
   if (!bet) return {};
-  const eventName = (bet.events as any)?.name ?? "jury duty";
+  const eventName = bet.eventName || "jury duty";
   return {
     title: bet.question,
     description: `vote on this prediction in ${eventName} — jury duty`,
@@ -38,7 +46,7 @@ export default async function BetPage({ params }: { params: Promise<{ id: string
   const total = entries.length;
   const isResolved = bet.status === "resolved";
   const winningOptionId = bet.winning_option_id;
-  const eventName = (bet.events as any)?.name ?? "";
+  const eventName = bet.eventName ?? "";
 
   const optionData = options.map((opt, i) => {
     const count = entries.filter((e) => e.option_id === opt.id).length;
