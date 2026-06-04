@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({
     userId: user.userId,
-    points: data?.points ?? 1000,
+    points: data?.points ?? 200,
     hasName: !!data?.display_name,
     hasUsername: !!data?.username,
   });

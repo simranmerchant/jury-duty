@@ -6,7 +6,7 @@ export const metadata: Metadata = {
 
 export default function PrivacyPage() {
   const updated = "May 9, 2026";
-  const email = "hello@juryduty.xyz";
+  const email = "support@juryduty.xyz";
 
   return (
     <main className="max-w-2xl mx-auto px-6 py-16 text-[var(--text)]">
