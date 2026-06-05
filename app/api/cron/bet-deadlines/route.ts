@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
     type: "bet_deadline",
     title: "the people need to know.",
     body: `"${bet.question}" is past its deadline. resolve your bet.`,
-    data: { bet_id: bet.id },
+    data: { bet_id: bet.id, event_id: bet.event_id },
   }));
 
   const pushPayloads = overdueBets.map((b) => ({
