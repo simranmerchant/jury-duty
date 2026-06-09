@@ -532,7 +532,8 @@ export default function EventsPage() {
                 <div className="flex flex-col">
                   {notifications.map((n) => {
                     const eventId = n.data?.event_id;
-                    const href = eventId ? `/e/${eventId}` : null;
+                    const isFollowNotif = n.type === "follow_request" || n.type === "new_follower" || n.type === "follow_accepted";
+                    const href = eventId ? `/e/${eventId}` : isFollowNotif ? "/profile" : null;
                     const iconConfig = (() => {
                       if (n.type === "bet_resolved_won") return { bg: "rgba(52,199,89,0.15)", border: "rgba(52,199,89,0.25)", icon: <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#34c759" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> };
                       if (n.type === "bet_resolved_lost") return { bg: "rgba(255,143,163,0.15)", border: "rgba(255,143,163,0.25)", icon: <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg> };
