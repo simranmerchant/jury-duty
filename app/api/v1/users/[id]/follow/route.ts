@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/privy";
 import { supabase } from "@/lib/supabase";
 import { sendPushToUsers } from "@/lib/push";
+import { computeFollowStatus, buildFollowNotification } from "@/lib/follow";
 
 // POST /api/v1/users/[id]/follow — follow or request to follow
 export async function POST(
@@ -25,7 +26,7 @@ export async function POST(
 
   if (!target) return NextResponse.json({ error: "not found" }, { status: 404 });
 
-  const status = target.is_private ? "pending" : "accepted";
+  const status = computeFollowStatus(target.is_private);
 
   const { error } = await supabase
     .from("follows")
@@ -40,38 +41,12 @@ export async function POST(
     .single();
 
   const followerName = follower?.display_name ?? follower?.username ?? "someone";
+  const notif = buildFollowNotification(followerName, status);
 
-  if (target.is_private) {
-    await Promise.all([
-      supabase.from("notifications").insert({
-        user_id: targetId,
-        type: "follow_request",
-        title: "new follow request",
-        body: `${followerName} wants to follow you.`,
-        data: { user_id: user.userId },
-      }),
-      sendPushToUsers([targetId], {
-        title: "new follow request",
-        body: `${followerName} wants to follow you.`,
-        data: { user_id: user.userId },
-      }),
-    ]);
-  } else {
-    await Promise.all([
-      supabase.from("notifications").insert({
-        user_id: targetId,
-        type: "new_follower",
-        title: "new follower",
-        body: `${followerName} started following you.`,
-        data: { user_id: user.userId },
-      }),
-      sendPushToUsers([targetId], {
-        title: "new follower",
-        body: `${followerName} started following you.`,
-        data: { user_id: user.userId },
-      }),
-    ]);
-  }
+  await Promise.all([
+    supabase.from("notifications").insert({ user_id: targetId, ...notif, data: { user_id: user.userId } }),
+    sendPushToUsers([targetId], { ...notif, data: { user_id: user.userId } }),
+  ]);
 
   return NextResponse.json({ status });
 }

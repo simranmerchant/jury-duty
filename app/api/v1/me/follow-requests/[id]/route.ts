@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/privy";
 import { supabase } from "@/lib/supabase";
 import { sendPushToUsers } from "@/lib/push";
+import { buildAcceptNotification } from "@/lib/follow";
 
 // POST /api/v1/me/follow-requests/[id]/accept — accept a pending follow request
 // DELETE /api/v1/me/follow-requests/[id] — decline a pending follow request
@@ -34,20 +35,11 @@ export async function POST(
     .single();
 
   const accepterName = accepter?.display_name ?? accepter?.username ?? "someone";
+  const notif = buildAcceptNotification(accepterName);
 
   await Promise.all([
-    supabase.from("notifications").insert({
-      user_id: requesterId,
-      type: "follow_accepted",
-      title: "follow request accepted",
-      body: `${accepterName} accepted your follow request.`,
-      data: { user_id: user.userId },
-    }),
-    sendPushToUsers([requesterId], {
-      title: "follow request accepted",
-      body: `${accepterName} accepted your follow request.`,
-      data: { user_id: user.userId },
-    }),
+    supabase.from("notifications").insert({ user_id: requesterId, ...notif, data: { user_id: user.userId } }),
+    sendPushToUsers([requesterId], { ...notif, data: { user_id: user.userId } }),
   ]);
 
   return NextResponse.json({ ok: true });
