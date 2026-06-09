@@ -26,7 +26,6 @@ export default function PeoplePage() {
   const [searched, setSearched] = useState(false);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [suggestionsLoading, setSuggestionsLoading] = useState(true);
-  const [followStatuses, setFollowStatuses] = useState<Record<string, "pending" | "accepted">>({});
   const [followLoading, setFollowLoading] = useState<Record<string, boolean>>({});
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -71,8 +70,7 @@ export default function PeoplePage() {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (res.ok) {
-      const data = await res.json();
-      setFollowStatuses((prev) => ({ ...prev, [userId]: data.status }));
+      setSuggestions((prev) => prev.filter((s) => s.user_id !== userId));
     }
     setFollowLoading((prev) => ({ ...prev, [userId]: false }));
   }
@@ -141,7 +139,6 @@ export default function PeoplePage() {
                 <div className="flex flex-col gap-2">
                   {suggestions.map((u) => {
                     const name = u.display_name ?? u.username ?? "unknown";
-                    const status = followStatuses[u.user_id] ?? null;
                     const isLoading = followLoading[u.user_id] ?? false;
                     return (
                       <div
@@ -176,18 +173,12 @@ export default function PeoplePage() {
                           </div>
                         </button>
                         <button
-                          onClick={() => !status && handleFollow(u.user_id)}
-                          disabled={isLoading || !!status}
+                          onClick={() => handleFollow(u.user_id)}
+                          disabled={isLoading}
                           className="flex-shrink-0 px-3.5 py-1.5 rounded-full font-bold text-[12px] disabled:opacity-70"
-                          style={
-                            status === "accepted"
-                              ? { background: "rgba(255,255,255,0.06)", color: "var(--muted)", border: "1px solid var(--border-soft)" }
-                              : status === "pending"
-                              ? { background: "rgba(255,255,255,0.04)", color: "var(--dimmer)", border: "1px solid var(--border-soft)" }
-                              : { background: "var(--accent)", color: "#fff" }
-                          }
+                          style={{ background: "var(--accent)", color: "#fff" }}
                         >
-                          {isLoading ? "..." : status === "accepted" ? "following" : status === "pending" ? "requested" : "follow"}
+                          {isLoading ? "..." : "follow"}
                         </button>
                       </div>
                     );
