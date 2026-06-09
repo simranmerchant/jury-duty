@@ -10,10 +10,10 @@ export async function GET(req: NextRequest) {
   const user = await requireUser(token).catch(() => null);
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  const [{ data: balance }, { data: entries }, { data: agreementRow }, { data: blockRows }] = await Promise.all([
+  const [{ data: balance }, { data: entries }, { data: agreementRow }, { data: blockRows }, { count: followerCount }, { count: followingCount }] = await Promise.all([
     supabase
       .from("balances")
-      .select("points, display_name, avatar_url, username, referral_code")
+      .select("points, display_name, avatar_url, username, referral_code, is_private")
       .eq("user_id", user.userId)
       .single(),
 
@@ -33,6 +33,10 @@ export async function GET(req: NextRequest) {
     supabase.from("user_agreements").select("user_id").eq("user_id", user.userId).single(),
 
     supabase.from("blocked_users").select("blocked_id").eq("blocker_id", user.userId),
+
+    supabase.from("follows").select("*", { count: "exact", head: true }).eq("following_id", user.userId).eq("status", "accepted"),
+
+    supabase.from("follows").select("*", { count: "exact", head: true }).eq("follower_id", user.userId).eq("status", "accepted"),
   ]);
 
   // Compute outcome for each entry
@@ -65,6 +69,9 @@ export async function GET(req: NextRequest) {
     avatar_url: balance?.avatar_url ?? null,
     username: balance?.username ?? null,
     referral_code: balance?.referral_code ?? null,
+    is_private: balance?.is_private ?? false,
+    follower_count: followerCount ?? 0,
+    following_count: followingCount ?? 0,
     history,
     stats,
     has_agreed_to_terms: !!agreementRow,

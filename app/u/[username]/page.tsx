@@ -10,6 +10,10 @@ type Profile = {
   username: string;
   avatar_url: string | null;
   points: number;
+  is_private: boolean;
+  follower_count: number;
+  following_count: number;
+  follow_status: "pending" | "accepted" | null;
 };
 
 type EventItem = { id: string; name: string; type: string };
@@ -18,13 +22,16 @@ export default function PublicProfilePage() {
   const params = useParams();
   const router = useRouter();
   const username = params.username as string;
-  const { ready, authenticated, getAccessToken } = usePrivy();
+  const { ready, authenticated, getAccessToken, user: privyUser } = usePrivy();
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [winRate, setWinRate] = useState<number | null>(null);
   const [mutualEvents, setMutualEvents] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [followStatus, setFollowStatus] = useState<"pending" | "accepted" | null>(null);
+  const [followLoading, setFollowLoading] = useState(false);
+  const [followerCount, setFollowerCount] = useState(0);
 
   useEffect(() => {
     if (!ready) return;
@@ -40,12 +47,41 @@ export default function PublicProfilePage() {
       .then((data) => {
         if (!data) return;
         setProfile(data.user);
+        setFollowStatus(data.user.follow_status ?? null);
+        setFollowerCount(data.user.follower_count ?? 0);
         setWinRate(data.win_rate ?? null);
         setMutualEvents(data.mutual_events ?? []);
         setLoading(false);
       })
       .catch(() => { setNotFound(true); setLoading(false); });
   }, [ready, authenticated, username, getAccessToken]);
+
+  async function handleFollow() {
+    if (!profile || followLoading) return;
+    setFollowLoading(true);
+    const token = await getAccessToken();
+    if (followStatus === null) {
+      const res = await fetch(`/api/v1/users/${encodeURIComponent(profile.user_id)}/follow`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setFollowStatus(data.status);
+        if (data.status === "accepted") setFollowerCount((c) => c + 1);
+      }
+    } else {
+      const res = await fetch(`/api/v1/users/${encodeURIComponent(profile.user_id)}/follow`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        if (followStatus === "accepted") setFollowerCount((c) => Math.max(0, c - 1));
+        setFollowStatus(null);
+      }
+    }
+    setFollowLoading(false);
+  }
 
   if (loading) return null;
 
@@ -61,6 +97,7 @@ export default function PublicProfilePage() {
 
   const name = profile?.display_name ?? profile?.username ?? "unknown";
   const isMutual = mutualEvents.length > 0;
+  const isOwnProfile = !!privyUser && profile?.user_id === privyUser.id;
 
   return (
     <div className="min-h-screen" style={{ background: "var(--bg)", color: "var(--text)" }}>
@@ -82,22 +119,71 @@ export default function PublicProfilePage() {
           )}
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          <h1 className="text-[32px] font-black tracking-tight" style={{ fontFamily: "var(--font-nunito)" }}>
-            {name}
-          </h1>
-          {isMutual && (
-            <span
-              className="text-[11px] font-bold px-2.5 py-1 rounded-full"
-              style={{ background: "var(--accent-dim)", color: "var(--accent)", border: "1px solid var(--accent-border)" }}
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-[32px] font-black tracking-tight" style={{ fontFamily: "var(--font-nunito)" }}>
+                {name}
+              </h1>
+              {isMutual && (
+                <span
+                  className="text-[11px] font-bold px-2.5 py-1 rounded-full"
+                  style={{ background: "var(--accent-dim)", color: "var(--accent)", border: "1px solid var(--accent-border)" }}
+                >
+                  mutual
+                </span>
+              )}
+              {profile?.is_private && (
+                <span className="text-[11px]" style={{ color: "var(--dimmer)" }}>🔒</span>
+              )}
+            </div>
+            {profile?.username && (
+              <p className="text-[14px] font-semibold mt-0.5" style={{ color: "var(--muted)" }}>@{profile.username}</p>
+            )}
+            {/* Follower/following counts */}
+            <div className="flex gap-4 mt-1.5">
+              <span className="text-[13px]" style={{ color: "var(--muted)" }}>
+                <span className="font-bold" style={{ color: "var(--text)" }}>{followerCount.toLocaleString()}</span>{" "}followers
+              </span>
+              <span className="text-[13px]" style={{ color: "var(--muted)" }}>
+                <span className="font-bold" style={{ color: "var(--text)" }}>{(profile?.following_count ?? 0).toLocaleString()}</span>{" "}following
+              </span>
+            </div>
+          </div>
+
+          {/* Follow / unfollow button */}
+          {!isOwnProfile && (
+            <button
+              onClick={handleFollow}
+              disabled={followLoading}
+              className="flex-shrink-0 mt-2 px-4 py-2 rounded-full font-bold text-[13px] disabled:opacity-50"
+              style={
+                followStatus === "accepted"
+                  ? { background: "rgba(255,255,255,0.06)", color: "var(--muted)", border: "1px solid var(--border-soft)" }
+                  : followStatus === "pending"
+                  ? { background: "rgba(255,255,255,0.06)", color: "var(--dimmer)", border: "1px solid var(--border-soft)" }
+                  : { background: "var(--accent)", color: "#fff" }
+              }
             >
-              mutual
-            </span>
+              {followLoading
+                ? "..."
+                : followStatus === "accepted"
+                ? "following"
+                : followStatus === "pending"
+                ? "requested"
+                : "follow"}
+            </button>
+          )}
+          {isOwnProfile && (
+            <button
+              onClick={() => router.push("/profile")}
+              className="flex-shrink-0 mt-2 px-4 py-2 rounded-full font-bold text-[13px]"
+              style={{ background: "rgba(255,255,255,0.06)", color: "var(--muted)", border: "1px solid var(--border-soft)" }}
+            >
+              edit profile
+            </button>
           )}
         </div>
-        {profile?.username && (
-          <p className="text-[14px] font-semibold mt-0.5" style={{ color: "var(--muted)" }}>@{profile.username}</p>
-        )}
       </div>
 
       <div className="px-4 pb-32 flex flex-col gap-4">

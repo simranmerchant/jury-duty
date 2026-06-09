@@ -6,6 +6,14 @@ import { useEffect, useState, useCallback, useRef } from "react";
 
 const USERNAME_RE = /^[a-z0-9][a-z0-9._]{1,18}[a-z0-9]$|^[a-z0-9]{3}$/;
 
+type FollowRequest = {
+  user_id: string;
+  display_name: string | null;
+  username: string | null;
+  avatar_url: string | null;
+  requested_at: string;
+};
+
 type HistoryEntry = {
   id: string;
   bet_id: string;
@@ -45,19 +53,31 @@ export default function ProfilePage() {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isPrivate, setIsPrivate] = useState(false);
+  const [followerCount, setFollowerCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
+  const [followRequests, setFollowRequests] = useState<FollowRequest[]>([]);
 
   const fetchMe = useCallback(async () => {
     const token = await getAccessToken();
-    const res = await fetch("/api/v1/me", {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const data = await res.json();
+    const [meRes, reqRes] = await Promise.all([
+      fetch("/api/v1/me", { headers: { Authorization: `Bearer ${token}` } }),
+      fetch("/api/v1/me/follow-requests", { headers: { Authorization: `Bearer ${token}` } }),
+    ]);
+    const data = await meRes.json();
     setPoints(data.points);
     setDisplayName(data.display_name ?? "");
     setUsername(data.username ?? null);
     setAvatarUrl(data.avatar_url ?? null);
+    setIsPrivate(data.is_private ?? false);
+    setFollowerCount(data.follower_count ?? 0);
+    setFollowingCount(data.following_count ?? 0);
     setHistory(data.history ?? []);
     setStats(data.stats ?? null);
+    if (reqRes.ok) {
+      const reqData = await reqRes.json();
+      setFollowRequests(reqData.requests ?? []);
+    }
     setLoading(false);
   }, [getAccessToken]);
 
@@ -109,6 +129,31 @@ export default function ProfilePage() {
       const data = await res.json().catch(() => ({}));
       setUsernameStatus(data.available ? "available" : "taken");
     }, 400);
+  }
+
+  async function togglePrivacy() {
+    const next = !isPrivate;
+    setIsPrivate(next);
+    const token = await getAccessToken();
+    const res = await fetch("/api/v1/me", {
+      method: "PATCH",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ is_private: next }),
+    });
+    if (!res.ok) setIsPrivate(!next);
+  }
+
+  async function handleFollowRequest(requesterId: string, action: "accept" | "decline") {
+    const token = await getAccessToken();
+    const method = action === "accept" ? "POST" : "DELETE";
+    const res = await fetch(`/api/v1/me/follow-requests/${encodeURIComponent(requesterId)}`, {
+      method,
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.ok) {
+      setFollowRequests((prev) => prev.filter((r) => r.user_id !== requesterId));
+      if (action === "accept") setFollowerCount((c) => c + 1);
+    }
   }
 
   async function saveName() {
@@ -248,6 +293,14 @@ export default function ProfilePage() {
                 {username && (
                   <p className="text-[14px] font-semibold mt-0.5" style={{ color: "var(--muted)" }}>@{username}</p>
                 )}
+                <div className="flex gap-4 mt-1.5">
+                  <span className="text-[13px]" style={{ color: "var(--muted)" }}>
+                    <span className="font-bold" style={{ color: "var(--text)" }}>{followerCount.toLocaleString()}</span>{" "}followers
+                  </span>
+                  <span className="text-[13px]" style={{ color: "var(--muted)" }}>
+                    <span className="font-bold" style={{ color: "var(--text)" }}>{followingCount.toLocaleString()}</span>{" "}following
+                  </span>
+                </div>
               </div>
               <button
                 onClick={() => { setNameInput(displayName); setUsernameInput(username ?? ""); setUsernameStatus(username ? "unchanged" : "idle"); setEditingName(true); }}
@@ -262,6 +315,59 @@ export default function ProfilePage() {
       </div>
 
       <div className="px-4 pb-32 flex flex-col gap-4">
+        {/* Follow requests */}
+        {followRequests.length > 0 && (
+          <div
+            className="rounded-2xl overflow-hidden"
+            style={{ background: "var(--card)", border: "1px solid var(--border-soft)" }}
+          >
+            <p className="text-[12px] font-semibold px-4 pt-4 pb-2" style={{ color: "var(--dimmer)" }}>
+              follow requests ({followRequests.length})
+            </p>
+            <div className="flex flex-col divide-y" style={{ borderColor: "rgba(255,255,255,0.05)" }}>
+              {followRequests.map((r) => {
+                const rname = r.display_name ?? r.username ?? "unknown";
+                return (
+                  <div key={r.user_id} className="flex items-center gap-3 px-4 py-3">
+                    <div
+                      className="w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center text-[14px] font-black overflow-hidden"
+                      style={{ background: "var(--accent-dim)", color: "var(--accent)", fontFamily: "var(--font-nunito)" }}
+                    >
+                      {r.avatar_url ? (
+                        <img src={r.avatar_url} alt="" className="w-9 h-9 rounded-full object-cover" />
+                      ) : (
+                        rname[0]?.toUpperCase() ?? "?"
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[14px] font-bold leading-tight truncate">{rname}</p>
+                      {r.username && (
+                        <p className="text-[12px]" style={{ color: "var(--muted)" }}>@{r.username}</p>
+                      )}
+                    </div>
+                    <div className="flex gap-2 flex-shrink-0">
+                      <button
+                        onClick={() => handleFollowRequest(r.user_id, "accept")}
+                        className="px-3 py-1.5 rounded-full font-bold text-[12px] text-white"
+                        style={{ background: "var(--accent)" }}
+                      >
+                        accept
+                      </button>
+                      <button
+                        onClick={() => handleFollowRequest(r.user_id, "decline")}
+                        className="px-3 py-1.5 rounded-full font-bold text-[12px]"
+                        style={{ background: "rgba(255,255,255,0.06)", color: "var(--muted)" }}
+                      >
+                        decline
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Balance card */}
         <div
           className="rounded-3xl p-6 flex flex-col gap-1"
@@ -381,6 +487,30 @@ export default function ProfilePage() {
             no bets yet
           </p>
         )}
+
+        {/* Private account toggle */}
+        <div
+          className="flex items-center justify-between px-5 py-4 rounded-2xl"
+          style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-soft)" }}
+        >
+          <div>
+            <p className="font-semibold text-[14px]">private account</p>
+            <p className="text-[12px] mt-0.5" style={{ color: "var(--muted)" }}>
+              {isPrivate ? "followers must be approved" : "anyone can follow you"}
+            </p>
+          </div>
+          <button
+            onClick={togglePrivacy}
+            className="relative w-11 h-6 rounded-full transition-colors flex-shrink-0"
+            style={{ background: isPrivate ? "var(--accent)" : "rgba(255,255,255,0.12)" }}
+            aria-label="toggle private account"
+          >
+            <span
+              className="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform"
+              style={{ transform: isPrivate ? "translateX(20px)" : "translateX(0)" }}
+            />
+          </button>
+        </div>
 
         {/* How it works */}
         <button
