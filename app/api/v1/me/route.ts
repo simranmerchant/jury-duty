@@ -127,18 +127,31 @@ export async function PATCH(req: NextRequest) {
   const user = await requireUser(token).catch(() => null);
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  const { display_name } = await req.json();
-  const name = display_name?.trim();
-  if (!name || name.length < 1 || name.length > 40) {
-    return NextResponse.json({ error: "name must be 1–40 characters" }, { status: 400 });
+  const body = await req.json();
+  const updates: Record<string, unknown> = {};
+
+  if (typeof body.display_name === "string") {
+    const name = body.display_name.trim();
+    if (name.length < 1 || name.length > 40) {
+      return NextResponse.json({ error: "name must be 1–40 characters" }, { status: 400 });
+    }
+    updates.display_name = name;
+  }
+
+  if (typeof body.is_private === "boolean") {
+    updates.is_private = body.is_private;
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return NextResponse.json({ error: "nothing to update" }, { status: 400 });
   }
 
   const { error } = await supabase
     .from("balances")
-    .update({ display_name: name })
+    .update(updates)
     .eq("user_id", user.userId);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  return NextResponse.json({ display_name: name });
+  return NextResponse.json({ ok: true, ...updates });
 }
