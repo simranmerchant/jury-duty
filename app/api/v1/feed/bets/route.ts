@@ -17,6 +17,10 @@ export async function POST(req: NextRequest) {
   const validationError = validateFeedBet({ question, options, deadline });
   if (validationError) return NextResponse.json({ error: validationError }, { status: 400 });
 
+  const normalizedOptions: { label: string }[] = (options as any[]).map((o) =>
+    typeof o === "string" ? { label: o } : { label: o.label }
+  );
+
   const [{ data: bet, error: betError }, { data: creatorData }] = await Promise.all([
     supabase
       .from("bets")
