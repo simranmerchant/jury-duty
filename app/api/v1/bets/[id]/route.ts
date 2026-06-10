@@ -2,6 +2,40 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/privy";
 import { supabase } from "@/lib/supabase";
 
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const token = req.headers.get("authorization")?.replace("Bearer ", "");
+  if (!token) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+  const user = await requireUser(token).catch(() => null);
+  if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+  const { id } = await params;
+
+  const { data: bet } = await supabase
+    .from("bets")
+    .select(`
+      id, question, deadline, status, winning_option_id, creator_id, created_at, audience,
+      event_id,
+      bet_options(id, label),
+      bet_entries(user_id, option_id, points_staked, is_anonymous),
+      balances:creator_id(display_name, avatar_url, username)
+    `)
+    .eq("id", id)
+    .single();
+
+  if (!bet) return NextResponse.json({ error: "not found" }, { status: 404 });
+
+  // Feed bets are publicly visible to anyone authenticated
+  if ((bet as any).audience !== "followers") {
+    return NextResponse.json({ error: "use the event screen for event bets" }, { status: 400 });
+  }
+
+  return NextResponse.json({ bet });
+}
+
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
