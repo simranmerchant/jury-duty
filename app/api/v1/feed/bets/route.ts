@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/privy";
 import { supabase } from "@/lib/supabase";
 import { sendPushToUsers } from "@/lib/push";
 import { sendWebPushToUsers } from "@/lib/webpush";
+import { validateFeedBet, buildFeedBetNotification } from "@/lib/feed";
 
 export async function POST(req: NextRequest) {
   const token = req.headers.get("authorization")?.replace("Bearer ", "");
@@ -13,22 +14,8 @@ export async function POST(req: NextRequest) {
 
   const { question, options, deadline } = await req.json();
 
-  if (!question?.trim() || question.trim().length > 200) {
-    return NextResponse.json({ error: "question required (max 200 chars)" }, { status: 400 });
-  }
-  if (!Array.isArray(options) || options.length < 2) {
-    return NextResponse.json({ error: "at least 2 options required" }, { status: 400 });
-  }
-  const normalizedOptions: { label: string }[] = options.map((o: any) =>
-    typeof o === "string" ? { label: o } : { label: o.label }
-  );
-  if (normalizedOptions.some((o) => !o.label?.trim() || o.label.trim().length > 100)) {
-    return NextResponse.json({ error: "each option must be 1-100 chars" }, { status: 400 });
-  }
-  if (!deadline) return NextResponse.json({ error: "deadline required" }, { status: 400 });
-  if (new Date(deadline) <= new Date()) {
-    return NextResponse.json({ error: "deadline must be in the future" }, { status: 400 });
-  }
+  const validationError = validateFeedBet({ question, options, deadline });
+  if (validationError) return NextResponse.json({ error: validationError }, { status: 400 });
 
   const [{ data: bet, error: betError }, { data: creatorData }] = await Promise.all([
     supabase
@@ -62,26 +49,19 @@ export async function POST(req: NextRequest) {
 
   const followerIds = (followers ?? []).map((r) => r.follower_id as string);
   const creatorName = creatorData?.display_name ?? "someone";
+  const notif = buildFeedBetNotification(creatorName, question);
 
   if (followerIds.length > 0) {
     await Promise.all([
       supabase.from("notifications").insert(followerIds.map((uid) => ({
         user_id: uid,
-        type: "new_feed_bet",
-        title: `${creatorName} posted a new prediction 🗳️`,
-        body: question.trim(),
+        type: notif.type,
+        title: notif.title,
+        body: notif.body,
         data: { bet_id: bet.id },
       }))),
-      sendPushToUsers(followerIds, {
-        title: `${creatorName} posted a new prediction 🗳️`,
-        body: question.trim(),
-        data: { bet_id: bet.id },
-      }),
-      sendWebPushToUsers(followerIds, {
-        title: `${creatorName} posted a new prediction 🗳️`,
-        body: question.trim(),
-        data: { bet_id: bet.id },
-      }),
+      sendPushToUsers(followerIds, { title: notif.title, body: notif.body, data: { bet_id: bet.id } }),
+      sendWebPushToUsers(followerIds, { title: notif.title, body: notif.body, data: { bet_id: bet.id } }),
     ]);
   }
 
