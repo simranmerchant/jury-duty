@@ -236,6 +236,12 @@ export default function EventsPage() {
           <span style={{ color: "var(--accent)", fontStyle: "italic" }}>duty</span>
         </h1>
         <div className="flex items-center gap-5">
+          <button onClick={() => router.push("/feed")}>
+            <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--muted)" }}>
+              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+              <path d="M9 22V12h6v10" />
+            </svg>
+          </button>
           <button onClick={() => router.push("/people")}>
             <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--muted)" }}>
               <circle cx="11" cy="11" r="8" />
