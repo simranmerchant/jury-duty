@@ -47,6 +47,17 @@ export default function EventsPage() {
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushPrompted, setPushPrompted] = useState(false);
 
+  function getSeenIds(): Set<string> {
+    try { return new Set(JSON.parse(sessionStorage.getItem("seenEventIds") ?? "[]")); } catch { return new Set(); }
+  }
+  function markSeen(id: string) {
+    try {
+      const ids = getSeenIds();
+      ids.add(id);
+      sessionStorage.setItem("seenEventIds", JSON.stringify([...ids]));
+    } catch {}
+  }
+
   const fetchEvents = useCallback(async () => {
     const token = await getAccessToken();
     const [eventsRes, meRes] = await Promise.all([
@@ -55,7 +66,9 @@ export default function EventsPage() {
     ]);
     const eventsData = await eventsRes.json();
     const meData = await meRes.json();
-    setEvents(eventsData.events ?? []);
+    const seenIds = getSeenIds();
+    const rawEvents: Event[] = eventsData.events ?? [];
+    setEvents(rawEvents.map((e) => seenIds.has(e.id) ? { ...e, hasNew: false } : e));
     setPoints(meData.points ?? null);
     setAvatarUrl(meData.avatar_url ?? null);
     setDisplayName(meData.display_name ?? null);
@@ -179,6 +192,7 @@ export default function EventsPage() {
     return (
       <button
         onClick={() => {
+          markSeen(event.id);
           if (event.hasNew) setEvents((prev) => prev.map((e) => e.id === event.id ? { ...e, hasNew: false } : e));
           router.push(`/e/${event.id}`);
         }}
@@ -297,6 +311,7 @@ export default function EventsPage() {
                 <p className="text-[10px] font-semibold px-1 pt-1" style={{ color: "var(--dimmer)", letterSpacing: "0.14em", textTransform: "uppercase" }}>next up</p>
                 <button
                   onClick={() => {
+                    markSeen(featured.id);
                     if (featured.hasNew) setEvents((prev) => prev.map((e) => e.id === featured.id ? { ...e, hasNew: false } : e));
                     router.push(`/e/${featured.id}`);
                   }}
