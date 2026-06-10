@@ -72,6 +72,15 @@ export default function EventsPage() {
     fetchEvents();
   }, [ready, authenticated, router, fetchEvents]);
 
+  // Re-fetch when the tab regains focus so hasNew clears after visiting an event
+  useEffect(() => {
+    function onVisible() {
+      if (document.visibilityState === "visible" && authenticated) fetchEvents();
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [authenticated, fetchEvents]);
+
   async function createEvent() {
     if (!name.trim()) return;
     if (createType === "event" && !endsAt) return;
@@ -169,7 +178,10 @@ export default function EventsPage() {
     const isPast = !isGroup && event.ends_at && new Date(event.ends_at) < now;
     return (
       <button
-        onClick={() => router.push(`/e/${event.id}`)}
+        onClick={() => {
+          if (event.hasNew) setEvents((prev) => prev.map((e) => e.id === event.id ? { ...e, hasNew: false } : e));
+          router.push(`/e/${event.id}`);
+        }}
         className="w-full text-left flex items-center gap-3 px-3 py-[11px] rounded-[10px]"
         style={{
           background: "var(--card)",
@@ -278,7 +290,10 @@ export default function EventsPage() {
               <>
                 <p className="text-[10px] font-semibold px-1 pt-1" style={{ color: "var(--dimmer)", letterSpacing: "0.14em", textTransform: "uppercase" }}>next up</p>
                 <button
-                  onClick={() => router.push(`/e/${featured.id}`)}
+                  onClick={() => {
+                    if (featured.hasNew) setEvents((prev) => prev.map((e) => e.id === featured.id ? { ...e, hasNew: false } : e));
+                    router.push(`/e/${featured.id}`);
+                  }}
                   className="w-full text-left rounded-[14px] overflow-hidden relative"
                   style={{ height: 128, border: "1px solid rgba(255,143,163,0.12)" }}
                 >
