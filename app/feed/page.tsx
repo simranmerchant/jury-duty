@@ -2,6 +2,7 @@
 
 import { usePrivy } from "@privy-io/react-auth";
 import { useRouter } from "next/navigation";
+import BottomNav from "@/components/BottomNav";
 import { useEffect, useState, useCallback, useRef } from "react";
 
 type BetOption = { id: string; label: string };
@@ -78,6 +79,16 @@ export default function FeedPage() {
     load().finally(() => setLoading(false));
   }, [ready, authenticated, router, load]);
 
+  useEffect(() => {
+    function onVisible() {
+      if (document.visibilityState === "visible" && authenticated) {
+        load().catch(() => {});
+      }
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [authenticated, load]);
+
   async function loadMore() {
     if (!nextCursor || loadingMore) return;
     setLoadingMore(true);
@@ -124,8 +135,7 @@ export default function FeedPage() {
       setShowPost(false);
       setPostQuestion(""); setPostOptions(["", ""]); setPostDeadline(""); setPostError(null);
       setLoading(true);
-      await load();
-      setLoading(false);
+      try { await load(); } finally { setLoading(false); }
     } else {
       const data = await res.json();
       setPostError(data.error ?? "something went wrong");
@@ -151,7 +161,7 @@ export default function FeedPage() {
           <span style={{ color: "var(--dimmer)", fontWeight: 800 }}>·</span>
           <span style={{ color: "var(--accent)", fontStyle: "italic" }}>duty</span>
         </h1>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           {myPoints !== null && (
             <span className="text-[12px] font-bold px-3 py-1.5 rounded-full"
               style={{ background: "var(--accent-dim)", color: "var(--accent)", border: "1px solid var(--accent-border)" }}>
@@ -165,21 +175,6 @@ export default function FeedPage() {
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
             post
-          </button>
-          <button onClick={() => router.push("/events")}>
-            <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--muted)" }}>
-              <path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />
-            </svg>
-          </button>
-          <button onClick={() => router.push("/profile")}>
-            {avatarUrl ? (
-              <img src={avatarUrl} alt="profile" className="w-[30px] h-[30px] rounded-full object-cover" />
-            ) : (
-              <div className="w-[30px] h-[30px] rounded-full flex items-center justify-center text-[12px] font-black"
-                style={{ background: "var(--accent-dim)", color: "var(--accent)", border: "1.5px solid var(--border)", fontFamily: "var(--font-nunito)" }}>
-                ?
-              </div>
-            )}
           </button>
         </div>
       </div>
@@ -316,6 +311,8 @@ export default function FeedPage() {
           </button>
         )}
       </div>
+
+      <BottomNav />
 
       {/* Post sheet */}
       {showPost && (

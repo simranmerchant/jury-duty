@@ -2,6 +2,7 @@
 
 import { usePrivy } from "@privy-io/react-auth";
 import { useRouter } from "next/navigation";
+import BottomNav from "@/components/BottomNav";
 import { useEffect, useState, useCallback, useRef } from "react";
 
 type Tab = "events" | "groups" | "past";
@@ -28,24 +29,16 @@ export default function EventsPage() {
   const { ready, authenticated, getAccessToken } = usePrivy();
   const router = useRouter();
   const [events, setEvents] = useState<Event[]>([]);
-  const [points, setPoints] = useState<number | null>(null);
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [displayName, setDisplayName] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>("events");
   const touchStartX = useRef<number | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [showJoin, setShowJoin] = useState(false);
-  const [showNotifs, setShowNotifs] = useState(false);
-  const [notifications, setNotifications] = useState<{ id: string; type: string; title: string; body: string; read: boolean; created_at: string; data: { bet_id?: string; event_id?: string; outcome?: string; [key: string]: unknown } | null }[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
   const [joinInput, setJoinInput] = useState("");
   const [name, setName] = useState("");
   const [endsAt, setEndsAt] = useState("");
   const [createType, setCreateType] = useState<"event" | "group">("event");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
-  const [pushEnabled, setPushEnabled] = useState(false);
-  const [pushPrompted, setPushPrompted] = useState(false);
 
   function getSeenIds(): Set<string> {
     try { return new Set(JSON.parse(sessionStorage.getItem("seenEventIds") ?? "[]")); } catch { return new Set(); }
@@ -60,23 +53,12 @@ export default function EventsPage() {
 
   const fetchEvents = useCallback(async () => {
     const token = await getAccessToken();
-    const [eventsRes, meRes] = await Promise.all([
-      fetch("/api/v1/events", { headers: { Authorization: `Bearer ${token}` } }),
-      fetch("/api/v1/me", { headers: { Authorization: `Bearer ${token}` } }),
-    ]);
+    const eventsRes = await fetch("/api/v1/events", { headers: { Authorization: `Bearer ${token}` } });
     const eventsData = await eventsRes.json();
-    const meData = await meRes.json();
     const seenIds = getSeenIds();
     const rawEvents: Event[] = eventsData.events ?? [];
     setEvents(rawEvents.map((e) => seenIds.has(e.id) ? { ...e, hasNew: false } : e));
-    setPoints(meData.points ?? null);
-    setAvatarUrl(meData.avatar_url ?? null);
-    setDisplayName(meData.display_name ?? null);
 
-    const notifsRes = await fetch("/api/v1/me/notifications", { headers: { Authorization: `Bearer ${token}` } });
-    const notifsData = await notifsRes.json();
-    setNotifications(notifsData.notifications ?? []);
-    setUnreadCount(notifsData.unreadCount ?? 0);
   }, [getAccessToken]);
 
   useEffect(() => {
@@ -119,45 +101,6 @@ export default function EventsPage() {
     fetchEvents();
   }
 
-  async function subscribeToPush() {
-    if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
-    try {
-      const reg = await navigator.serviceWorker.register("/sw.js");
-      const permission = await Notification.requestPermission();
-      if (permission !== "granted") return;
-      const sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
-      });
-      const token = await getAccessToken();
-      await fetch("/api/v1/me/web-push-subscription", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify(sub.toJSON()),
-      });
-      setPushEnabled(true);
-    } catch {
-      // permission denied or not supported — silent fail
-    }
-  }
-
-  async function openNotifs() {
-    setShowNotifs(true);
-    if (unreadCount > 0) {
-      const token = await getAccessToken();
-      await fetch("/api/v1/me/notifications", { method: "POST", headers: { Authorization: `Bearer ${token}` } });
-      setUnreadCount(0);
-      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-    }
-    // Check push state on first open
-    if (!pushPrompted && "Notification" in window) {
-      setPushPrompted(true);
-      if (Notification.permission === "granted") {
-        setPushEnabled(true);
-        subscribeToPush(); // re-register in case SW was cleared
-      }
-    }
-  }
 
   if (!ready) return null;
 
@@ -249,39 +192,6 @@ export default function EventsPage() {
           <span style={{ color: "var(--dimmer)", fontWeight: 800 }}>·</span>
           <span style={{ color: "var(--accent)", fontStyle: "italic" }}>duty</span>
         </h1>
-        <div className="flex items-center gap-5">
-          <button onClick={() => router.push("/feed")}>
-            <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--muted)" }}>
-              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-              <path d="M9 22V12h6v10" />
-            </svg>
-          </button>
-          <button onClick={() => router.push("/people")}>
-            <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--muted)" }}>
-              <circle cx="11" cy="11" r="8" />
-              <path d="m21 21-4.35-4.35" />
-            </svg>
-          </button>
-          <button onClick={openNotifs} className="relative">
-            <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--muted)" }}>
-              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-            </svg>
-            {unreadCount > 0 && (
-              <span className="absolute -top-1 -right-1" style={{ width: 9, height: 9, borderRadius: "50%", background: "var(--accent)", border: "1.5px solid var(--bg)", display: "block" }} />
-            )}
-          </button>
-          <button onClick={() => router.push("/profile")}>
-            {avatarUrl ? (
-              <img src={avatarUrl} alt="profile" className="w-[30px] h-[30px] rounded-full object-cover" />
-            ) : (
-              <div className="w-[30px] h-[30px] rounded-full flex items-center justify-center text-[12px] font-black"
-                style={{ background: "var(--accent-dim)", color: "var(--accent)", border: "1.5px solid var(--border)", fontFamily: "var(--font-nunito)" }}>
-                {displayName?.[0]?.toUpperCase() ?? "?"}
-              </div>
-            )}
-          </button>
-        </div>
       </div>
 
       {/* Tab bar */}
@@ -519,114 +429,7 @@ export default function EventsPage() {
           </div>
         </div>
       )}
-      {/* Notifications panel */}
-      {showNotifs && (
-        <div className="fixed inset-0 z-50 flex flex-col justify-end" style={{ background: "rgba(0,0,0,0.5)" }} onClick={() => setShowNotifs(false)}>
-          <div className="flex flex-col" style={{ maxHeight: "82vh", background: "var(--card)", borderTopLeftRadius: 28, borderTopRightRadius: 28, borderTop: "1px solid var(--border-soft)", borderLeft: "1px solid var(--border-soft)", borderRight: "1px solid var(--border-soft)" }} onClick={(e) => e.stopPropagation()}>
-            {/* Drag handle */}
-            <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
-              <div className="w-10 h-1 rounded-full" style={{ background: "var(--border)" }} />
-            </div>
-            {/* Header */}
-            <div className="px-5 pt-2 pb-3 flex items-center justify-between flex-shrink-0" style={{ borderBottom: "1px solid var(--border-soft)" }}>
-              <h2 className="text-[18px] font-black" style={{ fontFamily: "var(--font-nunito)" }}>notifications</h2>
-              <button
-                onClick={() => setShowNotifs(false)}
-                className="flex items-center justify-center rounded-full"
-                style={{ width: 32, height: 32, background: "var(--bg)", border: "1px solid var(--border-soft)" }}
-              >
-                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth={2.5} strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
-              </button>
-            </div>
-            {/* Push prompt banner */}
-            {"Notification" in (typeof window !== "undefined" ? window : {}) && !pushEnabled && Notification.permission !== "denied" && (
-              <div className="mx-4 mt-3 mb-1 flex items-center gap-3 rounded-2xl px-4 py-3" style={{ background: "rgba(216,180,254,0.1)", border: "1px solid rgba(216,180,254,0.2)" }}>
-                <div className="flex items-center justify-center rounded-full flex-shrink-0" style={{ width: 32, height: 32, background: "rgba(216,180,254,0.15)" }}>
-                  <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#d8b4fe" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-                </div>
-                <p className="flex-1 text-[12px]" style={{ color: "var(--muted)", lineHeight: 1.4 }}>get notified when bets resolve</p>
-                <button
-                  onClick={subscribeToPush}
-                  className="text-[12px] font-bold flex-shrink-0 px-3 py-1.5 rounded-xl"
-                  style={{ background: "rgba(216,180,254,0.2)", color: "#d8b4fe", border: "1px solid rgba(216,180,254,0.3)" }}
-                >
-                  enable
-                </button>
-              </div>
-            )}
-            {/* List */}
-            <div className="overflow-y-auto flex-1" style={{ paddingBottom: "env(safe-area-inset-bottom, 24px)" }}>
-              {notifications.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 gap-3">
-                  <div className="flex items-center justify-center rounded-full" style={{ width: 56, height: 56, background: "rgba(216,180,254,0.12)", border: "1px solid rgba(216,180,254,0.2)" }}>
-                    <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="var(--dimmer)" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-                  </div>
-                  <p className="text-[14px] font-bold" style={{ color: "var(--muted)" }}>all caught up</p>
-                  <p className="text-[12px]" style={{ color: "var(--dimmer)" }}>no notifications yet</p>
-                </div>
-              ) : (
-                <div className="flex flex-col">
-                  {notifications.map((n) => {
-                    const eventId = n.data?.event_id;
-                    const isFollowNotif = n.type === "follow_request" || n.type === "new_follower" || n.type === "follow_accepted";
-                    const href = eventId ? `/e/${eventId}` : isFollowNotif ? "/profile" : null;
-                    const iconConfig = (() => {
-                      if (n.type === "bet_resolved_won") return { bg: "rgba(52,199,89,0.15)", border: "rgba(52,199,89,0.25)", icon: <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#34c759" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> };
-                      if (n.type === "bet_resolved_lost") return { bg: "rgba(255,143,163,0.15)", border: "rgba(255,143,163,0.25)", icon: <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg> };
-                      if (n.type === "bet_resolved_refunded") return { bg: "rgba(180,180,200,0.12)", border: "rgba(180,180,200,0.25)", icon: <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg> };
-                      if (n.type === "points_earned") return { bg: "rgba(255,200,0,0.12)", border: "rgba(255,200,0,0.25)", icon: <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#e6a817" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> };
-                      return { bg: "rgba(216,180,254,0.12)", border: "rgba(216,180,254,0.25)", icon: <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#d8b4fe" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg> };
-                    })();
-                    const timeAgo = (() => {
-                      const diff = Date.now() - new Date(n.created_at).getTime();
-                      const mins = Math.floor(diff / 60000);
-                      if (mins < 1) return "just now";
-                      if (mins < 60) return `${mins}m`;
-                      const hrs = Math.floor(mins / 60);
-                      if (hrs < 24) return `${hrs}h`;
-                      const days = Math.floor(hrs / 24);
-                      if (days < 7) return `${days}d`;
-                      return new Date(n.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-                    })();
-                    const Row = href ? "a" : "div";
-                    return (
-                      <Row
-                        key={n.id}
-                        {...(href ? { href, onClick: () => setShowNotifs(false) } : {})}
-                        style={{
-                          display: "flex",
-                          alignItems: "flex-start",
-                          gap: 14,
-                          padding: "14px 20px",
-                          textDecoration: "none",
-                          color: "inherit",
-                          cursor: href ? "pointer" : "default",
-                          background: !n.read ? "rgba(255,143,163,0.04)" : "transparent",
-                          borderBottom: "1px solid var(--border-soft)",
-                          WebkitTapHighlightColor: "transparent",
-                        }}
-                      >
-                        {/* Unread bar */}
-                        <div style={{ position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)", width: 3, height: 32, borderRadius: 2, background: !n.read ? "var(--accent)" : "transparent" }} />
-                        <div className="flex-shrink-0 flex items-center justify-center rounded-full" style={{ width: 42, height: 42, background: iconConfig.bg, border: `1px solid ${iconConfig.border}` }}>
-                          {iconConfig.icon}
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
-                            <p style={{ fontWeight: 700, fontSize: 14, lineHeight: 1.3, color: "var(--text)", margin: 0 }}>{n.title}</p>
-                            <p style={{ fontSize: 11, color: "var(--dimmer)", flexShrink: 0, marginTop: 1 }}>{timeAgo}</p>
-                          </div>
-                          <p style={{ fontSize: 13, color: "var(--muted)", marginTop: 3, lineHeight: 1.4 }}>{n.body}</p>
-                        </div>
-                      </Row>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      <BottomNav />
     </div>
   );
 }

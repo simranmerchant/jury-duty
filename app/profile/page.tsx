@@ -3,6 +3,7 @@
 import { usePrivy } from "@privy-io/react-auth";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback, useRef } from "react";
+import BottomNav from "@/components/BottomNav";
 
 const USERNAME_RE = /^[a-z0-9][a-z0-9._]{1,18}[a-z0-9]$|^[a-z0-9]{3}$/;
 
@@ -204,13 +205,6 @@ export default function ProfilePage() {
   return (
     <div className="min-h-screen" style={{ background: "var(--bg)", color: "var(--text)" }}>
       <div className="px-5 pt-14 pb-4">
-        <button
-          onClick={() => router.push("/events")}
-          className="text-sm mb-4 flex items-center gap-1"
-          style={{ color: "var(--muted)" }}
-        >
-          ← events
-        </button>
         {/* Avatar */}
         <label className="relative w-20 h-20 rounded-full cursor-pointer block mb-3">
           {avatarUrl ? (
@@ -531,6 +525,7 @@ export default function ProfilePage() {
           log out
         </button>
       </div>
+      <BottomNav />
     </div>
   );
 }

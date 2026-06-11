@@ -3,6 +3,7 @@
 import { usePrivy } from "@privy-io/react-auth";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useRef, useCallback } from "react";
+import BottomNav from "@/components/BottomNav";
 
 type UserResult = {
   user_id: string;
@@ -82,13 +83,6 @@ export default function PeoplePage() {
   return (
     <div className="min-h-screen" style={{ background: "var(--bg)", color: "var(--text)" }}>
       <div className="px-5 pt-14 pb-2">
-        <button
-          onClick={() => router.push("/events")}
-          className="text-sm mb-5 flex items-center gap-1"
-          style={{ color: "var(--muted)" }}
-        >
-          ← events
-        </button>
         <h1 className="text-[28px] font-black tracking-tight" style={{ fontFamily: "var(--font-nunito)" }}>
           people
         </h1>
@@ -247,6 +241,7 @@ export default function PeoplePage() {
           </>
         )}
       </div>
+      <BottomNav />
     </div>
   );
 }
