@@ -43,6 +43,9 @@ export default function FeedPage() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [votingId, setVotingId] = useState<string | null>(null);
   const [feedError, setFeedError] = useState<string | null>(null);
+  const [seenBetIds, setSeenBetIds] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(sessionStorage.getItem("seenFeedBetIds") ?? "[]")); } catch { return new Set(); }
+  });
 
   // New bet sheet
   const [showPost, setShowPost] = useState(false);
@@ -77,6 +80,15 @@ export default function FeedPage() {
     const incoming: FeedBet[] = feedData.bets ?? [];
     setBets((prev) => cursor ? [...prev, ...incoming] : incoming);
     setNextCursor(feedData.nextCursor ?? null);
+    // Mark all loaded bets as seen after this render
+    setTimeout(() => {
+      setSeenBetIds((prev) => {
+        const next = new Set(prev);
+        incoming.forEach((b) => next.add(b.id));
+        try { sessionStorage.setItem("seenFeedBetIds", JSON.stringify([...next])); } catch {}
+        return next;
+      });
+    }, 0);
   }, [getAccessToken]);
 
   useEffect(() => {
@@ -245,7 +257,7 @@ export default function FeedPage() {
                       resolved
                     </span>
                   )}
-                  {isOpen && <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: "var(--accent)" }} />}
+                  {isOpen && !seenBetIds.has(bet.id) && <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: "var(--accent)" }} />}
                 </div>
               </div>
 
