@@ -43,6 +43,8 @@ export default function FeedPage() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [votingId, setVotingId] = useState<string | null>(null);
   const [feedError, setFeedError] = useState<string | null>(null);
+  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [seenBetIds, setSeenBetIds] = useState<Set<string>>(() => {
     try { return new Set(JSON.parse(sessionStorage.getItem("seenFeedBetIds") ?? "[]")); } catch { return new Set(); }
   });
@@ -107,6 +109,13 @@ export default function FeedPage() {
     return () => document.removeEventListener("visibilitychange", onVisible);
   }, [authenticated, load]);
 
+  useEffect(() => {
+    if (!menuOpenId) return;
+    function onClickOutside() { setMenuOpenId(null); }
+    document.addEventListener("click", onClickOutside);
+    return () => document.removeEventListener("click", onClickOutside);
+  }, [menuOpenId]);
+
   async function loadMore() {
     if (!nextCursor || loadingMore) return;
     setLoadingMore(true);
@@ -131,6 +140,20 @@ export default function FeedPage() {
       if (myPoints !== null) setMyPoints((p) => (p ?? 0) - 50);
     }
     setVotingId(null);
+  }
+
+  async function deleteBet(betId: string) {
+    setDeletingId(betId);
+    setMenuOpenId(null);
+    const token = await getAccessToken();
+    const res = await fetch(`/api/v1/bets/${encodeURIComponent(betId)}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.ok) {
+      setBets((prev) => prev.filter((b) => b.id !== betId));
+    }
+    setDeletingId(null);
   }
 
   async function postBet() {
@@ -258,6 +281,30 @@ export default function FeedPage() {
                     </span>
                   )}
                   {isOpen && !seenBetIds.has(bet.id) && <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: "var(--accent)" }} />}
+                  {bet.creator_id === privyUser?.id && (
+                    <div className="relative">
+                      <button
+                        onClick={() => setMenuOpenId(menuOpenId === bet.id ? null : bet.id)}
+                        className="w-7 h-7 flex items-center justify-center rounded-full"
+                        style={{ color: "var(--muted)" }}
+                      >
+                        ···
+                      </button>
+                      {menuOpenId === bet.id && (
+                        <div className="absolute right-0 top-8 z-10 rounded-[12px] overflow-hidden shadow-lg"
+                          style={{ background: "var(--card)", border: "1px solid var(--border-soft)", minWidth: 130 }}>
+                          <button
+                            onClick={() => deleteBet(bet.id)}
+                            disabled={deletingId === bet.id}
+                            className="w-full px-4 py-3 text-left text-[13px] font-semibold"
+                            style={{ color: "var(--accent)" }}
+                          >
+                            {deletingId === bet.id ? "deleting…" : "delete bet"}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
