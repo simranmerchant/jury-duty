@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
     .from("bets")
     .select(`
       id, question, deadline, status, winning_option_id, creator_id, created_at, audience,
-      bet_options(id, label, tagged_user_id,
+      bet_options!bet_id(id, label, tagged_user_id,
         balances:tagged_user_id(display_name, avatar_url, username)
       ),
       bet_entries(user_id, option_id, points_staked, is_anonymous),

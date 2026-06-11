@@ -19,7 +19,7 @@ export async function GET(
     .select(`
       id, question, deadline, status, winning_option_id, creator_id, created_at, audience,
       event_id,
-      bet_options(id, label),
+      bet_options!bet_id(id, label),
       bet_entries(user_id, option_id, points_staked, is_anonymous),
       balances:creator_id(display_name, avatar_url, username)
     `)
