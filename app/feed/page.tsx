@@ -42,6 +42,7 @@ export default function FeedPage() {
   const [myPoints, setMyPoints] = useState<number | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [votingId, setVotingId] = useState<string | null>(null);
+  const [feedError, setFeedError] = useState<string | null>(null);
 
   // New bet sheet
   const [showPost, setShowPost] = useState(false);
@@ -63,6 +64,11 @@ export default function FeedPage() {
         ];
     const [feedRes, meRes] = await Promise.all(requests);
     const feedData = await feedRes.json();
+    if (!feedRes.ok) {
+      setFeedError(feedData.error ?? "failed to load feed");
+      return;
+    }
+    setFeedError(null);
     if (meRes) {
       const meData = await meRes.json();
       setMyPoints(meData.points ?? null);
@@ -183,7 +189,14 @@ export default function FeedPage() {
 
       {/* Feed list */}
       <div className="px-4 pb-36 flex flex-col gap-3">
-        {bets.length === 0 && (
+        {feedError && (
+          <div className="flex flex-col items-center justify-center pt-20 gap-2">
+            <p className="font-bold text-[15px]" style={{ color: "var(--accent)" }}>couldn't load feed</p>
+            <p className="text-[13px]" style={{ color: "var(--muted)" }}>{feedError}</p>
+          </div>
+        )}
+
+        {!feedError && bets.length === 0 && (
           <div className="flex flex-col items-center justify-center pt-20 gap-3">
             <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--muted)" }}>
               <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />

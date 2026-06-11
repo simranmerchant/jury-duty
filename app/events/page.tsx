@@ -113,7 +113,6 @@ export default function EventsPage() {
     .sort((a, b) => new Date(b.ends_at ?? 0).getTime() - new Date(a.ends_at ?? 0).getTime());
   const groups = events.filter((e) => e.type === "group");
   const featured = activeEventsList[0] ?? null;
-  const featuredNewCount = featured?.bets?.filter((b) => b.status === "open").length ?? 0;
 
   function handleTouchStart(e: React.TouchEvent) {
     touchStartX.current = e.touches[0].clientX;
@@ -234,9 +233,9 @@ export default function EventsPage() {
                     <div className="absolute inset-0" style={{ background: "var(--card)" }} />
                   )}
                   <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, rgba(255,143,163,0.18) 0%, transparent 55%), linear-gradient(to top, rgba(16,14,12,0.75) 0%, transparent 60%)" }} />
-                  {featuredNewCount > 0 && (
+                  {featured.hasNew && (
                     <span className="absolute top-2.5 right-2.5 text-[10px] font-bold text-white px-2.5 py-1 rounded-full" style={{ background: "var(--accent)" }}>
-                      {featuredNewCount} new
+                      new
                     </span>
                   )}
                   <div className="absolute bottom-0 left-0 right-0 p-3.5">
@@ -289,7 +288,7 @@ export default function EventsPage() {
       </div>
 
       {/* Floating action buttons */}
-      <div className="fixed bottom-0 left-0 right-0 flex gap-2.5 px-4 pb-8 pt-3" style={{ zIndex: 10, background: "linear-gradient(to top, var(--bg) 65%, transparent 100%)" }}>
+      <div className="fixed bottom-0 left-0 right-0 flex gap-2.5 px-4 pb-[76px] pt-3" style={{ zIndex: 10, background: "linear-gradient(to top, var(--bg) 65%, transparent 100%)" }}>
         <button
           onClick={() => setShowJoin(true)}
           className="flex-1 py-3.5 rounded-[12px] font-semibold text-[14px]"
