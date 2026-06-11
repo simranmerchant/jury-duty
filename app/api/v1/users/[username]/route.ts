@@ -23,7 +23,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ user
   const userId = balance.user_id;
 
   // Fetch entries, memberships, follow counts, and viewer's follow state in parallel
-  const [{ data: entries }, { data: memberships }, { data: followerRows }, { data: followingRows }, { data: viewerFollow }] = await Promise.all([
+  const [{ data: entries }, { data: memberships }, { count: followerCount }, { count: followingCount }, { data: viewerFollow }] = await Promise.all([
     supabase
       .from("bet_entries")
       .select("option_id, bets(status, winning_option_id, visibility)")
@@ -95,8 +95,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ user
       avatar_url: balance.avatar_url ?? null,
       points: balance.points ?? 0,
       is_private: balance.is_private ?? false,
-      follower_count: followerRows ?? 0,
-      following_count: followingRows ?? 0,
+      follower_count: followerCount ?? 0,
+      following_count: followingCount ?? 0,
       follow_status: viewerFollow?.status ?? null,
     },
     win_rate,
