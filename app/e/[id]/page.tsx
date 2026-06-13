@@ -21,6 +21,7 @@ type Bet = {
   winning_option_id: string | null;
   creator_id: string;
   created_at: string;
+  walrus_blob_id: string | null;
   isNew: boolean;
   bet_options: BetOption[];
   bet_entries: BetEntry[];
@@ -1142,6 +1143,17 @@ function BetCard({
               })}
               {bet.isNew && <span className="w-2 h-2 rounded-full flex-shrink-0 inline-block ml-1.5" style={{ background: "var(--accent)" }} />}
             </p>
+          )}
+          {bet.walrus_blob_id && (
+            <a
+              href={`https://aggregator.walrus-testnet.walrus.space/v1/blobs/${bet.walrus_blob_id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[10px] font-semibold mt-0.5 inline-block"
+              style={{ color: "var(--dimmer)" }}
+            >
+              verify on walrus ↗
+            </a>
           )}
           {/* Tag someone button — creator only, open bet */}
           {bet.creator_id === userId && isOpen && !qTagMode && (
