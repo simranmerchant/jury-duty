@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/privy";
 import { supabase } from "@/lib/supabase";
+import { uploadToWalrus } from "@/lib/walrus";
 
 export async function POST(req: NextRequest) {
   const token = req.headers.get("authorization")?.replace("Bearer ", "");
@@ -19,14 +20,18 @@ export async function POST(req: NextRequest) {
   const path = `${user.userId}.${ext}`;
   const buffer = Buffer.from(await file.arrayBuffer());
 
-  const { error: uploadError } = await supabase.storage
-    .from("avatars")
-    .upload(path, buffer, { contentType: file.type, upsert: true });
-
-  if (uploadError) return NextResponse.json({ error: uploadError.message }, { status: 500 });
-
-  const { data: { publicUrl } } = supabase.storage.from("avatars").getPublicUrl(path);
-  const avatarUrl = `${publicUrl}?t=${Date.now()}`;
+  let avatarUrl: string;
+  try {
+    avatarUrl = await uploadToWalrus(buffer, file.type);
+  } catch {
+    // Fall back to Supabase storage if Walrus is unavailable
+    const { error: uploadError } = await supabase.storage
+      .from("avatars")
+      .upload(path, buffer, { contentType: file.type, upsert: true });
+    if (uploadError) return NextResponse.json({ error: uploadError.message }, { status: 500 });
+    const { data: { publicUrl } } = supabase.storage.from("avatars").getPublicUrl(path);
+    avatarUrl = `${publicUrl}?t=${Date.now()}`;
+  }
 
   const { error: updateError } = await supabase
     .from("balances")

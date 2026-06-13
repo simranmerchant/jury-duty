@@ -14,7 +14,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ user
 
   const { data: balance } = await supabase
     .from("balances")
-    .select("user_id, display_name, username, avatar_url, points, is_private")
+    .select("user_id, display_name, username, avatar_url, points, is_private, ens_name, world_verified")
     .eq("username", u)
     .single();
 
@@ -95,6 +95,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ user
       avatar_url: balance.avatar_url ?? null,
       points: balance.points ?? 0,
       is_private: balance.is_private ?? false,
+      ens_name: balance.ens_name ?? null,
+      world_verified: balance.world_verified ?? false,
       follower_count: followerCount ?? 0,
       following_count: followingCount ?? 0,
       follow_status: viewerFollow?.status ?? null,

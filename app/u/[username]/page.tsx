@@ -14,6 +14,8 @@ type Profile = {
   follower_count: number;
   following_count: number;
   follow_status: "pending" | "accepted" | null;
+  ens_name: string | null;
+  world_verified: boolean;
 };
 
 type EventItem = { id: string; name: string; type: string };
@@ -140,6 +142,18 @@ export default function PublicProfilePage() {
             {profile?.username && (
               <p className="text-[14px] font-semibold mt-0.5" style={{ color: "var(--muted)" }}>@{profile.username}</p>
             )}
+            <div className="flex gap-2 mt-1 flex-wrap">
+              {profile?.ens_name && (
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(99,102,241,0.15)", color: "#818cf8", border: "1px solid rgba(99,102,241,0.3)" }}>
+                  {profile.ens_name}
+                </span>
+              )}
+              {profile?.world_verified && (
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(52,199,89,0.15)", color: "#34c759", border: "1px solid rgba(52,199,89,0.3)" }}>
+                  ✓ human
+                </span>
+              )}
+            </div>
             {/* Follower/following counts */}
             <div className="flex gap-4 mt-1.5">
               <span className="text-[13px]" style={{ color: "var(--muted)" }}>

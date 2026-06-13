@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
   const [{ data: balance }, { data: entries }, { data: agreementRow }, { data: blockRows }, { count: followerCount }, { count: followingCount }] = await Promise.all([
     supabase
       .from("balances")
-      .select("points, display_name, avatar_url, username, referral_code, is_private")
+      .select("points, display_name, avatar_url, username, referral_code, is_private, ens_name, world_verified")
       .eq("user_id", user.userId)
       .single(),
 
@@ -70,6 +70,8 @@ export async function GET(req: NextRequest) {
     username: balance?.username ?? null,
     referral_code: balance?.referral_code ?? null,
     is_private: balance?.is_private ?? false,
+    ens_name: balance?.ens_name ?? null,
+    world_verified: balance?.world_verified ?? false,
     follower_count: followerCount ?? 0,
     following_count: followingCount ?? 0,
     history,
