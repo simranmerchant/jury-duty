@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { sendPushToUsers } from "@/lib/push";
 import { sendWebPushToUsers } from "@/lib/webpush";
 import { buildInviteIds, questionMentionRecipients, optionTagRecipients } from "@/lib/notification-recipients";
+import { uploadToWalrus } from "@/lib/walrus";
 
 export async function POST(
   req: NextRequest,
@@ -92,6 +93,24 @@ export async function POST(
   ]);
 
   if (optError) return NextResponse.json({ error: optError.message }, { status: 500 });
+
+  // Write immutable receipt to Walrus (fire-and-forget)
+  const receipt = {
+    bet_id: bet.id,
+    event_id: eventId,
+    creator_id: user.userId,
+    question: question.trim(),
+    options: normalizedOptions.map((o) => o.label.trim()),
+    visibility: visibility ?? "public",
+    deadline: betDeadline,
+    created_at: new Date().toISOString(),
+  };
+  uploadToWalrus(Buffer.from(JSON.stringify(receipt)), "application/json")
+    .then((url) => {
+      const blobId = url.split("/").pop()!;
+      return supabase.from("bets").update({ walrus_blob_id: blobId }).eq("id", bet.id);
+    })
+    .catch(() => {});
 
   const otherGuestIds = (allGuests ?? []).map((g: any) => g.user_id as string);
   const creatorName = creatorData?.display_name ?? "someone";

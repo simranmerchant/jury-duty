@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
   let query = supabase
     .from("bets")
     .select(`
-      id, question, deadline, status, winning_option_id, creator_id, created_at, audience,
+      id, question, deadline, status, winning_option_id, creator_id, created_at, audience, walrus_blob_id,
       bet_options!bet_id(id, label, tagged_user_id,
         balances:tagged_user_id(display_name, avatar_url, username)
       ),

@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { sendPushToUsers } from "@/lib/push";
 import { sendWebPushToUsers } from "@/lib/webpush";
 import { validateFeedBet, buildFeedBetNotification } from "@/lib/feed";
+import { uploadToWalrus } from "@/lib/walrus";
 
 export async function POST(req: NextRequest) {
   const token = req.headers.get("authorization")?.replace("Bearer ", "");
@@ -43,6 +44,25 @@ export async function POST(req: NextRequest) {
     normalizedOptions.map((o) => ({ bet_id: bet.id, label: o.label.trim() }))
   );
   if (optError) return NextResponse.json({ error: optError.message }, { status: 500 });
+
+  // Write immutable receipt to Walrus (fire-and-forget)
+  const receipt = {
+    bet_id: bet.id,
+    event_id: null,
+    creator_id: user.userId,
+    question: question.trim(),
+    options: normalizedOptions.map((o) => o.label.trim()),
+    visibility: "public",
+    audience: "followers",
+    deadline,
+    created_at: new Date().toISOString(),
+  };
+  uploadToWalrus(Buffer.from(JSON.stringify(receipt)), "application/json")
+    .then((url) => {
+      const blobId = url.split("/").pop()!;
+      return supabase.from("bets").update({ walrus_blob_id: blobId }).eq("id", bet.id);
+    })
+    .catch(() => {});
 
   // Notify followers
   const { data: followers } = await supabase

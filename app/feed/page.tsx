@@ -14,6 +14,7 @@ type FeedBet = {
   winning_option_id: string | null;
   creator_id: string;
   created_at: string;
+  walrus_blob_id: string | null;
   bet_options: BetOption[];
   bet_entries: { user_id: string; option_id: string; points_staked: number }[];
   balances: { display_name: string | null; avatar_url: string | null; username: string | null } | null;
@@ -310,6 +311,17 @@ export default function FeedPage() {
 
               {/* Question */}
               <p className="text-[15px] font-bold leading-snug" style={{ color: "var(--text)" }}>{bet.question}</p>
+              {bet.walrus_blob_id && (
+                <a
+                  href={`https://aggregator.walrus-testnet.walrus.space/v1/blobs/${bet.walrus_blob_id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[10px] font-semibold"
+                  style={{ color: "var(--dimmer)" }}
+                >
+                  verify on walrus ↗
+                </a>
+              )}
 
               {/* Options */}
               <div className="flex flex-col gap-2">

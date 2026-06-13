@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/privy";
 import { supabase } from "@/lib/supabase";
-import { uploadToWalrus } from "@/lib/walrus";
 
 export async function POST(
   req: NextRequest,
@@ -34,34 +33,26 @@ export async function POST(
   const ts = Date.now();
   const path = `${id}.jpg`;
 
-  let coverUrl: string;
-  try {
-    coverUrl = await uploadToWalrus(buffer, "image/jpeg");
-  } catch {
-    const { error: uploadError } = await supabase.storage
-      .from("covers")
-      .upload(path, buffer, { contentType: "image/jpeg", upsert: true });
-    if (uploadError) return NextResponse.json({ error: uploadError.message }, { status: 500 });
-    const { data: { publicUrl } } = supabase.storage.from("covers").getPublicUrl(path);
-    coverUrl = `${publicUrl}?t=${ts}`;
-  }
+  const { error: uploadError } = await supabase.storage
+    .from("covers")
+    .upload(path, buffer, { contentType: "image/jpeg", upsert: true });
+  if (uploadError) return NextResponse.json({ error: uploadError.message }, { status: 500 });
+
+  const { data: { publicUrl } } = supabase.storage.from("covers").getPublicUrl(path);
+  const coverUrl = `${publicUrl}?t=${ts}`;
 
   // Also store the original (uncropped) when provided as a separate field
   const originalFile = formData.get("original") as File | null;
   let coverOriginalUrl: string | null = null;
   if (originalFile && originalFile.type.startsWith("image/")) {
     const originalBuffer = Buffer.from(await originalFile.arrayBuffer());
-    try {
-      coverOriginalUrl = await uploadToWalrus(originalBuffer, "image/jpeg");
-    } catch {
-      const originalPath = `originals/${id}.jpg`;
-      const { error: origError } = await supabase.storage
-        .from("covers")
-        .upload(originalPath, originalBuffer, { contentType: "image/jpeg", upsert: true });
-      if (!origError) {
-        const { data: { publicUrl: origPub } } = supabase.storage.from("covers").getPublicUrl(originalPath);
-        coverOriginalUrl = `${origPub}?t=${ts}`;
-      }
+    const originalPath = `originals/${id}.jpg`;
+    const { error: origError } = await supabase.storage
+      .from("covers")
+      .upload(originalPath, originalBuffer, { contentType: "image/jpeg", upsert: true });
+    if (!origError) {
+      const { data: { publicUrl: origPub } } = supabase.storage.from("covers").getPublicUrl(originalPath);
+      coverOriginalUrl = `${origPub}?t=${ts}`;
     }
   }
 

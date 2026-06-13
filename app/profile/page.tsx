@@ -4,7 +4,7 @@ import { usePrivy } from "@privy-io/react-auth";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback, useRef } from "react";
 import BottomNav from "@/components/BottomNav";
-import { IDKitRequestWidget, proofOfHuman, type IDKitResult } from "@worldcoin/idkit";
+import { IDKitWidget, VerificationLevel, type ISuccessResult } from "@worldcoin/idkit";
 
 const USERNAME_RE = /^[a-z0-9][a-z0-9._]{1,18}[a-z0-9]$|^[a-z0-9]{3}$/;
 
@@ -65,7 +65,6 @@ export default function ProfilePage() {
   const [ensError, setEnsError] = useState<string | null>(null);
   const [worldVerified, setWorldVerified] = useState(false);
   const [worldVerifying, setWorldVerifying] = useState(false);
-  const [worldOpen, setWorldOpen] = useState(false);
 
   const fetchMe = useCallback(async () => {
     const token = await getAccessToken();
@@ -143,7 +142,7 @@ export default function ProfilePage() {
   }
 
   async function linkEns() {
-    const name = ensInput.trim();
+    const name = ensInput.trim().toLowerCase();
     if (!name || ensLoading) return;
     setEnsLoading(true);
     setEnsError(null);
@@ -177,7 +176,7 @@ export default function ProfilePage() {
     setEnsLoading(false);
   }
 
-  async function onWorldVerify(result: IDKitResult) {
+  async function onWorldVerify(result: ISuccessResult) {
     setWorldVerifying(true);
     const token = await getAccessToken();
     const res = await fetch("/api/v1/me/world-verify", {
@@ -189,7 +188,6 @@ export default function ProfilePage() {
       const data = await res.json().catch(() => ({}));
       throw new Error((data as any).error ?? "verification failed");
     }
-    setWorldVerified(true);
     setWorldVerifying(false);
   }
 
@@ -453,7 +451,7 @@ export default function ProfilePage() {
           <div className="px-4 pb-4 flex flex-col gap-2" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
             <div className="flex items-center gap-2 pt-3">
               <span className="text-[13px] font-bold" style={{ color: "var(--text)" }}>ENS</span>
-              {ensName && <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(99,102,241,0.15)", color: "#818cf8", border: "1px solid rgba(99,102,241,0.3)" }}>{ensName}</span>}
+              {ensName && <a href={`https://app.ens.domains/${ensName}`} target="_blank" rel="noopener noreferrer" className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(99,102,241,0.15)", color: "#818cf8", border: "1px solid rgba(99,102,241,0.3)" }}>{ensName}</a>}
             </div>
             {ensName ? (
               <button onClick={unlinkEns} disabled={ensLoading} className="self-start text-[12px] font-semibold px-3 py-1.5 rounded-xl" style={{ background: "rgba(255,255,255,0.04)", color: "var(--muted)", border: "1px solid var(--border-soft)" }}>
@@ -487,25 +485,25 @@ export default function ProfilePage() {
               <p className="text-[12px]" style={{ color: "var(--dimmer)" }}>your predictions are proof-of-human verified</p>
             ) : (
               <>
-                {/* @ts-ignore — v4 requires rp_context (server-signed nonce); omitted for hackathon demo */}
-                <IDKitRequestWidget
-                  open={worldOpen}
-                  onOpenChange={setWorldOpen}
+                <IDKitWidget
                   app_id={(process.env.NEXT_PUBLIC_WORLD_APP_ID ?? "app_staging_placeholder") as `app_${string}`}
                   action="verify-human"
-                  preset={proofOfHuman()}
+                  verification_level={VerificationLevel.Orb}
                   handleVerify={onWorldVerify}
                   onSuccess={() => setWorldVerified(true)}
-                />
-                <button
-                  onClick={() => setWorldOpen(true)}
-                  disabled={worldVerifying}
-                  className="self-start flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-[13px] disabled:opacity-50"
-                  style={{ background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", color: "var(--text)" }}
                 >
-                  <svg width={16} height={16} viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="16" fill="#fff"/><path d="M10 16a6 6 0 1 1 12 0 6 6 0 0 1-12 0z" fill="#000"/></svg>
-                  {worldVerifying ? "verifying..." : "verify with World ID"}
-                </button>
+                  {({ open }: { open: () => void }) => (
+                    <button
+                      onClick={open}
+                      disabled={worldVerifying}
+                      className="self-start flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-[13px] disabled:opacity-50"
+                      style={{ background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", color: "var(--text)" }}
+                    >
+                      <svg width={16} height={16} viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="16" fill="#fff"/><path d="M10 16a6 6 0 1 1 12 0 6 6 0 0 1-12 0z" fill="#000"/></svg>
+                      {worldVerifying ? "verifying..." : "verify with World ID"}
+                    </button>
+                  )}
+                </IDKitWidget>
               </>
             )}
           </div>

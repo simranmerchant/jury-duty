@@ -3,8 +3,9 @@ import { requireUser } from "@/lib/privy";
 import { supabase } from "@/lib/supabase";
 import { createPublicClient, http } from "viem";
 import { mainnet } from "viem/chains";
+import { normalize } from "viem/ens";
 
-const client = createPublicClient({ chain: mainnet, transport: http("https://cloudflare-eth.com") });
+const client = createPublicClient({ chain: mainnet, transport: http("https://ethereum.publicnode.com") });
 
 export async function POST(req: NextRequest) {
   const token = req.headers.get("authorization")?.replace("Bearer ", "");
@@ -16,16 +17,15 @@ export async function POST(req: NextRequest) {
   const { ens_name } = await req.json();
 
   if (!ens_name) {
-    // Clear ENS
-    await supabase.from("balances").update({ ens_name: null }).eq("user_id", user.userId);
+    await supabase.from("balances").update({ ens_name: null, display_name: null }).eq("user_id", user.userId);
     return NextResponse.json({ ok: true, ens_name: null });
   }
 
   const name = ens_name.trim().toLowerCase();
   if (!name.endsWith(".eth")) return NextResponse.json({ error: "must end with .eth" }, { status: 400 });
 
-  // Verify the name resolves to something
-  const address = await client.getEnsAddress({ name }).catch(() => null);
+  // Verify the name resolves on mainnet
+  const address = await client.getEnsAddress({ name: normalize(name) }).catch(() => null);
   if (!address) return NextResponse.json({ error: "ENS name not found or not resolved" }, { status: 400 });
 
   // Fetch avatar from ENS metadata service

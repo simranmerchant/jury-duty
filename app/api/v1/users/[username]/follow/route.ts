@@ -4,10 +4,10 @@ import { supabase } from "@/lib/supabase";
 import { sendPushToUsers } from "@/lib/push";
 import { computeFollowStatus, buildFollowNotification } from "@/lib/follow";
 
-// POST /api/v1/users/[id]/follow — follow or request to follow
+// POST /api/v1/users/[username]/follow — follow or request to follow (param is user_id)
 export async function POST(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ username: string }> }
 ) {
   const token = req.headers.get("authorization")?.replace("Bearer ", "");
   if (!token) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -15,7 +15,7 @@ export async function POST(
   const user = await requireUser(token).catch(() => null);
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  const { id: targetId } = await params;
+  const { username: targetId } = await params;
   if (targetId === user.userId) return NextResponse.json({ error: "cannot follow yourself" }, { status: 400 });
 
   const { data: target } = await supabase
@@ -51,10 +51,10 @@ export async function POST(
   return NextResponse.json({ status });
 }
 
-// DELETE /api/v1/users/[id]/follow — unfollow or cancel request
+// DELETE /api/v1/users/[username]/follow — unfollow or cancel request (param is user_id)
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ username: string }> }
 ) {
   const token = req.headers.get("authorization")?.replace("Bearer ", "");
   if (!token) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -62,7 +62,7 @@ export async function DELETE(
   const user = await requireUser(token).catch(() => null);
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  const { id: targetId } = await params;
+  const { username: targetId } = await params;
 
   const { error } = await supabase
     .from("follows")

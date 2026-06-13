@@ -144,9 +144,9 @@ export default function PublicProfilePage() {
             )}
             <div className="flex gap-2 mt-1 flex-wrap">
               {profile?.ens_name && (
-                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(99,102,241,0.15)", color: "#818cf8", border: "1px solid rgba(99,102,241,0.3)" }}>
+                <a href={`https://app.ens.domains/${profile.ens_name}`} target="_blank" rel="noopener noreferrer" className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(99,102,241,0.15)", color: "#818cf8", border: "1px solid rgba(99,102,241,0.3)" }}>
                   {profile.ens_name}
-                </span>
+                </a>
               )}
               {profile?.world_verified && (
                 <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(52,199,89,0.15)", color: "#34c759", border: "1px solid rgba(52,199,89,0.3)" }}>
