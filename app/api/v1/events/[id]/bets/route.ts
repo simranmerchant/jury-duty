@@ -105,7 +105,7 @@ export async function POST(
     deadline: betDeadline,
     created_at: new Date().toISOString(),
   };
-  uploadToWalrus(Buffer.from(JSON.stringify(receipt)), "application/json")
+  uploadToWalrus(Buffer.from(JSON.stringify(receipt, null, 2)), "text/plain")
     .then((url) => {
       const blobId = url.split("/").pop()!;
       return supabase.from("bets").update({ walrus_blob_id: blobId }).eq("id", bet.id);
