@@ -752,7 +752,7 @@ function BetCard({
 
   // Bet placement state
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
-  const [stakeInput, setStakeInput] = useState("100");
+  const [stakeInput, setStakeInput] = useState("1");
   const [placing, setPlacing] = useState(false);
   const [placeError, setPlaceError] = useState<string | null>(null);
   const [isAnonymous, setIsAnonymous] = useState(false);
@@ -769,12 +769,12 @@ function BetCard({
 
   // Double down
   const [doubling, setDoubling] = useState(false);
-  const [doubleInput, setDoubleInput] = useState("100");
+  const [doubleInput, setDoubleInput] = useState("1");
   const [doubleError, setDoubleError] = useState<string | null>(null);
   const [doublingDown, setDoublingDown] = useState(false);
 
   async function submitDoubleDown() {
-    const pts = parseInt(doubleInput, 10);
+    const pts = Math.round(parseFloat(doubleInput) * 100);
     if (!pts || pts <= 0 || doublingDown) return;
     if (userPoints !== null && pts > userPoints) {
       setDoubleError(`not enough — you have ${centsToDisplay(userPoints)} available`);
@@ -958,7 +958,7 @@ function BetCard({
 
   async function placeBet() {
     if (!selectedOption || placing) return;
-    const stake = parseInt(stakeInput, 10);
+    const stake = Math.round(parseFloat(stakeInput) * 100);
     if (!stake || stake <= 0) return;
     if (userPoints !== null && stake > userPoints) {
       setPlaceError(`not enough — you have ${centsToDisplay(userPoints)} available`);
@@ -1425,9 +1425,9 @@ function BetCard({
       {/* Stake input — mobile-style quick picks + custom */}
       {canBet && selectedOption && (
         <div className="mt-3 flex flex-col gap-2">
-          <span className="text-[12px] font-semibold" style={{ color: "var(--muted)" }}>stake (cents)</span>
+          <span className="text-[12px] font-semibold" style={{ color: "var(--muted)" }}>stake</span>
           <div className="flex gap-2">
-            {[50, 100, 200].map((v) => (
+            {[1, 2, 5].map((v) => (
               <button
                 key={v}
                 onClick={() => setStakeInput(String(v))}
@@ -1438,13 +1438,14 @@ function BetCard({
                   color: stakeInput === String(v) ? "var(--accent)" : "var(--muted)",
                 }}
               >
-                {centsToDisplay(v)}
+                ${v}
               </button>
             ))}
             <input
               type="number"
-              min="1"
-              value={[50, 100, 200].map(String).includes(stakeInput) ? "" : stakeInput}
+              min="0.01"
+              step="0.01"
+              value={["1", "2", "5"].includes(stakeInput) ? "" : stakeInput}
               onChange={(e) => setStakeInput(e.target.value)}
               placeholder="custom"
               className="flex-1 rounded-2xl px-3 py-2.5 text-[14px] outline-none text-center"
@@ -1492,7 +1493,7 @@ function BetCard({
               onChange={(e) => setDoubleInput(e.target.value)}
               className="flex-1 rounded-2xl px-4 py-2.5 text-[15px] outline-none"
               style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--accent-border)", color: "var(--text)" }}
-              placeholder="cents"
+              placeholder="$0.00"
               autoFocus
             />
             <button
