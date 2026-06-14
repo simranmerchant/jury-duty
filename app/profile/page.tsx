@@ -218,21 +218,19 @@ export default function ProfilePage() {
         address: TREASURY_ADDRESS,
         token: BLINK_USDC_BASE,
       });
-      const token = await getAccessToken();
-      const res = await fetch("/api/v1/me/blink-deposit", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ transfer_id: result.transfer.id, amount_usd: amountUsd }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setPoints(data.new_balance);
-        setLastTransferId(result.transfer.id);
-        setDepositSuccess(`+${centsToDisplay(displayToCents(amountUsd))} added!`);
-      } else {
-        const data = await res.json().catch(() => ({}));
-        setDepositError((data as any).error ?? "failed to credit deposit");
-      }
+      // Optimistically credit balance immediately after Blink confirms the transfer
+      const credited = displayToCents(amountUsd);
+      setPoints((prev) => (prev ?? 0) + credited);
+      setLastTransferId(result.transfer.id);
+      setDepositSuccess(`+${centsToDisplay(credited)} added!`);
+      // Best-effort backend sync — doesn't block the UI
+      getAccessToken().then((token) =>
+        fetch("/api/v1/me/blink-deposit", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ transfer_id: result.transfer.id, amount_usd: amountUsd }),
+        })
+      ).catch(() => {});
     } catch (err: any) {
       if (err?.code !== "DEPOSIT_DISMISSED") {
         setDepositError(getDisplayMessage(err) ?? "deposit failed");
