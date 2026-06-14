@@ -223,7 +223,5 @@ export async function POST(
     ]);
   }
 
-  await supabase.rpc("increment_balance", { p_user_id: user.userId, p_amount: 25 });
-
   return NextResponse.json({ betId: bet.id }, { status: 201 });
 }

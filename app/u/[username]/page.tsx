@@ -3,6 +3,7 @@
 import { usePrivy } from "@privy-io/react-auth";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { centsToDisplay } from "@/lib/usdc";
 
 type Profile = {
   user_id: string;
@@ -15,7 +16,6 @@ type Profile = {
   following_count: number;
   follow_status: "pending" | "accepted" | null;
   ens_name: string | null;
-  world_verified: boolean;
 };
 
 type EventItem = { id: string; name: string; type: string };
@@ -148,11 +148,6 @@ export default function PublicProfilePage() {
                   {profile.ens_name}
                 </a>
               )}
-              {profile?.world_verified && (
-                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(52,199,89,0.15)", color: "#34c759", border: "1px solid rgba(52,199,89,0.3)" }}>
-                  ✓ human
-                </span>
-              )}
             </div>
             {/* Follower/following counts */}
             <div className="flex gap-4 mt-1.5">
@@ -208,9 +203,9 @@ export default function PublicProfilePage() {
             style={{ background: "var(--card)", border: "1px solid var(--border-soft)" }}
           >
             <p className="text-[20px] font-black" style={{ fontFamily: "var(--font-nunito)" }}>
-              {(profile?.points ?? 0).toLocaleString()}
+              {centsToDisplay(profile?.points ?? 0)}
             </p>
-            <p className="text-[11px]" style={{ color: "var(--muted)" }}>points</p>
+            <p className="text-[11px]" style={{ color: "var(--muted)" }}>balance</p>
           </div>
           <div
             className="rounded-2xl p-4 flex flex-col gap-0.5"

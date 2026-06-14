@@ -79,9 +79,6 @@ export async function DELETE(
   const { error } = await supabase.from("events").delete().eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Claw back the creation reward from the host
-  await supabase.rpc("increment_balance", { p_user_id: user.userId, p_amount: -50 });
-
   return NextResponse.json({ ok: true });
 }
 

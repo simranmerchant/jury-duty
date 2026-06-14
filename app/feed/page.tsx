@@ -4,6 +4,7 @@ import { usePrivy } from "@privy-io/react-auth";
 import { useRouter } from "next/navigation";
 import BottomNav from "@/components/BottomNav";
 import { useEffect, useState, useCallback, useRef } from "react";
+import { centsToDisplay } from "@/lib/usdc";
 
 type BetOption = { id: string; label: string };
 type FeedBet = {
@@ -131,14 +132,14 @@ export default function FeedPage() {
     const res = await fetch("/api/v1/bets/place", {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ bet_id: betId, option_id: optionId, points: 50 }),
+      body: JSON.stringify({ bet_id: betId, option_id: optionId, points: 100 }),
     });
     if (res.ok) {
       setBets((prev) => prev.map((b) => b.id !== betId ? b : {
         ...b,
-        bet_entries: [...b.bet_entries, { user_id: privyUser!.id, option_id: optionId, points_staked: 50 }],
+        bet_entries: [...b.bet_entries, { user_id: privyUser!.id, option_id: optionId, points_staked: 100 }],
       }));
-      if (myPoints !== null) setMyPoints((p) => (p ?? 0) - 50);
+      if (myPoints !== null) setMyPoints((p) => (p ?? 0) - 100);
     }
     setVotingId(null);
   }
@@ -207,7 +208,7 @@ export default function FeedPage() {
           {myPoints !== null && (
             <span className="text-[12px] font-bold px-3 py-1.5 rounded-full"
               style={{ background: "var(--accent-dim)", color: "var(--accent)", border: "1px solid var(--accent-border)" }}>
-              {myPoints.toLocaleString()} pts
+              {centsToDisplay(myPoints)}
             </span>
           )}
           <button
@@ -374,7 +375,7 @@ export default function FeedPage() {
               <div className="flex items-center justify-between pt-1" style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}>
                 <span className="text-[11px]" style={{ color: "var(--dimmer)" }}>
                   {bet.bet_entries.length} {bet.bet_entries.length === 1 ? "vote" : "votes"}
-                  {totalStaked > 0 ? ` · ${totalStaked.toLocaleString()} pts` : ""}
+                  {totalStaked > 0 ? ` · ${centsToDisplay(totalStaked)}` : ""}
                 </span>
                 <span className="text-[11px]" style={{ color: "var(--dimmer)" }}>
                   {isOpen ? "closes " : "closed "}

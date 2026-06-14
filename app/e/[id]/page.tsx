@@ -5,6 +5,7 @@ import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { filterTagPickerGuests } from "../../../lib/tag-picker";
 import { parseQuestion, extractTaggedUserIds, insertMentionAt, removeMention, getWordTokens } from "../../../lib/question-tags";
+import { centsToDisplay } from "../../../lib/usdc";
 
 type BetOption = { id: string; label: string; tagged_user_id?: string | null; balances?: { display_name: string | null; avatar_url: string | null; username?: string | null } | null };
 type BetEntry = { id: string; user_id: string; option_id: string; points_staked: number; is_anonymous: boolean; balances?: { display_name: string | null; avatar_url: string | null } };
@@ -776,7 +777,7 @@ function BetCard({
     const pts = parseInt(doubleInput, 10);
     if (!pts || pts <= 0 || doublingDown) return;
     if (userPoints !== null && pts > userPoints) {
-      setDoubleError(`not enough points — you have ${userPoints.toLocaleString()} available`);
+      setDoubleError(`not enough — you have ${centsToDisplay(userPoints)} available`);
       return;
     }
     setDoublingDown(true);
@@ -960,7 +961,7 @@ function BetCard({
     const stake = parseInt(stakeInput, 10);
     if (!stake || stake <= 0) return;
     if (userPoints !== null && stake > userPoints) {
-      setPlaceError(`not enough points — you have ${userPoints.toLocaleString()} available`);
+      setPlaceError(`not enough — you have ${centsToDisplay(userPoints)} available`);
       return;
     }
     setPlacing(true);
@@ -1235,7 +1236,7 @@ function BetCard({
         })()}
         {bet.bet_entries.length > 0 && (
           <p className="text-[13px]" style={{ color: "var(--muted)" }}>
-            {bet.bet_entries.length} {bet.bet_entries.length === 1 ? "vote" : "votes"} · {totalPot.toLocaleString()} pts
+            {bet.bet_entries.length} {bet.bet_entries.length === 1 ? "vote" : "votes"} · {centsToDisplay(totalPot)}
           </p>
         )}
         {bet.bet_entries.length === 0 && isOpen && !isPast && (
@@ -1363,7 +1364,7 @@ function BetCard({
 
               {/* Pts in pool */}
               <p className="text-[11px]" style={{ color: "var(--dimmer)" }}>
-                {optTotal > 0 ? `${optTotal.toLocaleString()} pts` : ""}
+                {optTotal > 0 ? centsToDisplay(optTotal) : ""}
               </p>
             </div>
           );
@@ -1424,7 +1425,7 @@ function BetCard({
       {/* Stake input — mobile-style quick picks + custom */}
       {canBet && selectedOption && (
         <div className="mt-3 flex flex-col gap-2">
-          <span className="text-[12px] font-semibold" style={{ color: "var(--muted)" }}>points</span>
+          <span className="text-[12px] font-semibold" style={{ color: "var(--muted)" }}>stake (cents)</span>
           <div className="flex gap-2">
             {[50, 100, 200].map((v) => (
               <button
@@ -1437,7 +1438,7 @@ function BetCard({
                   color: stakeInput === String(v) ? "var(--accent)" : "var(--muted)",
                 }}
               >
-                {v}
+                {centsToDisplay(v)}
               </button>
             ))}
             <input
@@ -1491,7 +1492,7 @@ function BetCard({
               onChange={(e) => setDoubleInput(e.target.value)}
               className="flex-1 rounded-2xl px-4 py-2.5 text-[15px] outline-none"
               style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--accent-border)", color: "var(--text)" }}
-              placeholder="points"
+              placeholder="cents"
               autoFocus
             />
             <button

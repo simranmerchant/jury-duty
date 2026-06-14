@@ -129,8 +129,5 @@ export async function DELETE(
   const { error } = await supabase.from("bets").delete().eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Claw back the creation reward from the creator
-  await supabase.rpc("increment_balance", { p_user_id: bet.creator_id, p_amount: -100 });
-
   return NextResponse.json({ ok: true });
 }

@@ -4,7 +4,12 @@ import { usePrivy } from "@privy-io/react-auth";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback, useRef } from "react";
 import BottomNav from "@/components/BottomNav";
-import { IDKitWidget, VerificationLevel, type ISuccessResult } from "@worldcoin/idkit";
+import { useBlinkDeposit } from "@swype-org/deposit/react";
+import { getDisplayMessage } from "@swype-org/deposit";
+import { BLINK_CHAIN_ID, BLINK_USDC_BASE } from "@/lib/blink";
+import { centsToDisplay, displayToCents } from "@/lib/usdc";
+
+const TREASURY_ADDRESS = process.env.NEXT_PUBLIC_TREASURY_ADDRESS ?? "";
 
 const USERNAME_RE = /^[a-z0-9][a-z0-9._]{1,18}[a-z0-9]$|^[a-z0-9]{3}$/;
 
@@ -63,8 +68,12 @@ export default function ProfilePage() {
   const [ensName, setEnsName] = useState<string | null>(null);
   const [ensLoading, setEnsLoading] = useState(false);
   const [ensError, setEnsError] = useState<string | null>(null);
-  const [worldVerified, setWorldVerified] = useState(false);
-  const [worldVerifying, setWorldVerifying] = useState(false);
+  const [depositError, setDepositError] = useState<string | null>(null);
+  const [depositSuccess, setDepositSuccess] = useState<string | null>(null);
+  const [lastTransferId, setLastTransferId] = useState<string | null>(null);
+  const [withdrawing, setWithdrawing] = useState(false);
+  const [withdrawError, setWithdrawError] = useState<string | null>(null);
+  const [withdrawSuccess, setWithdrawSuccess] = useState<string | null>(null);
 
   const fetchMe = useCallback(async () => {
     const token = await getAccessToken();
@@ -81,7 +90,6 @@ export default function ProfilePage() {
     setFollowerCount(data.follower_count ?? 0);
     setFollowingCount(data.following_count ?? 0);
     setEnsName(data.ens_name ?? null);
-    setWorldVerified(data.world_verified ?? false);
     setHistory(data.history ?? []);
     setStats(data.stats ?? null);
     if (reqRes.ok) {
@@ -176,20 +184,84 @@ export default function ProfilePage() {
     setEnsLoading(false);
   }
 
-  async function onWorldVerify(result: ISuccessResult) {
-    setWorldVerifying(true);
+
+  // Custom signer function so we can attach the Privy auth token.
+  // getAccessToken is a stable reference from Privy, safe to capture in the closure.
+  const { requestDeposit, status: blinkStatus } = useBlinkDeposit({
+    environment: (process.env.NEXT_PUBLIC_BLINK_ENV as "sandbox" | "production" | undefined) ?? "sandbox",
+    signer: async (signerReq) => {
+      const token = await getAccessToken();
+      const res = await fetch("/api/v1/me/blink-sign", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(signerReq),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+  });
+
+  async function handleDeposit(amountUsd: number) {
+    if (!TREASURY_ADDRESS) {
+      setDepositError("deposits not configured");
+      return;
+    }
+    setDepositError(null);
+    setDepositSuccess(null);
+    try {
+      const result = await requestDeposit({
+        amount: amountUsd,
+        chainId: BLINK_CHAIN_ID,
+        address: TREASURY_ADDRESS,
+        token: BLINK_USDC_BASE,
+      });
+      const token = await getAccessToken();
+      const res = await fetch("/api/v1/me/blink-deposit", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ transfer_id: result.transfer.id, amount_usd: amountUsd }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPoints(data.new_balance);
+        setLastTransferId(result.transfer.id);
+        setDepositSuccess(`+${centsToDisplay(displayToCents(amountUsd))} added!`);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setDepositError((data as any).error ?? "failed to credit deposit");
+      }
+    } catch (err: any) {
+      if (err?.code !== "DEPOSIT_DISMISSED") {
+        setDepositError(getDisplayMessage(err) ?? "deposit failed");
+      }
+    }
+  }
+
+  async function handleWithdraw() {
+    if (withdrawing || !points || points <= 0) return;
+    setWithdrawing(true);
+    setWithdrawError(null);
+    setWithdrawSuccess(null);
     const token = await getAccessToken();
-    const res = await fetch("/api/v1/me/world-verify", {
+    const res = await fetch("/api/v1/me/withdraw", {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify(result),
+      body: JSON.stringify({ cents: points }),
     });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error((data as any).error ?? "verification failed");
+    const data = await res.json();
+    if (res.ok) {
+      setWithdrawSuccess(`${centsToDisplay(points)} sent to your wallet!`);
+      setPoints(data.new_balance);
+      setTimeout(() => setWithdrawSuccess(null), 5000);
+    } else {
+      setWithdrawError(data.error ?? "withdrawal failed");
     }
-    setWorldVerifying(false);
+    setWithdrawing(false);
   }
+
 
   async function togglePrivacy() {
     const next = !isPrivate;
@@ -433,14 +505,26 @@ export default function ProfilePage() {
             className="text-[48px] font-black leading-none tracking-tight"
             style={{ fontFamily: "var(--font-nunito)", color: "var(--accent)" }}
           >
-            {points?.toLocaleString() ?? "—"}
+            {points !== null ? centsToDisplay(points) : "—"}
           </p>
-          <p className="text-[13px]" style={{ color: "var(--dimmer)" }}>points available</p>
+          <p className="text-[13px]" style={{ color: "var(--dimmer)" }}>USDC available</p>
           {staked > 0 && (
             <p className="text-[12px] mt-1" style={{ color: "var(--muted)" }}>
-              + {staked.toLocaleString()} pts in {stats?.pending} open {stats?.pending === 1 ? "prediction" : "predictions"}
+              + {centsToDisplay(staked)} in {stats?.pending} open {stats?.pending === 1 ? "prediction" : "predictions"}
             </p>
           )}
+          {points !== null && points > 0 && (
+            <button
+              onClick={handleWithdraw}
+              disabled={withdrawing}
+              className="mt-3 self-start text-[13px] font-bold px-4 py-2 rounded-xl disabled:opacity-50"
+              style={{ background: "rgba(255,255,255,0.07)", border: "1px solid var(--border-soft)", color: "var(--text)" }}
+            >
+              {withdrawing ? "sending..." : "withdraw to wallet"}
+            </button>
+          )}
+          {withdrawSuccess && <p className="text-[12px] mt-1 font-bold" style={{ color: "var(--win)" }}>{withdrawSuccess}</p>}
+          {withdrawError && <p className="text-[12px] mt-1" style={{ color: "var(--accent)" }}>{withdrawError}</p>}
         </div>
 
         {/* Web3 Identity */}
@@ -475,38 +559,59 @@ export default function ProfilePage() {
             {ensError && <p className="text-[12px]" style={{ color: "var(--accent)" }}>{ensError}</p>}
           </div>
 
-          {/* World ID */}
-          <div className="px-4 pb-4 flex flex-col gap-2" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
-            <div className="flex items-center gap-2 pt-3">
-              <span className="text-[13px] font-bold" style={{ color: "var(--text)" }}>World ID</span>
-              {worldVerified && <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(52,199,89,0.15)", color: "#34c759", border: "1px solid rgba(52,199,89,0.3)" }}>✓ verified human</span>}
-            </div>
-            {worldVerified ? (
-              <p className="text-[12px]" style={{ color: "var(--dimmer)" }}>your predictions are proof-of-human verified</p>
-            ) : (
-              <>
-                <IDKitWidget
-                  app_id={(process.env.NEXT_PUBLIC_WORLD_APP_ID ?? "app_staging_placeholder") as `app_${string}`}
-                  action="verify-human"
-                  verification_level={VerificationLevel.Orb}
-                  handleVerify={onWorldVerify}
-                  onSuccess={() => setWorldVerified(true)}
-                >
-                  {({ open }: { open: () => void }) => (
-                    <button
-                      onClick={open}
-                      disabled={worldVerifying}
-                      className="self-start flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-[13px] disabled:opacity-50"
-                      style={{ background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", color: "var(--text)" }}
-                    >
-                      <svg width={16} height={16} viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="16" fill="#fff"/><path d="M10 16a6 6 0 1 1 12 0 6 6 0 0 1-12 0z" fill="#000"/></svg>
-                      {worldVerifying ? "verifying..." : "verify with World ID"}
-                    </button>
-                  )}
-                </IDKitWidget>
-              </>
+        </div>
+
+        {/* Blink Deposit */}
+        <div
+          className="rounded-2xl flex flex-col gap-3 p-4"
+          style={{ background: "var(--card)", border: "1px solid var(--border-soft)" }}
+        >
+          <div className="flex items-center justify-between">
+            <p className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: "var(--dimmer)" }}>
+              add funds
+            </p>
+            {depositSuccess && (
+              <span className="text-[12px] font-bold" style={{ color: "var(--win)" }}>{depositSuccess}</span>
             )}
           </div>
+          <p className="text-[12px]" style={{ color: "var(--muted)" }}>
+            deposit USDC on Base — instantly credited to your balance
+          </p>
+          <div className="grid grid-cols-3 gap-2">
+            {([5, 10, 25] as const).map((amt) => (
+              <button
+                key={amt}
+                onClick={() => handleDeposit(amt)}
+                disabled={blinkStatus === "iframe-active" || blinkStatus === "signer-loading"}
+                className="flex items-center justify-center py-3 rounded-xl font-black disabled:opacity-50 transition-opacity text-[17px]"
+                style={{ background: "rgba(255,255,255,0.06)", border: "1px solid var(--border-soft)", color: "var(--text)", fontFamily: "var(--font-nunito)" }}
+              >
+                ${amt}
+              </button>
+            ))}
+          </div>
+          {depositError && (
+            <p className="text-[12px]" style={{ color: "var(--accent)" }}>{depositError}</p>
+          )}
+          {(blinkStatus === "signer-loading" || blinkStatus === "iframe-active") && (
+            <p className="text-[12px]" style={{ color: "var(--dimmer)" }}>opening deposit...</p>
+          )}
+          {lastTransferId && TREASURY_ADDRESS && (
+            <div className="flex flex-col gap-1">
+              <p className="text-[11px]" style={{ color: "var(--dimmer)" }}>
+                transfer id: <span className="font-mono">{lastTransferId}</span>
+              </p>
+              <a
+                href={`https://basescan.org/address/${TREASURY_ADDRESS}#tokentxns`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[11px] font-bold"
+                style={{ color: "#818cf8" }}
+              >
+                view on Base ↗
+              </a>
+            </div>
+          )}
         </div>
 
         {/* Stats row */}
@@ -570,7 +675,7 @@ export default function ProfilePage() {
                         {entry.question}
                       </p>
                       <p className="text-[11px]" style={{ color: "var(--muted)" }}>
-                        {entry.event_name} · {entry.pick} · {entry.points_staked.toLocaleString()} pts
+                        {entry.event_name} · {entry.pick} · {centsToDisplay(entry.points_staked)}
                       </p>
                     </button>
                     <div className="flex items-center gap-2 flex-shrink-0">
