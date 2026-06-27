@@ -46,6 +46,8 @@ export async function GET(req: NextRequest) {
     .select(`
       id, user_id, bet_id, caption, created_at,
       balances:user_id(display_name, avatar_url, username),
+      post_likes(user_id),
+      post_comments!post_id(id),
       bets:bet_id(
         id, question, deadline, status, winning_option_id, creator_id, created_at,
         bet_options!bet_id(id, label),

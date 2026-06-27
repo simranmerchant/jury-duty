@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ id: post.id });
 }
 
-// DELETE /api/v1/posts?bet_id=... — unshare a bet
+// DELETE /api/v1/posts?post_id=... or ?bet_id=... — delete a shared post
 export async function DELETE(req: NextRequest) {
   const token = req.headers.get("authorization")?.replace("Bearer ", "");
   if (!token) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -61,10 +61,17 @@ export async function DELETE(req: NextRequest) {
   const user = await requireUser(token).catch(() => null);
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  const bet_id = new URL(req.url).searchParams.get("bet_id");
-  if (!bet_id) return NextResponse.json({ error: "bet_id required" }, { status: 400 });
+  const { searchParams } = new URL(req.url);
+  const post_id = searchParams.get("post_id");
+  const bet_id = searchParams.get("bet_id");
 
-  await supabase.from("posts").delete().eq("user_id", user.userId).eq("bet_id", bet_id);
+  if (post_id) {
+    await supabase.from("posts").delete().eq("id", post_id).eq("user_id", user.userId);
+  } else if (bet_id) {
+    await supabase.from("posts").delete().eq("bet_id", bet_id).eq("user_id", user.userId);
+  } else {
+    return NextResponse.json({ error: "post_id or bet_id required" }, { status: 400 });
+  }
 
   return NextResponse.json({ ok: true });
 }

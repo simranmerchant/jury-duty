@@ -19,6 +19,7 @@ type EmbeddedBet = {
   balances: { display_name: string | null; avatar_url: string | null; username: string | null } | null;
 };
 type FeedBet = EmbeddedBet & { type: "bet"; audience: string };
+type PostComment = { id: string; body: string; created_at: string; user_id: string; balances?: { display_name: string | null; avatar_url: string | null; username?: string | null } | null };
 type FeedPost = {
   type: "post";
   id: string;
@@ -27,6 +28,8 @@ type FeedPost = {
   caption: string | null;
   created_at: string;
   balances: { display_name: string | null; avatar_url: string | null; username: string | null } | null;
+  post_likes: { user_id: string }[];
+  post_comments: { id: string }[];
   bets: EmbeddedBet | null;
 };
 type FeedItem = FeedBet | FeedPost;
@@ -257,72 +260,14 @@ export default function FeedPage() {
 
         {items.map((item) => {
           if (item.type === "post") {
-            const bet = item.bets;
-            if (!bet) return null;
-            const sharer = item.balances;
-            const sharerName = sharer?.display_name ?? sharer?.username ?? "someone";
-            const totalStaked = bet.bet_entries.reduce((s, e) => s + e.points_staked, 0);
-            const winOpt = bet.winning_option_id ? bet.bet_options.find((o) => o.id === bet.winning_option_id) : null;
             return (
-              <div key={`post-${item.id}`} className="rounded-[16px] p-4 flex flex-col gap-3"
-                style={{ background: "var(--card)", border: "1px solid var(--border-soft)" }}>
-                {/* Sharer row */}
-                <div className="flex items-center justify-between">
-                  <button className="flex items-center gap-2.5"
-                    onClick={() => sharer?.username && router.push(`/u/${sharer.username}`)}>
-                    <div className="rounded-full flex items-center justify-center overflow-hidden flex-shrink-0"
-                      style={{ width: 32, height: 32, background: "var(--accent-dim)", border: "1px solid var(--accent-border)" }}>
-                      {sharer?.avatar_url
-                        ? <img src={sharer.avatar_url} alt="" className="w-full h-full object-cover" />
-                        : <span className="text-[12px] font-black" style={{ color: "var(--accent)" }}>{sharerName[0]?.toUpperCase() ?? "?"}</span>
-                      }
-                    </div>
-                    <div className="text-left">
-                      <p className="text-[13px] font-bold leading-none" style={{ color: "var(--text)" }}>
-                        {sharerName} <span className="font-normal" style={{ color: "var(--muted)" }}>shared a prediction</span>
-                      </p>
-                      <p className="text-[11px] mt-0.5" style={{ color: "var(--muted)" }}>{timeAgo(item.created_at)}</p>
-                    </div>
-                  </button>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-[6px]"
-                    style={{ background: "var(--win-dim)", color: "var(--win)", border: "1px solid var(--win-border)" }}>
-                    resolved
-                  </span>
-                </div>
-                {/* Caption */}
-                {item.caption && <p className="text-[14px] leading-snug" style={{ color: "var(--text)" }}>{item.caption}</p>}
-                {/* Embedded bet */}
-                <div className="rounded-[12px] p-3 flex flex-col gap-2"
-                  style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
-                  <p className="text-[14px] font-bold leading-snug" style={{ color: "var(--text)" }}>{bet.question}</p>
-                  <div className="flex flex-col gap-1.5">
-                    {bet.bet_options.map((opt) => {
-                      const optTotal = bet.bet_entries.filter((e) => e.option_id === opt.id).reduce((s, e) => s + e.points_staked, 0);
-                      const pct = totalStaked > 0 ? Math.round((optTotal / totalStaked) * 100) : 0;
-                      const isWinner = bet.winning_option_id === opt.id;
-                      return (
-                        <div key={opt.id} className="rounded-[10px] p-2.5 flex flex-col gap-1.5"
-                          style={{ background: isWinner ? "var(--win-dim)" : "rgba(255,255,255,0.03)", border: `1px solid ${isWinner ? "var(--win-border)" : "rgba(255,255,255,0.06)"}` }}>
-                          <div className="flex items-center justify-between">
-                            <span className="text-[13px] font-semibold" style={{ color: isWinner ? "var(--win)" : "var(--text)" }}>{opt.label}</span>
-                            <span className="text-[13px] font-bold" style={{ color: "var(--muted)" }}>{pct}%</span>
-                          </div>
-                          <div className="rounded-full overflow-hidden" style={{ height: 3, background: "rgba(255,255,255,0.06)" }}>
-                            <div className="h-full rounded-full" style={{ width: `${pct}%`, background: isWinner ? "var(--win-border)" : "rgba(255,255,255,0.18)" }} />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  {winOpt && <p className="text-[12px] font-bold" style={{ color: "var(--win)" }}>✓ {winOpt.label} won</p>}
-                </div>
-                <div className="pt-1" style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}>
-                  <span className="text-[11px]" style={{ color: "var(--dimmer)" }}>
-                    {bet.bet_entries.length} {bet.bet_entries.length === 1 ? "vote" : "votes"}
-                    {totalStaked > 0 ? ` · ${totalStaked.toLocaleString()} pts` : ""}
-                  </span>
-                </div>
-              </div>
+              <PostCard
+                key={`post-${item.id}`}
+                item={item}
+                currentUserId={privyUser?.id}
+                getAccessToken={getAccessToken}
+                onDelete={() => setItems((prev) => prev.filter((i) => i.id !== item.id))}
+              />
             );
           }
 
@@ -542,6 +487,245 @@ export default function FeedPage() {
               style={{ background: "var(--accent)", color: "#fff", opacity: (!canPost || posting) ? 0.4 : 1, fontFamily: "var(--font-nunito)" }}>
               {posting ? "posting…" : "post prediction"}
             </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PostCard({
+  item,
+  currentUserId,
+  getAccessToken,
+  onDelete,
+}: {
+  item: FeedPost;
+  currentUserId?: string;
+  getAccessToken: () => Promise<string | null>;
+  onDelete: () => void;
+}) {
+  const router = useRouter();
+  const bet = item.bets;
+  const sharer = item.balances;
+  const sharerName = sharer?.display_name ?? sharer?.username ?? "someone";
+  const isOwn = item.user_id === currentUserId;
+
+  const [liked, setLiked] = useState(() => item.post_likes.some((l) => l.user_id === currentUserId));
+  const [likeCount, setLikeCount] = useState(item.post_likes.length);
+  const [showComments, setShowComments] = useState(false);
+  const [comments, setComments] = useState<PostComment[]>([]);
+  const [commentCount, setCommentCount] = useState(item.post_comments.length);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [commentInput, setCommentInput] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showMenu) return;
+    function close(e: MouseEvent) { if (menuRef.current && !menuRef.current.contains(e.target as Node)) setShowMenu(false); }
+    document.addEventListener("click", close);
+    return () => document.removeEventListener("click", close);
+  }, [showMenu]);
+
+  async function toggleLike() {
+    const token = await getAccessToken();
+    setLiked((v) => !v);
+    setLikeCount((c) => liked ? c - 1 : c + 1);
+    await fetch(`/api/v1/posts/${item.id}/likes`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+  }
+
+  async function fetchComments() {
+    setCommentsLoading(true);
+    const token = await getAccessToken();
+    const res = await fetch(`/api/v1/posts/${item.id}/comments`, { headers: { Authorization: `Bearer ${token}` } });
+    const data = await res.json().catch(() => ({}));
+    setComments(data.comments ?? []);
+    setCommentCount(data.comments?.length ?? commentCount);
+    setCommentsLoading(false);
+  }
+
+  async function submitComment(e: React.FormEvent) {
+    e.preventDefault();
+    if (!commentInput.trim() || submitting) return;
+    setSubmitting(true);
+    const token = await getAccessToken();
+    const res = await fetch(`/api/v1/posts/${item.id}/comments`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ body: commentInput.trim() }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) {
+      setComments((prev) => [...prev, data.comment]);
+      setCommentCount((c) => c + 1);
+      setCommentInput("");
+    }
+    setSubmitting(false);
+  }
+
+  async function deleteComment(commentId: string) {
+    const token = await getAccessToken();
+    await fetch(`/api/v1/posts/${item.id}/comments?commentId=${commentId}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    setComments((prev) => prev.filter((c) => c.id !== commentId));
+    setCommentCount((c) => c - 1);
+  }
+
+  async function deletePost() {
+    setDeleting(true);
+    const token = await getAccessToken();
+    await fetch(`/api/v1/posts?post_id=${item.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+    onDelete();
+  }
+
+  if (!bet) return null;
+  const totalStaked = bet.bet_entries.reduce((s, e) => s + e.points_staked, 0);
+  const winOpt = bet.winning_option_id ? bet.bet_options.find((o) => o.id === bet.winning_option_id) : null;
+
+  return (
+    <div className="rounded-[16px] p-4 flex flex-col gap-3" style={{ background: "var(--card)", border: "1px solid var(--border-soft)" }}>
+      {/* Sharer row */}
+      <div className="flex items-center justify-between">
+        <button className="flex items-center gap-2.5" onClick={() => sharer?.username && router.push(`/u/${sharer.username}`)}>
+          <div className="rounded-full flex items-center justify-center overflow-hidden flex-shrink-0"
+            style={{ width: 32, height: 32, background: "var(--accent-dim)", border: "1px solid var(--accent-border)" }}>
+            {sharer?.avatar_url
+              ? <img src={sharer.avatar_url} alt="" className="w-full h-full object-cover" />
+              : <span className="text-[12px] font-black" style={{ color: "var(--accent)" }}>{sharerName[0]?.toUpperCase() ?? "?"}</span>
+            }
+          </div>
+          <div className="text-left">
+            <p className="text-[13px] font-bold leading-none" style={{ color: "var(--text)" }}>
+              {sharerName} <span className="font-normal" style={{ color: "var(--muted)" }}>shared a prediction</span>
+            </p>
+            <p className="text-[11px] mt-0.5" style={{ color: "var(--muted)" }}>{timeAgo(item.created_at)}</p>
+          </div>
+        </button>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-[6px]"
+            style={{ background: "var(--win-dim)", color: "var(--win)", border: "1px solid var(--win-border)" }}>resolved</span>
+          {isOwn && (
+            <div className="relative" ref={menuRef}>
+              <button onClick={() => setShowMenu((s) => !s)} className="w-7 h-7 flex items-center justify-center rounded-full text-[15px] font-bold" style={{ color: "var(--muted)" }}>···</button>
+              {showMenu && (
+                <div className="absolute right-0 top-8 z-10 rounded-[12px] overflow-hidden shadow-lg" style={{ background: "var(--card)", border: "1px solid var(--border-soft)", minWidth: 130 }}>
+                  <button onClick={deletePost} disabled={deleting} className="w-full px-4 py-3 text-left text-[13px] font-semibold" style={{ color: "var(--accent)" }}>
+                    {deleting ? "deleting…" : "delete post"}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Caption */}
+      {item.caption && <p className="text-[14px] leading-snug" style={{ color: "var(--text)" }}>{item.caption}</p>}
+
+      {/* Embedded bet */}
+      <div className="rounded-[12px] p-3 flex flex-col gap-2" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+        <p className="text-[14px] font-bold leading-snug" style={{ color: "var(--text)" }}>{bet.question}</p>
+        <div className="flex flex-col gap-1.5">
+          {bet.bet_options.map((opt) => {
+            const optTotal = bet.bet_entries.filter((e) => e.option_id === opt.id).reduce((s, e) => s + e.points_staked, 0);
+            const pct = totalStaked > 0 ? Math.round((optTotal / totalStaked) * 100) : 0;
+            const isWinner = bet.winning_option_id === opt.id;
+            return (
+              <div key={opt.id} className="rounded-[10px] p-2.5 flex flex-col gap-1.5"
+                style={{ background: isWinner ? "var(--win-dim)" : "rgba(255,255,255,0.03)", border: `1px solid ${isWinner ? "var(--win-border)" : "rgba(255,255,255,0.06)"}` }}>
+                <div className="flex items-center justify-between">
+                  <span className="text-[13px] font-semibold" style={{ color: isWinner ? "var(--win)" : "var(--text)" }}>{opt.label}</span>
+                  <span className="text-[13px] font-bold" style={{ color: "var(--muted)" }}>{pct}%</span>
+                </div>
+                <div className="rounded-full overflow-hidden" style={{ height: 3, background: "rgba(255,255,255,0.06)" }}>
+                  <div className="h-full rounded-full" style={{ width: `${pct}%`, background: isWinner ? "var(--win-border)" : "rgba(255,255,255,0.18)" }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        {winOpt && <p className="text-[12px] font-bold" style={{ color: "var(--win)" }}>✓ {winOpt.label} won</p>}
+      </div>
+
+      {/* Footer: votes + like + comment */}
+      <div className="flex items-center justify-between pt-1" style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}>
+        <span className="text-[11px]" style={{ color: "var(--dimmer)" }}>
+          {bet.bet_entries.length} {bet.bet_entries.length === 1 ? "vote" : "votes"}
+          {totalStaked > 0 ? ` · ${totalStaked.toLocaleString()} pts` : ""}
+        </span>
+        <div className="flex items-center gap-3">
+          <button onClick={toggleLike} className="flex items-center gap-1.5 text-[12px] font-bold" style={{ color: liked ? "var(--accent)" : "var(--dimmer)" }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill={liked ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+            </svg>
+            {likeCount > 0 ? likeCount : "like"}
+          </button>
+          <button
+            onClick={() => { if (!showComments) fetchComments(); setShowComments(true); }}
+            className="flex items-center gap-1.5 text-[12px] font-bold"
+            style={{ color: "var(--dimmer)" }}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+            {commentCount > 0 ? commentCount : "comment"}
+          </button>
+        </div>
+      </div>
+
+      {/* Comments sheet */}
+      {showComments && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,0.6)" }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowComments(false); }}>
+          <div className="w-full max-w-lg rounded-t-3xl flex flex-col" style={{ background: "var(--card)", border: "1px solid var(--border-soft)", maxHeight: "75vh" }}>
+            <div className="px-6 pt-5 pb-3 flex items-center justify-between flex-shrink-0" style={{ borderBottom: "1px solid var(--border-soft)" }}>
+              <p className="font-extrabold text-[16px]" style={{ fontFamily: "var(--font-nunito)" }}>comments</p>
+              <button onClick={() => setShowComments(false)} className="text-[14px] font-bold" style={{ color: "var(--dimmer)" }}>done</button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-3">
+              {commentsLoading ? (
+                <p className="text-[13px] text-center py-6" style={{ color: "var(--dimmer)" }}>loading...</p>
+              ) : comments.length === 0 ? (
+                <p className="text-[13px] text-center py-6" style={{ color: "var(--dimmer)" }}>no comments yet — be first</p>
+              ) : comments.map((c) => {
+                const name = c.balances?.display_name ?? c.balances?.username ?? "someone";
+                return (
+                  <div key={c.id} className="flex gap-2.5">
+                    <div className="rounded-full flex items-center justify-center flex-shrink-0" style={{ width: 28, height: 28, background: "var(--accent-dim)" }}>
+                      {c.balances?.avatar_url
+                        ? <img src={c.balances.avatar_url} alt="" className="w-full h-full rounded-full object-cover" />
+                        : <span className="text-[10px] font-black" style={{ color: "var(--accent)" }}>{name[0]?.toUpperCase()}</span>
+                      }
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-[12px] font-bold" style={{ color: "var(--text)" }}>{name}</p>
+                      <p className="text-[13px] mt-0.5" style={{ color: "var(--text)" }}>{c.body}</p>
+                    </div>
+                    {c.user_id === currentUserId && (
+                      <button onClick={() => deleteComment(c.id)} className="text-[11px] self-start mt-1" style={{ color: "var(--dimmer)" }}>✕</button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <form onSubmit={submitComment} className="flex gap-2 px-6 py-4 flex-shrink-0" style={{ borderTop: "1px solid var(--border-soft)" }}>
+              <input
+                value={commentInput}
+                onChange={(e) => setCommentInput(e.target.value)}
+                placeholder="add a comment..."
+                maxLength={500}
+                className="flex-1 text-[14px] px-4 py-3 rounded-2xl outline-none"
+                style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--border-soft)", color: "var(--text)" }}
+              />
+              <button type="submit" disabled={!commentInput.trim() || submitting} className="px-4 py-3 rounded-2xl text-[14px] font-bold text-white disabled:opacity-40" style={{ background: "var(--accent)" }}>
+                post
+              </button>
+            </form>
           </div>
         </div>
       )}
