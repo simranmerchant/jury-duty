@@ -7,6 +7,8 @@ import BottomNav from "@/components/BottomNav";
 
 const USERNAME_RE = /^[a-z0-9][a-z0-9._]{1,18}[a-z0-9]$|^[a-z0-9]{3}$/;
 
+type FollowUser = { user_id: string; display_name: string | null; username: string | null; avatar_url: string | null };
+
 type FollowRequest = {
   user_id: string;
   display_name: string | null;
@@ -58,6 +60,10 @@ export default function ProfilePage() {
   const [followerCount, setFollowerCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
   const [followRequests, setFollowRequests] = useState<FollowRequest[]>([]);
+  const [showFollowModal, setShowFollowModal] = useState(false);
+  const [followModalMode, setFollowModalMode] = useState<"followers" | "following">("followers");
+  const [followModalUsers, setFollowModalUsers] = useState<FollowUser[]>([]);
+  const [followModalLoading, setFollowModalLoading] = useState(false);
 
   const fetchMe = useCallback(async () => {
     const token = await getAccessToken();
@@ -155,6 +161,19 @@ export default function ProfilePage() {
       setFollowRequests((prev) => prev.filter((r) => r.user_id !== requesterId));
       if (action === "accept") setFollowerCount((c) => c + 1);
     }
+  }
+
+  async function openFollowList(mode: "followers" | "following") {
+    setFollowModalMode(mode);
+    setFollowModalUsers([]);
+    setFollowModalLoading(true);
+    setShowFollowModal(true);
+    const token = await getAccessToken();
+    const endpoint = mode === "followers" ? "/api/v1/me/followers" : "/api/v1/me/following";
+    const res = await fetch(endpoint, { headers: { Authorization: `Bearer ${token}` } });
+    const data = await res.json().catch(() => ({}));
+    setFollowModalUsers(data?.[mode] ?? []);
+    setFollowModalLoading(false);
   }
 
   async function saveName() {
@@ -288,12 +307,12 @@ export default function ProfilePage() {
                   <p className="text-[14px] font-semibold mt-0.5" style={{ color: "var(--muted)" }}>@{username}</p>
                 )}
                 <div className="flex gap-4 mt-1.5">
-                  <span className="text-[13px]" style={{ color: "var(--muted)" }}>
+                  <button className="text-[13px]" style={{ color: "var(--muted)" }} onClick={() => openFollowList("followers")}>
                     <span className="font-bold" style={{ color: "var(--text)" }}>{followerCount.toLocaleString()}</span>{" "}followers
-                  </span>
-                  <span className="text-[13px]" style={{ color: "var(--muted)" }}>
+                  </button>
+                  <button className="text-[13px]" style={{ color: "var(--muted)" }} onClick={() => openFollowList("following")}>
                     <span className="font-bold" style={{ color: "var(--text)" }}>{followingCount.toLocaleString()}</span>{" "}following
-                  </span>
+                  </button>
                 </div>
               </div>
               <button
@@ -525,6 +544,52 @@ export default function ProfilePage() {
           log out
         </button>
       </div>
+      {showFollowModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
+          style={{ background: "rgba(0,0,0,0.7)" }}
+          onClick={() => setShowFollowModal(false)}
+        >
+          <div
+            className="w-full sm:max-w-sm rounded-t-3xl sm:rounded-2xl flex flex-col"
+            style={{ background: "var(--card)", maxHeight: "70vh" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 pt-5 pb-3">
+              <p className="text-[18px] font-black" style={{ fontFamily: "var(--font-nunito)" }}>{followModalMode}</p>
+              <button onClick={() => setShowFollowModal(false)} className="text-[18px]" style={{ color: "var(--muted)" }}>✕</button>
+            </div>
+            <div className="overflow-y-auto flex-1 px-5 pb-5">
+              {followModalLoading ? (
+                <p className="text-center py-8 text-sm" style={{ color: "var(--muted)" }}>loading...</p>
+              ) : followModalUsers.length === 0 ? (
+                <p className="text-center py-8 text-sm" style={{ color: "var(--muted)" }}>no {followModalMode} yet</p>
+              ) : (
+                <div className="flex flex-col divide-y" style={{ borderColor: "rgba(255,255,255,0.05)" }}>
+                  {followModalUsers.map((u) => {
+                    const uname = u.display_name ?? u.username ?? "unknown";
+                    return (
+                      <button
+                        key={u.user_id}
+                        className="flex items-center gap-3 py-3 text-left w-full"
+                        onClick={() => { if (u.username) { setShowFollowModal(false); router.push(`/u/${u.username}`); } }}
+                      >
+                        <div className="w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center text-[14px] font-black overflow-hidden" style={{ background: "var(--accent-dim)", color: "var(--accent)", fontFamily: "var(--font-nunito)" }}>
+                          {u.avatar_url ? <img src={u.avatar_url} alt="" className="w-9 h-9 rounded-full object-cover" /> : uname[0]?.toUpperCase() ?? "?"}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[14px] font-bold leading-tight truncate">{uname}</p>
+                          {u.username && <p className="text-[12px]" style={{ color: "var(--muted)" }}>@{u.username}</p>}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       <BottomNav />
     </div>
   );
