@@ -81,7 +81,7 @@ const SLIDES: Slide[] = [
     title: "earning points",
     body: "points are your prediction power. you never buy them — you earn them.",
     bullets: [
-      { text: "join jury duty  —  +500 pts" },
+      { text: "join jury duty  —  +300 pts" },
       { text: "nail a prediction  —  your points back + winnings" },
       { text: "create a prediction  —  +25 pts" },
       { text: "create a group or event  —  +50 pts" },
