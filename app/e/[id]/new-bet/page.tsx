@@ -467,7 +467,16 @@ export default function NewBetPage() {
 
           {visibility === "private" && guests.length > 0 && (
             <div className="mt-2 flex flex-col gap-2">
-              <p className="text-[11px]" style={{ color: "var(--dimmer)" }}>select who can see and join this bet</p>
+              <div className="flex items-center justify-between">
+                <p className="text-[11px]" style={{ color: "var(--dimmer)" }}>select who can see and join this bet</p>
+                <button
+                  onClick={() => setInvitedIds(invitedIds.length === guests.length ? [] : guests.map((g) => g.user_id))}
+                  className="text-[11px] font-bold"
+                  style={{ color: "var(--purple)" }}
+                >
+                  {invitedIds.length === guests.length ? "deselect all" : "select all"}
+                </button>
+              </div>
               {guests.map((g) => {
                 const selected = invitedIds.includes(g.user_id);
                 return (
