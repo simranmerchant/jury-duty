@@ -6,7 +6,7 @@ import BottomNav from "@/components/BottomNav";
 import { useEffect, useState, useCallback, useRef } from "react";
 
 type BetOption = { id: string; label: string };
-type FeedBet = {
+type EmbeddedBet = {
   id: string;
   question: string;
   deadline: string;
@@ -18,6 +18,18 @@ type FeedBet = {
   bet_entries: { user_id: string; option_id: string; points_staked: number }[];
   balances: { display_name: string | null; avatar_url: string | null; username: string | null } | null;
 };
+type FeedBet = EmbeddedBet & { type: "bet"; audience: string };
+type FeedPost = {
+  type: "post";
+  id: string;
+  user_id: string;
+  bet_id: string;
+  caption: string | null;
+  created_at: string;
+  balances: { display_name: string | null; avatar_url: string | null; username: string | null } | null;
+  bets: EmbeddedBet | null;
+};
+type FeedItem = FeedBet | FeedPost;
 
 function timeAgo(dateString: string): string {
   const seconds = Math.floor((Date.now() - new Date(dateString).getTime()) / 1000);
@@ -35,7 +47,7 @@ export default function FeedPage() {
   const { ready, authenticated, getAccessToken, user: privyUser } = usePrivy();
   const router = useRouter();
 
-  const [bets, setBets] = useState<FeedBet[]>([]);
+  const [items, setItems] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -79,10 +91,10 @@ export default function FeedPage() {
       setMyPoints(meData.points ?? null);
       setAvatarUrl(meData.avatar_url ?? null);
     }
-    const incoming: FeedBet[] = feedData.bets ?? [];
-    setBets((prev) => cursor ? [...prev, ...incoming] : incoming);
+    const incoming: FeedItem[] = feedData.items ?? [];
+    setItems((prev) => cursor ? [...prev, ...incoming] : incoming);
     setNextCursor(feedData.nextCursor ?? null);
-    // Mark all loaded bets as seen after this render
+    // Mark all loaded items as seen after this render
     setTimeout(() => {
       setSeenBetIds((prev) => {
         const next = new Set(prev);
@@ -133,9 +145,9 @@ export default function FeedPage() {
       body: JSON.stringify({ bet_id: betId, option_id: optionId, points: 50 }),
     });
     if (res.ok) {
-      setBets((prev) => prev.map((b) => b.id !== betId ? b : {
-        ...b,
-        bet_entries: [...b.bet_entries, { user_id: privyUser!.id, option_id: optionId, points_staked: 50 }],
+      setItems((prev) => prev.map((item) => {
+        if (item.type !== "bet" || item.id !== betId) return item;
+        return { ...item, bet_entries: [...item.bet_entries, { user_id: privyUser!.id, option_id: optionId, points_staked: 50 }] };
       }));
       if (myPoints !== null) setMyPoints((p) => (p ?? 0) - 50);
     }
@@ -151,7 +163,7 @@ export default function FeedPage() {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (res.ok) {
-      setBets((prev) => prev.filter((b) => b.id !== betId));
+      setItems((prev) => prev.filter((item) => item.id !== betId));
     }
     setDeletingId(null);
   }
@@ -231,7 +243,7 @@ export default function FeedPage() {
           </div>
         )}
 
-        {!feedError && bets.length === 0 && (
+        {!feedError && items.length === 0 && (
           <div className="flex flex-col items-center justify-center pt-20 gap-3">
             <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--muted)" }}>
               <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
@@ -243,7 +255,79 @@ export default function FeedPage() {
           </div>
         )}
 
-        {bets.map((bet) => {
+        {items.map((item) => {
+          if (item.type === "post") {
+            const bet = item.bets;
+            if (!bet) return null;
+            const sharer = item.balances;
+            const sharerName = sharer?.display_name ?? sharer?.username ?? "someone";
+            const totalStaked = bet.bet_entries.reduce((s, e) => s + e.points_staked, 0);
+            const winOpt = bet.winning_option_id ? bet.bet_options.find((o) => o.id === bet.winning_option_id) : null;
+            return (
+              <div key={`post-${item.id}`} className="rounded-[16px] p-4 flex flex-col gap-3"
+                style={{ background: "var(--card)", border: "1px solid var(--border-soft)" }}>
+                {/* Sharer row */}
+                <div className="flex items-center justify-between">
+                  <button className="flex items-center gap-2.5"
+                    onClick={() => sharer?.username && router.push(`/u/${sharer.username}`)}>
+                    <div className="rounded-full flex items-center justify-center overflow-hidden flex-shrink-0"
+                      style={{ width: 32, height: 32, background: "var(--accent-dim)", border: "1px solid var(--accent-border)" }}>
+                      {sharer?.avatar_url
+                        ? <img src={sharer.avatar_url} alt="" className="w-full h-full object-cover" />
+                        : <span className="text-[12px] font-black" style={{ color: "var(--accent)" }}>{sharerName[0]?.toUpperCase() ?? "?"}</span>
+                      }
+                    </div>
+                    <div className="text-left">
+                      <p className="text-[13px] font-bold leading-none" style={{ color: "var(--text)" }}>
+                        {sharerName} <span className="font-normal" style={{ color: "var(--muted)" }}>shared a prediction</span>
+                      </p>
+                      <p className="text-[11px] mt-0.5" style={{ color: "var(--muted)" }}>{timeAgo(item.created_at)}</p>
+                    </div>
+                  </button>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-[6px]"
+                    style={{ background: "var(--win-dim)", color: "var(--win)", border: "1px solid var(--win-border)" }}>
+                    resolved
+                  </span>
+                </div>
+                {/* Caption */}
+                {item.caption && <p className="text-[14px] leading-snug" style={{ color: "var(--text)" }}>{item.caption}</p>}
+                {/* Embedded bet */}
+                <div className="rounded-[12px] p-3 flex flex-col gap-2"
+                  style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                  <p className="text-[14px] font-bold leading-snug" style={{ color: "var(--text)" }}>{bet.question}</p>
+                  <div className="flex flex-col gap-1.5">
+                    {bet.bet_options.map((opt) => {
+                      const optTotal = bet.bet_entries.filter((e) => e.option_id === opt.id).reduce((s, e) => s + e.points_staked, 0);
+                      const pct = totalStaked > 0 ? Math.round((optTotal / totalStaked) * 100) : 0;
+                      const isWinner = bet.winning_option_id === opt.id;
+                      return (
+                        <div key={opt.id} className="rounded-[10px] p-2.5 flex flex-col gap-1.5"
+                          style={{ background: isWinner ? "var(--win-dim)" : "rgba(255,255,255,0.03)", border: `1px solid ${isWinner ? "var(--win-border)" : "rgba(255,255,255,0.06)"}` }}>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[13px] font-semibold" style={{ color: isWinner ? "var(--win)" : "var(--text)" }}>{opt.label}</span>
+                            <span className="text-[13px] font-bold" style={{ color: "var(--muted)" }}>{pct}%</span>
+                          </div>
+                          <div className="rounded-full overflow-hidden" style={{ height: 3, background: "rgba(255,255,255,0.06)" }}>
+                            <div className="h-full rounded-full" style={{ width: `${pct}%`, background: isWinner ? "var(--win-border)" : "rgba(255,255,255,0.18)" }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {winOpt && <p className="text-[12px] font-bold" style={{ color: "var(--win)" }}>✓ {winOpt.label} won</p>}
+                </div>
+                <div className="pt-1" style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}>
+                  <span className="text-[11px]" style={{ color: "var(--dimmer)" }}>
+                    {bet.bet_entries.length} {bet.bet_entries.length === 1 ? "vote" : "votes"}
+                    {totalStaked > 0 ? ` · ${totalStaked.toLocaleString()} pts` : ""}
+                  </span>
+                </div>
+              </div>
+            );
+          }
+
+          // type === "bet"
+          const bet = item;
           const myEntry = bet.bet_entries.find((e) => e.user_id === privyUser?.id);
           const isOpen = bet.status === "open" && new Date(bet.deadline) > new Date();
           const totalStaked = bet.bet_entries.reduce((s, e) => s + e.points_staked, 0);
@@ -252,7 +336,7 @@ export default function FeedPage() {
           const isVoting = votingId === bet.id;
 
           return (
-            <div key={bet.id} className="rounded-[16px] p-4 flex flex-col gap-3"
+            <div key={`bet-${bet.id}`} className="rounded-[16px] p-4 flex flex-col gap-3"
               style={{ background: "var(--card)", border: "1px solid var(--border-soft)" }}>
               {/* Creator row */}
               <div className="flex items-center justify-between">

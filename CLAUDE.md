@@ -27,6 +27,7 @@ Next.js web app + API backend for **Jury Duty** — a social prediction app wher
 - `feed/` — paginated social feed
 - `auth/init/` — create balance row on first login (new users start at 300 pts)
 - `comments/`, `reports/`, `join/`
+- `posts/` — share/unshare a resolved public bet to the social feed
 
 **Key lib files:**
 - `lib/supabase.ts` — Supabase client
@@ -35,7 +36,11 @@ Next.js web app + API backend for **Jury Duty** — a social prediction app wher
 - `lib/payout.ts` — bet resolution payout math (tested)
 - `lib/push.ts` / `lib/webpush.ts` — push notification helpers
 
-**Database:** migrations live in `supabase/migrations/`. Latest is `034_default_points_300.sql`. Apply with `npx supabase db push` after linking (`supabase link --project-ref gfcipzuqaldyebocmypw`).
+**Database:** migrations live in `supabase/migrations/`. Latest is `035_posts.sql` (posts table for feed sharing). Apply with `npx supabase db push` after linking (`supabase link --project-ref gfcipzuqaldyebocmypw`).
+
+**Key API routes added:**
+- `posts/` — POST to share a resolved bet to feed; DELETE to unshare (by `?bet_id=`)
+- `users/[id]/followers/`, `users/[id]/following/` — list followers/following for any user
 
 **Current branch for ETHGlobal work:** `feat/ethglobal-prizes` (not merged to main).
 

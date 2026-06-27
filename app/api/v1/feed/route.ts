@@ -12,7 +12,6 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const cursor = searchParams.get("cursor"); // created_at ISO string for pagination
 
-  // Get followed user IDs (accepted follows only)
   const { data: followRows } = await supabase
     .from("follows")
     .select("following_id")
@@ -20,15 +19,14 @@ export async function GET(req: NextRequest) {
     .eq("status", "accepted");
 
   const followedIds = (followRows ?? []).map((r) => r.following_id as string);
-
-  // Include own posts in feed
   const feedUserIds = [...new Set([user.userId, ...followedIds])];
 
   if (feedUserIds.length === 0) {
-    return NextResponse.json({ bets: [], nextCursor: null });
+    return NextResponse.json({ items: [], nextCursor: null });
   }
 
-  let query = supabase
+  // Query feed bets and posts in parallel, fetching extra so merged sort is accurate
+  const betQuery = supabase
     .from("bets")
     .select(`
       id, question, deadline, status, winning_option_id, creator_id, created_at, audience,
@@ -41,17 +39,39 @@ export async function GET(req: NextRequest) {
     .eq("audience", "followers")
     .in("creator_id", feedUserIds)
     .order("created_at", { ascending: false })
-    .limit(20);
+    .limit(25);
 
-  if (cursor) {
-    query = query.lt("created_at", cursor);
-  }
+  const postQuery = supabase
+    .from("posts")
+    .select(`
+      id, user_id, bet_id, caption, created_at,
+      balances:user_id(display_name, avatar_url, username),
+      bets:bet_id(
+        id, question, deadline, status, winning_option_id, creator_id, created_at,
+        bet_options!bet_id(id, label),
+        bet_entries(user_id, option_id, points_staked),
+        balances:creator_id(display_name, avatar_url, username)
+      )
+    `)
+    .in("user_id", feedUserIds)
+    .order("created_at", { ascending: false })
+    .limit(25);
 
-  const { data: bets, error } = await query;
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  const applyCursor = (q: any) => cursor ? q.lt("created_at", cursor) : q;
 
-  const list = bets ?? [];
-  const nextCursor = list.length === 20 ? list[list.length - 1].created_at : null;
+  const [{ data: bets }, { data: posts }] = await Promise.all([
+    applyCursor(betQuery),
+    applyCursor(postQuery),
+  ]);
 
-  return NextResponse.json({ bets: list, nextCursor });
+  const betItems = (bets ?? []).map((b: any) => ({ type: "bet" as const, ...b }));
+  const postItems = (posts ?? []).map((p: any) => ({ type: "post" as const, ...p }));
+
+  const merged = [...betItems, ...postItems]
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .slice(0, 20);
+
+  const nextCursor = merged.length === 20 ? merged[merged.length - 1].created_at : null;
+
+  return NextResponse.json({ items: merged, nextCursor });
 }
