@@ -1098,7 +1098,7 @@ function BetCard({
       style={{
         background: "var(--card)",
         border: `1px solid ${isOpen && urgency === "critical" ? "rgba(239,68,68,0.35)" : isOpen && urgency === "soon" ? "rgba(245,158,11,0.35)" : "var(--border-soft)"}`,
-        opacity: bet.status === "resolved" || isPast ? 0.45 : 1,
+        opacity: 1,
       }}
     >
       {/* Blur overlay for private bets */}

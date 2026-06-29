@@ -143,7 +143,7 @@ export default function EventsPage() {
           background: "var(--card)",
           border: `1px solid var(--border)`,
           borderLeft: isGroup ? "2px solid var(--purple-border)" : "1px solid var(--border)",
-          opacity: isPast ? 0.3 : 1,
+          opacity: 1,
         }}
       >
         {/* Thumb */}
