@@ -245,7 +245,7 @@ export default function EventPage() {
   const isGroup = event.type === "group";
   const isClosed = !isGroup && !!event.ends_at && new Date(event.ends_at) < new Date();
   const guestCount = event.event_guests?.length ?? 0;
-  const byNewest = (a: { created_at: string }, b: { created_at: string }) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  const byNewest = (a: { created_at: string }, b: { created_at: string }) => (b.created_at > a.created_at ? 1 : b.created_at < a.created_at ? -1 : 0);
   const openBets = (event.bets?.filter((b) => b.status === "open") ?? []).slice().sort(byNewest);
   const resolvedBets = (event.bets?.filter((b) => b.status === "resolved") ?? []).slice().sort(byNewest);
 
