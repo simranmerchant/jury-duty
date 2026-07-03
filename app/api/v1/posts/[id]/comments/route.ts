@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/privy";
 import { supabase } from "@/lib/supabase";
+import { validateComment } from "@/lib/comment-validation";
 
 export async function GET(
   req: NextRequest,
@@ -38,12 +39,12 @@ export async function POST(
   const { id: postId } = await params;
   const { body, gif_url } = await req.json().catch(() => ({}));
 
-  if (!body?.trim() && !gif_url) return NextResponse.json({ error: "comment or gif required" }, { status: 400 });
-  if (body?.trim() && body.trim().length > 500) return NextResponse.json({ error: "max 500 chars" }, { status: 400 });
+  const validation = validateComment(body, gif_url);
+  if (!validation.ok) return NextResponse.json({ error: validation.error }, { status: 400 });
 
   const insert: Record<string, unknown> = { post_id: postId, user_id: user.userId };
-  if (body?.trim()) insert.body = body.trim();
-  if (gif_url) insert.gif_url = gif_url;
+  if (validation.body) insert.body = validation.body;
+  if (validation.gif_url) insert.gif_url = validation.gif_url;
 
   const { data, error } = await supabase
     .from("post_comments")

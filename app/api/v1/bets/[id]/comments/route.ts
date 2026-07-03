@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/privy";
 import { supabase } from "@/lib/supabase";
 import { sendPushToUsers } from "@/lib/push";
+import { validateComment } from "@/lib/comment-validation";
 
 export async function GET(
   req: NextRequest,
@@ -39,12 +40,12 @@ export async function POST(
   const { id: betId } = await params;
   const { body, parentId, gif_url } = await req.json();
 
-  if (!body?.trim() && !gif_url) return NextResponse.json({ error: "comment or gif required" }, { status: 400 });
-  if (body?.trim() && body.trim().length > 500) return NextResponse.json({ error: "max 500 chars" }, { status: 400 });
+  const validation = validateComment(body, gif_url);
+  if (!validation.ok) return NextResponse.json({ error: validation.error }, { status: 400 });
 
   const insert: Record<string, unknown> = { bet_id: betId, user_id: user.userId };
-  if (body?.trim()) insert.body = body.trim();
-  if (gif_url) insert.gif_url = gif_url;
+  if (validation.body) insert.body = validation.body;
+  if (validation.gif_url) insert.gif_url = validation.gif_url;
   if (parentId) insert.parent_id = parentId;
 
   const { data, error } = await supabase
@@ -56,7 +57,8 @@ export async function POST(
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   // Fetch bet + sender profile for notifications (always needed now)
-  const mentionedUsernames = [...body.trim().matchAll(/@(\w+)/g)].map((m) => m[1]);
+  const commentBody = validation.body ?? "";
+  const mentionedUsernames = [...commentBody.matchAll(/@(\w+)/g)].map((m) => m[1]);
   const [senderProfileRes, betRes, mentionedRes] = await Promise.all([
     supabase.from("balances").select("display_name, username").eq("user_id", user.userId).single(),
     supabase.from("bets").select("event_id, creator_id, question").eq("id", betId).single(),
@@ -83,13 +85,13 @@ export async function POST(
           user_id: uid,
           type: "comment_mention",
           title: `${senderName} mentioned you`,
-          body: body.trim().slice(0, 80),
+          body: commentBody.slice(0, 80),
           data: notifData,
         }))
       ),
       sendPushToUsers(mentionedIds, {
         title: `${senderName} mentioned you in a comment`,
-        body: body.trim().slice(0, 80),
+        body: commentBody.slice(0, 80),
         data: notifData,
       }),
     ]);
@@ -102,12 +104,12 @@ export async function POST(
         user_id: creatorId,
         type: "comment_on_bet",
         title: `${senderName} commented on your prediction`,
-        body: body.trim().slice(0, 80),
+        body: commentBody.slice(0, 80),
         data: notifData,
       }),
       sendPushToUsers([creatorId], {
         title: `${senderName} commented on your prediction`,
-        body: body.trim().slice(0, 80),
+        body: commentBody.slice(0, 80),
         data: notifData,
       }),
     ]);
