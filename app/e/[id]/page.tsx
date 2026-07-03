@@ -999,7 +999,7 @@ function BetCard({
   const winOpt = bet.winning_option_id ? bet.bet_options.find((o) => o.id === bet.winning_option_id) : null;
   const canBet = isOpen && !isPast && !myEntry && !resolving;
   const past24h = isPast && new Date() > new Date(new Date(bet.deadline).getTime() + 24 * 60 * 60 * 1000);
-  const canResolve = isOpen && (bet.creator_id === userId || (past24h && !!userId));
+  const canResolve = isOpen && (bet.creator_id === userId || isHost || (past24h && !!userId));
 
   async function placeBet() {
     if (!selectedOption || placing) return;
@@ -1632,7 +1632,7 @@ function BetCard({
               </button>
             </>
           )}
-          {bet.creator_id === userId && (
+          {(bet.creator_id === userId || isHost) && (
             confirmDeleteBet ? (
               <button
                 onClick={deleteBet}
