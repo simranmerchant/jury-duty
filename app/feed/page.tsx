@@ -19,7 +19,8 @@ type EmbeddedBet = {
   balances: { display_name: string | null; avatar_url: string | null; username: string | null } | null;
 };
 type FeedBet = EmbeddedBet & { type: "bet"; audience: string };
-type PostComment = { id: string; body: string; created_at: string; user_id: string; balances?: { display_name: string | null; avatar_url: string | null; username?: string | null } | null };
+type GifResult = { id: string; images: { fixed_height: { url: string }; fixed_height_small: { url: string } } };
+type PostComment = { id: string; body?: string | null; gif_url?: string | null; created_at: string; user_id: string; balances?: { display_name: string | null; avatar_url: string | null; username?: string | null } | null };
 type FeedPost = {
   type: "post";
   id: string;
@@ -522,6 +523,11 @@ function PostCard({
   const [deleting, setDeleting] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const [pendingGif, setPendingGif] = useState<string | null>(null);
+  const [gifPickerOpen, setGifPickerOpen] = useState(false);
+  const [gifSearch, setGifSearch] = useState("");
+  const [gifResults, setGifResults] = useState<GifResult[]>([]);
+  const [gifLoading, setGifLoading] = useState(false);
 
   useEffect(() => {
     if (!showMenu) return;
@@ -547,21 +553,39 @@ function PostCard({
     setCommentsLoading(false);
   }
 
+  async function searchGifs(query: string) {
+    setGifLoading(true);
+    const key = process.env.NEXT_PUBLIC_GIPHY_API_KEY;
+    const endpoint = query.trim()
+      ? `https://api.giphy.com/v1/gifs/search?api_key=${key}&q=${encodeURIComponent(query)}&limit=24&rating=pg-13`
+      : `https://api.giphy.com/v1/gifs/trending?api_key=${key}&limit=24&rating=pg-13`;
+    const res = await fetch(endpoint);
+    const data = await res.json();
+    setGifResults(data.data ?? []);
+    setGifLoading(false);
+  }
+
   async function submitComment(e: React.FormEvent) {
     e.preventDefault();
-    if (!commentInput.trim() || submitting) return;
+    if (!commentInput.trim() && !pendingGif) return;
+    if (submitting) return;
     setSubmitting(true);
     const token = await getAccessToken();
+    const payload: Record<string, unknown> = {};
+    if (commentInput.trim()) payload.body = commentInput.trim();
+    if (pendingGif) payload.gif_url = pendingGif;
     const res = await fetch(`/api/v1/posts/${item.id}/comments`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ body: commentInput.trim() }),
+      body: JSON.stringify(payload),
     });
     const data = await res.json().catch(() => ({}));
     if (res.ok) {
       setComments((prev) => [...prev, data.comment]);
       setCommentCount((c) => c + 1);
       setCommentInput("");
+      setPendingGif(null);
+      setGifPickerOpen(false);
     }
     setSubmitting(false);
   }
@@ -704,7 +728,8 @@ function PostCard({
                     </div>
                     <div className="flex-1">
                       <p className="text-[12px] font-bold" style={{ color: "var(--text)" }}>{name}</p>
-                      <p className="text-[13px] mt-0.5" style={{ color: "var(--text)" }}>{c.body}</p>
+                      {c.body && <p className="text-[13px] mt-0.5" style={{ color: "var(--text)" }}>{c.body}</p>}
+                      {c.gif_url && <img src={c.gif_url} alt="gif" className="rounded-xl mt-1" style={{ maxWidth: 200, maxHeight: 150, objectFit: "cover" }} />}
                     </div>
                     {c.user_id === currentUserId && (
                       <button onClick={() => deleteComment(c.id)} className="text-[11px] self-start mt-1" style={{ color: "var(--dimmer)" }}>✕</button>
@@ -713,19 +738,60 @@ function PostCard({
                 );
               })}
             </div>
-            <form onSubmit={submitComment} className="flex gap-2 px-6 py-4 flex-shrink-0" style={{ borderTop: "1px solid var(--border-soft)" }}>
-              <input
-                value={commentInput}
-                onChange={(e) => setCommentInput(e.target.value)}
-                placeholder="add a comment..."
-                maxLength={500}
-                className="flex-1 text-[14px] px-4 py-3 rounded-2xl outline-none"
-                style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--border-soft)", color: "var(--text)" }}
-              />
-              <button type="submit" disabled={!commentInput.trim() || submitting} className="px-4 py-3 rounded-2xl text-[14px] font-bold text-white disabled:opacity-40" style={{ background: "var(--accent)" }}>
-                post
-              </button>
-            </form>
+            <div className="flex-shrink-0" style={{ borderTop: "1px solid var(--border-soft)" }}>
+              {gifPickerOpen && (
+                <div className="px-4 pt-3 pb-2 flex flex-col gap-2">
+                  <input
+                    autoFocus
+                    placeholder="search GIFs..."
+                    value={gifSearch}
+                    onChange={(e) => { setGifSearch(e.target.value); searchGifs(e.target.value); }}
+                    onFocus={() => { if (gifResults.length === 0) searchGifs(""); }}
+                    className="w-full text-[13px] px-3 py-2 rounded-xl outline-none"
+                    style={{ background: "rgba(255,255,255,0.07)", border: "1px solid var(--border-soft)", color: "var(--text)" }}
+                  />
+                  <div className="grid grid-cols-4 gap-1 overflow-y-auto" style={{ maxHeight: 180 }}>
+                    {gifLoading
+                      ? <p className="col-span-4 text-center text-[12px] py-4" style={{ color: "var(--dimmer)" }}>loading...</p>
+                      : gifResults.map((g) => (
+                        <button key={g.id} type="button" onClick={() => { setPendingGif(g.images.fixed_height.url); setGifPickerOpen(false); setGifSearch(""); setGifResults([]); }} className="rounded-lg overflow-hidden aspect-square">
+                          <img src={g.images.fixed_height_small.url} alt="gif" className="w-full h-full object-cover" />
+                        </button>
+                      ))
+                    }
+                  </div>
+                </div>
+              )}
+              {pendingGif && (
+                <div className="px-6 pt-2 flex items-start gap-2">
+                  <div className="relative">
+                    <img src={pendingGif} alt="gif" className="rounded-xl" style={{ maxHeight: 100, maxWidth: 160 }} />
+                    <button onClick={() => setPendingGif(null)} className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold" style={{ background: "var(--card)", border: "1px solid var(--border-soft)", color: "var(--muted)" }}>✕</button>
+                  </div>
+                </div>
+              )}
+              <form onSubmit={submitComment} className="flex gap-2 px-6 py-3 items-center">
+                <input
+                  value={commentInput}
+                  onChange={(e) => setCommentInput(e.target.value)}
+                  placeholder="add a comment..."
+                  maxLength={500}
+                  className="flex-1 text-[14px] px-4 py-3 rounded-2xl outline-none"
+                  style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--border-soft)", color: "var(--text)" }}
+                />
+                <button
+                  type="button"
+                  onClick={() => { setGifPickerOpen((v) => !v); if (!gifPickerOpen && gifResults.length === 0) searchGifs(""); }}
+                  className="px-3 py-3 rounded-2xl text-[12px] font-black"
+                  style={{ background: gifPickerOpen ? "var(--accent-dim)" : "rgba(255,255,255,0.05)", border: `1px solid ${gifPickerOpen ? "var(--accent-border)" : "var(--border-soft)"}`, color: gifPickerOpen ? "var(--accent)" : "var(--dimmer)" }}
+                >
+                  GIF
+                </button>
+                <button type="submit" disabled={(!commentInput.trim() && !pendingGif) || submitting} className="px-4 py-3 rounded-2xl text-[14px] font-bold text-white disabled:opacity-40" style={{ background: "var(--accent)" }}>
+                  post
+                </button>
+              </form>
+            </div>
           </div>
         </div>
       )}
