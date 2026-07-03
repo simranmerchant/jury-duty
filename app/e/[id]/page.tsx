@@ -9,7 +9,8 @@ import { parseQuestion, extractTaggedUserIds, insertMentionAt, removeMention, ge
 type BetOption = { id: string; label: string; tagged_user_id?: string | null; balances?: { display_name: string | null; avatar_url: string | null; username?: string | null } | null };
 type BetEntry = { id: string; user_id: string; option_id: string; points_staked: number; is_anonymous: boolean; balances?: { display_name: string | null; avatar_url: string | null } };
 type BetInvite = { user_id: string };
-type BetComment = { id: string; body: string; created_at: string; user_id: string; parent_id?: string | null; balances?: { display_name: string | null; avatar_url: string | null; username?: string | null } | null; comment_likes?: { user_id: string }[] };
+type GifResult = { id: string; images: { fixed_height: { url: string }; fixed_height_small: { url: string } } };
+type BetComment = { id: string; body?: string | null; gif_url?: string | null; created_at: string; user_id: string; parent_id?: string | null; balances?: { display_name: string | null; avatar_url: string | null; username?: string | null } | null; comment_likes?: { user_id: string }[] };
 type BetReaction = { user_id: string; emoji: string };
 type Bet = {
   id: string;
@@ -668,6 +669,11 @@ function BetCard({
   const [replyingTo, setReplyingTo] = useState<{ id: string; name: string } | null>(null);
   const [expandedThreads, setExpandedThreads] = useState<Set<string>>(new Set());
   const commentInputRef = useRef<HTMLInputElement>(null);
+  const [pendingGif, setPendingGif] = useState<string | null>(null);
+  const [gifPickerOpen, setGifPickerOpen] = useState(false);
+  const [gifSearch, setGifSearch] = useState("");
+  const [gifResults, setGifResults] = useState<GifResult[]>([]);
+  const [gifLoading, setGifLoading] = useState(false);
 
   // Reactions
   const [reactions, setReactions] = useState<BetReaction[]>(bet.bet_reactions ?? []);
@@ -691,18 +697,36 @@ function BetCard({
     setCommentsLoading(false);
   }
 
+  async function searchGifs(query: string) {
+    setGifLoading(true);
+    const key = process.env.NEXT_PUBLIC_GIPHY_API_KEY;
+    const endpoint = query.trim()
+      ? `https://api.giphy.com/v1/gifs/search?api_key=${key}&q=${encodeURIComponent(query)}&limit=24&rating=pg-13`
+      : `https://api.giphy.com/v1/gifs/trending?api_key=${key}&limit=24&rating=pg-13`;
+    const res = await fetch(endpoint);
+    const data = await res.json();
+    setGifResults(data.data ?? []);
+    setGifLoading(false);
+  }
+
   async function submitComment(e: React.FormEvent) {
     e.preventDefault();
-    if (!commentInput.trim() || submittingComment) return;
+    if (!commentInput.trim() && !pendingGif) return;
+    if (submittingComment) return;
     setSubmittingComment(true);
     const token = await getAccessToken();
+    const payload: Record<string, unknown> = { parentId: replyingTo?.id ?? null };
+    if (commentInput.trim()) payload.body = commentInput.trim();
+    if (pendingGif) payload.gif_url = pendingGif;
     const res = await fetch(`/api/v1/bets/${bet.id}/comments`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ body: commentInput.trim(), parentId: replyingTo?.id ?? null }),
+      body: JSON.stringify(payload),
     });
     if (res.ok) {
       setCommentInput("");
+      setPendingGif(null);
+      setGifPickerOpen(false);
       setReplyingTo(null);
       if (replyingTo) setExpandedThreads((s) => new Set([...s, replyingTo.id]));
       fetchComments();
@@ -1726,13 +1750,16 @@ function BetCard({
                             : (c.balances?.display_name?.[0] ?? "?").toUpperCase()}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-baseline gap-1.5 flex-wrap">
+                          <div className="flex flex-col gap-1">
                             <span className="text-[13px] font-bold" style={{ color: "var(--muted)" }}>{c.balances?.display_name ?? "unknown"}</span>
-                            <span className="text-[14px]" style={{ color: "var(--text)" }}>
-                              {c.body.split(/(@\w+)/g).map((part, i) =>
-                                part.startsWith("@") ? <span key={i} className="font-bold" style={{ color: "var(--accent)" }}>{part}</span> : part
-                              )}
-                            </span>
+                            {c.body && (
+                              <span className="text-[14px]" style={{ color: "var(--text)" }}>
+                                {c.body.split(/(@\w+)/g).map((part, i) =>
+                                  part.startsWith("@") ? <span key={i} className="font-bold" style={{ color: "var(--accent)" }}>{part}</span> : part
+                                )}
+                              </span>
+                            )}
+                            {c.gif_url && <img src={c.gif_url} alt="gif" className="rounded-xl mt-0.5" style={{ maxWidth: 220, maxHeight: 160, objectFit: "cover" }} />}
                           </div>
                           <div className="flex items-center gap-4 mt-1.5">
                             <button onClick={() => toggleCommentLike(c.id)} className="text-[12px] font-bold flex items-center gap-1" style={{ color: c.comment_likes?.some((l) => l.user_id === userId) ? "var(--accent)" : "var(--dimmer)" }}>
@@ -1756,13 +1783,16 @@ function BetCard({
                               : (r.balances?.display_name?.[0] ?? "?").toUpperCase()}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-baseline gap-1.5 flex-wrap">
+                            <div className="flex flex-col gap-1">
                               <span className="text-[12px] font-bold" style={{ color: "var(--muted)" }}>{r.balances?.display_name ?? "unknown"}</span>
-                              <span className="text-[13px]" style={{ color: "var(--text)" }}>
-                                {r.body.split(/(@\w+)/g).map((part, i) =>
-                                  part.startsWith("@") ? <span key={i} className="font-bold" style={{ color: "var(--accent)" }}>{part}</span> : part
-                                )}
-                              </span>
+                              {r.body && (
+                                <span className="text-[13px]" style={{ color: "var(--text)" }}>
+                                  {r.body.split(/(@\w+)/g).map((part, i) =>
+                                    part.startsWith("@") ? <span key={i} className="font-bold" style={{ color: "var(--accent)" }}>{part}</span> : part
+                                  )}
+                                </span>
+                              )}
+                              {r.gif_url && <img src={r.gif_url} alt="gif" className="rounded-xl mt-0.5" style={{ maxWidth: 200, maxHeight: 150, objectFit: "cover" }} />}
                             </div>
                             <div className="flex items-center gap-4 mt-1.5">
                               <button onClick={() => toggleCommentLike(r.id)} className="text-[12px] font-bold flex items-center gap-1" style={{ color: r.comment_likes?.some((l) => l.user_id === userId) ? "var(--accent)" : "var(--dimmer)" }}>
@@ -1802,21 +1832,64 @@ function BetCard({
                 <button onClick={() => { setReplyingTo(null); setCommentInput(""); }} className="text-[11px]" style={{ color: "var(--dimmer)" }}>×</button>
               </div>
             )}
-            <form onSubmit={submitComment} className="flex gap-2 px-6 py-4 flex-shrink-0" style={{ borderTop: "1px solid var(--border-soft)" }}>
-              <input
-                ref={commentInputRef}
-                value={commentInput}
-                onChange={(e) => { const val = e.target.value; setCommentInput(val); const atIdx = val.lastIndexOf("@"); if (atIdx !== -1 && (atIdx === 0 || val[atIdx - 1] === " ")) { setCommentMentionSearch(val.slice(atIdx + 1)); } else { setCommentMentionSearch(null); } }}
-                onKeyDown={(e) => { if (e.key === "Escape") { setCommentMentionSearch(null); setReplyingTo(null); setCommentInput(""); } }}
-                placeholder={replyingTo ? `reply to @${replyingTo.name}...` : "add a comment... (@ to mention)"}
-                maxLength={500}
-                className="flex-1 text-[14px] px-4 py-3 rounded-2xl outline-none"
-                style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--border-soft)", color: "var(--text)" }}
-              />
-              <button type="submit" disabled={!commentInput.trim() || submittingComment} className="px-4 py-3 rounded-2xl text-[14px] font-bold text-white disabled:opacity-40" style={{ background: "var(--accent)" }}>
-                post
-              </button>
-            </form>
+            <div className="flex-shrink-0" style={{ borderTop: "1px solid var(--border-soft)" }}>
+              {/* GIF picker */}
+              {gifPickerOpen && (
+                <div className="px-4 pt-3 pb-2 flex flex-col gap-2">
+                  <input
+                    autoFocus
+                    placeholder="search GIFs..."
+                    value={gifSearch}
+                    onChange={(e) => { setGifSearch(e.target.value); searchGifs(e.target.value); }}
+                    onFocus={() => { if (gifResults.length === 0) searchGifs(""); }}
+                    className="w-full text-[13px] px-3 py-2 rounded-xl outline-none"
+                    style={{ background: "rgba(255,255,255,0.07)", border: "1px solid var(--border-soft)", color: "var(--text)" }}
+                  />
+                  <div className="grid grid-cols-4 gap-1 overflow-y-auto" style={{ maxHeight: 180 }}>
+                    {gifLoading
+                      ? <p className="col-span-4 text-center text-[12px] py-4" style={{ color: "var(--dimmer)" }}>loading...</p>
+                      : gifResults.map((g) => (
+                        <button key={g.id} type="button" onClick={() => { setPendingGif(g.images.fixed_height.url); setGifPickerOpen(false); setGifSearch(""); setGifResults([]); }} className="rounded-lg overflow-hidden aspect-square">
+                          <img src={g.images.fixed_height_small.url} alt="gif" className="w-full h-full object-cover" />
+                        </button>
+                      ))
+                    }
+                  </div>
+                </div>
+              )}
+              {/* Pending GIF preview */}
+              {pendingGif && (
+                <div className="px-6 pt-2 flex items-start gap-2">
+                  <div className="relative">
+                    <img src={pendingGif} alt="gif" className="rounded-xl" style={{ maxHeight: 100, maxWidth: 160 }} />
+                    <button onClick={() => setPendingGif(null)} className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold" style={{ background: "var(--card)", border: "1px solid var(--border-soft)", color: "var(--muted)" }}>✕</button>
+                  </div>
+                </div>
+              )}
+              <form onSubmit={submitComment} className="flex gap-2 px-6 py-3 items-center">
+                <input
+                  ref={commentInputRef}
+                  value={commentInput}
+                  onChange={(e) => { const val = e.target.value; setCommentInput(val); const atIdx = val.lastIndexOf("@"); if (atIdx !== -1 && (atIdx === 0 || val[atIdx - 1] === " ")) { setCommentMentionSearch(val.slice(atIdx + 1)); } else { setCommentMentionSearch(null); } }}
+                  onKeyDown={(e) => { if (e.key === "Escape") { setCommentMentionSearch(null); setReplyingTo(null); setCommentInput(""); } }}
+                  placeholder={replyingTo ? `reply to @${replyingTo.name}...` : "add a comment..."}
+                  maxLength={500}
+                  className="flex-1 text-[14px] px-4 py-3 rounded-2xl outline-none"
+                  style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--border-soft)", color: "var(--text)" }}
+                />
+                <button
+                  type="button"
+                  onClick={() => { setGifPickerOpen((v) => !v); if (!gifPickerOpen && gifResults.length === 0) searchGifs(""); }}
+                  className="px-3 py-3 rounded-2xl text-[12px] font-black"
+                  style={{ background: gifPickerOpen ? "var(--accent-dim)" : "rgba(255,255,255,0.05)", border: `1px solid ${gifPickerOpen ? "var(--accent-border)" : "var(--border-soft)"}`, color: gifPickerOpen ? "var(--accent)" : "var(--dimmer)" }}
+                >
+                  GIF
+                </button>
+                <button type="submit" disabled={(!commentInput.trim() && !pendingGif) || submittingComment} className="px-4 py-3 rounded-2xl text-[14px] font-bold text-white disabled:opacity-40" style={{ background: "var(--accent)" }}>
+                  post
+                </button>
+              </form>
+            </div>
           </div>
         </div>
       )}
