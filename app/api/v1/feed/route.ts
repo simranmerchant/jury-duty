@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
   const postQuery = supabase
     .from("posts")
     .select(`
-      id, user_id, bet_id, caption, created_at,
+      id, user_id, bet_id, caption, photo_url, created_at,
       balances:user_id(display_name, avatar_url, username),
       post_likes(user_id),
       post_comments!post_id(id),

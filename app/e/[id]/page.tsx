@@ -12,6 +12,14 @@ type BetInvite = { user_id: string };
 type GifResult = { id: string; images: { fixed_height: { url: string }; fixed_height_small: { url: string } } };
 type BetComment = { id: string; body?: string | null; gif_url?: string | null; created_at: string; user_id: string; parent_id?: string | null; balances?: { display_name: string | null; avatar_url: string | null; username?: string | null } | null; comment_likes?: { user_id: string }[] };
 type BetReaction = { user_id: string; emoji: string };
+type BetPost = {
+  id: string;
+  user_id: string;
+  caption: string | null;
+  photo_url: string | null;
+  created_at: string;
+  balances: { display_name: string | null; avatar_url: string | null; username: string | null } | null;
+};
 type Bet = {
   id: string;
   question: string;
@@ -28,6 +36,7 @@ type Bet = {
   bet_invites: BetInvite[];
   bet_reactions: BetReaction[];
   bet_comments?: { id: string }[];
+  posts?: BetPost[];
 };
 type Guest = { user_id: string; balances?: { display_name: string | null; avatar_url: string | null; username?: string | null } };
 type Event = {
@@ -686,6 +695,9 @@ function BetCard({
   const [shareCaption, setShareCaption] = useState("");
   const [sharingToFeed, setSharingToFeed] = useState(false);
   const [sharedToFeed, setSharedToFeed] = useState(false);
+  const [sharePhoto, setSharePhoto] = useState<File | null>(null);
+  const [sharePhotoPreview, setSharePhotoPreview] = useState<string | null>(null);
+  const sharePhotoInputRef = useRef<HTMLInputElement>(null);
 
   async function fetchComments() {
     setCommentsLoading(true);
@@ -955,19 +967,55 @@ function BetCard({
       setTimeout(() => setBetSharedCopied(false), 2000);
     }
   }
+  async function compressPhoto(file: File): Promise<Blob> {
+    const img = new Image();
+    const objUrl = URL.createObjectURL(file);
+    img.src = objUrl;
+    await new Promise<void>((r) => { img.onload = () => r(); });
+    URL.revokeObjectURL(objUrl);
+    const MAX = 1400;
+    let { width, height } = img;
+    if (width > MAX) { height = Math.round(height * MAX / width); width = MAX; }
+    if (height > MAX) { width = Math.round(width * MAX / height); height = MAX; }
+    const canvas = document.createElement("canvas");
+    canvas.width = width; canvas.height = height;
+    canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
+    return new Promise<Blob>((r) => canvas.toBlob((b) => r(b!), "image/jpeg", 0.85));
+  }
+
   async function shareToFeed() {
+    if (sharingToFeed) return;
     setSharingToFeed(true);
+    let photoUrl: string | undefined;
+    if (sharePhoto) {
+      const blob = await compressPhoto(sharePhoto);
+      const fd = new FormData();
+      fd.append("file", blob, "photo.jpg");
+      const token = await getAccessToken();
+      const uploadRes = await fetch("/api/v1/posts/upload", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      });
+      if (uploadRes.ok) {
+        const d = await uploadRes.json();
+        photoUrl = d.photo_url;
+      }
+    }
     const token = await getAccessToken();
     const res = await fetch("/api/v1/posts", {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ bet_id: bet.id, caption: shareCaption.trim() || undefined }),
+      body: JSON.stringify({ bet_id: bet.id, caption: shareCaption.trim() || undefined, photo_url: photoUrl }),
     });
     setSharingToFeed(false);
     if (res.ok) {
       setSharedToFeed(true);
       setShowShareFeed(false);
       setShareCaption("");
+      setSharePhoto(null);
+      setSharePhotoPreview(null);
+      onUpdate();
     }
   }
 
@@ -1655,6 +1703,34 @@ function BetCard({
         </div>
       )}
 
+      {/* Photo carousel — posts from people who shared with a photo */}
+      {bet.status === "resolved" && (bet.posts ?? []).some((p) => p.photo_url) && (
+        <div className="mt-4 -mx-4 px-4 overflow-x-auto flex gap-3 pb-1" style={{ scrollbarWidth: "none" }}>
+          {(bet.posts ?? []).filter((p) => p.photo_url).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()).map((post) => {
+            const name = post.balances?.display_name ?? post.balances?.username ?? "someone";
+            const handle = post.balances?.username ? `@${post.balances.username}` : name;
+            return (
+              <a key={post.id} href="/feed"
+                className="flex-shrink-0 rounded-[14px] overflow-hidden flex flex-col cursor-pointer"
+                style={{ width: 220, background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-soft)", textDecoration: "none" }}
+              >
+                <img src={post.photo_url!} alt="" className="w-full object-cover" style={{ height: 140 }} />
+                <div className="p-3 flex flex-col gap-1.5">
+                  <div className="flex items-center gap-1.5">
+                    {post.balances?.avatar_url
+                      ? <img src={post.balances.avatar_url} alt="" className="w-5 h-5 rounded-full object-cover flex-shrink-0" />
+                      : <div className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold flex-shrink-0" style={{ background: "var(--accent)", color: "#fff" }}>{name[0]?.toUpperCase() ?? "?"}</div>
+                    }
+                    <span className="text-[11px] font-semibold truncate" style={{ color: "var(--muted)" }}>{handle}</span>
+                  </div>
+                  {post.caption && <p className="text-[12px] leading-snug line-clamp-3" style={{ color: "var(--text)" }}>{post.caption}</p>}
+                </div>
+              </a>
+            );
+          })}
+        </div>
+      )}
+
       {/* Reactions + comment button — single row with border-top */}
       {(() => {
         const grouped = EMOJIS.map((e) => ({ emoji: e, users: reactions.filter((r) => r.emoji === e) })).filter((g) => g.users.length > 0);
@@ -1902,13 +1978,13 @@ function BetCard({
       <div
         className="fixed inset-0 z-50 flex items-end justify-center"
         style={{ background: "rgba(0,0,0,0.6)" }}
-        onClick={(e) => { if (e.target === e.currentTarget) { setShowShareFeed(false); setShareCaption(""); } }}
+        onClick={(e) => { if (e.target === e.currentTarget) { setShowShareFeed(false); setShareCaption(""); setSharePhoto(null); setSharePhotoPreview(null); } }}
       >
         <div className="w-full max-w-lg rounded-t-[20px] p-6 flex flex-col gap-4"
           style={{ background: "var(--card)", border: "1px solid var(--border-soft)" }}>
           <div className="flex items-center justify-between">
             <h2 className="font-black text-[18px]" style={{ fontFamily: "var(--font-nunito)", color: "var(--text)" }}>share to feed</h2>
-            <button onClick={() => { setShowShareFeed(false); setShareCaption(""); }} style={{ color: "var(--muted)" }}>
+            <button onClick={() => { setShowShareFeed(false); setShareCaption(""); setSharePhoto(null); setSharePhotoPreview(null); }} style={{ color: "var(--muted)" }}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
             </button>
           </div>
@@ -1926,6 +2002,34 @@ function BetCard({
             {shareCaption.length > 200 && (
               <p className="text-[11px] text-right" style={{ color: "var(--dimmer)" }}>{280 - shareCaption.length} left</p>
             )}
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: "var(--dimmer)" }}>photo (optional)</label>
+            {sharePhotoPreview ? (
+              <div className="relative">
+                <img src={sharePhotoPreview} alt="" className="w-full rounded-[12px] object-cover" style={{ maxHeight: 200 }} />
+                <button
+                  onClick={() => { setSharePhoto(null); setSharePhotoPreview(null); }}
+                  className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center text-[13px] font-bold"
+                  style={{ background: "rgba(0,0,0,0.65)", color: "#fff" }}
+                >✕</button>
+              </div>
+            ) : (
+              <button
+                onClick={() => sharePhotoInputRef.current?.click()}
+                className="w-full py-3 rounded-[12px] text-[13px] font-semibold"
+                style={{ border: "1px dashed var(--border-soft)", color: "var(--muted)", background: "rgba(255,255,255,0.02)" }}
+              >+ add photo</button>
+            )}
+            <input ref={sharePhotoInputRef} type="file" accept="image/*" className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (!f) return;
+                setSharePhoto(f);
+                setSharePhotoPreview(URL.createObjectURL(f));
+                e.target.value = "";
+              }}
+            />
           </div>
           <button
             onClick={shareToFeed}

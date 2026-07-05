@@ -27,6 +27,7 @@ type FeedPost = {
   user_id: string;
   bet_id: string;
   caption: string | null;
+  photo_url: string | null;
   created_at: string;
   balances: { display_name: string | null; avatar_url: string | null; username: string | null } | null;
   post_likes: { user_id: string }[];
@@ -650,6 +651,11 @@ function PostCard({
 
       {/* Caption */}
       {item.caption && <p className="text-[14px] leading-snug" style={{ color: "var(--text)" }}>{item.caption}</p>}
+
+      {/* Photo */}
+      {item.photo_url && (
+        <img src={item.photo_url} alt="" className="w-full rounded-[12px] object-cover" style={{ maxHeight: 340 }} />
+      )}
 
       {/* Embedded bet */}
       <div className="rounded-[12px] p-3 flex flex-col gap-2" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>

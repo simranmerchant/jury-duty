@@ -132,7 +132,8 @@ export async function GET(
           bet_entries(id, user_id, option_id, points_staked, is_anonymous),
           bet_invites(user_id),
           bet_reactions(user_id, emoji),
-          bet_comments!bet_comments_bet_id_fkey(id)
+          bet_comments!bet_comments_bet_id_fkey(id),
+          posts!posts_bet_id_fkey(id, user_id, caption, photo_url, created_at, balances:user_id(display_name, avatar_url, username))
         )
       `)
       .eq("id", id)
