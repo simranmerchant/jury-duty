@@ -650,7 +650,15 @@ function PostCard({
       </div>
 
       {/* Caption */}
-      {item.caption && <p className="text-[14px] leading-snug" style={{ color: "var(--text)" }}>{item.caption}</p>}
+      {item.caption && (
+        <p className="text-[14px] leading-snug" style={{ color: "var(--text)" }}>
+          {item.caption.split(/(@\w+)/g).map((part, i) =>
+            /^@\w+$/.test(part)
+              ? <a key={i} href={`/u/${part.slice(1)}`} style={{ color: "var(--accent)", fontWeight: 600, textDecoration: "none" }}>{part}</a>
+              : part
+          )}
+        </p>
+      )}
 
       {/* Photo */}
       {item.photo_url && (

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/privy";
 import { supabase } from "@/lib/supabase";
+import { sendPushToUsers } from "@/lib/push";
 
 // POST /api/v1/posts — share a resolved public bet to your followers' feed
 export async function POST(req: NextRequest) {
@@ -49,6 +50,37 @@ export async function POST(req: NextRequest) {
   if (error) {
     if (error.code === "23505") return NextResponse.json({ error: "already shared" }, { status: 409 });
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  // Notify @mentioned users
+  const captionText = caption?.trim() ?? "";
+  const mentionedUsernames = [...captionText.matchAll(/@(\w+)/g)].map((m) => m[1]);
+  if (mentionedUsernames.length > 0) {
+    const [senderRes, mentionedRes] = await Promise.all([
+      supabase.from("balances").select("display_name, username").eq("user_id", user.userId).single(),
+      supabase.from("balances").select("user_id, username").in("username", mentionedUsernames),
+    ]);
+    const senderName = senderRes.data?.display_name ?? senderRes.data?.username ?? "someone";
+    const mentionedIds = (mentionedRes.data ?? []).map((m: { user_id: string }) => m.user_id).filter((id) => id !== user.userId);
+    if (mentionedIds.length > 0) {
+      const notifData = { post_id: post.id, bet_id };
+      await Promise.all([
+        supabase.from("notifications").insert(
+          mentionedIds.map((uid: string) => ({
+            user_id: uid,
+            type: "post_mention",
+            title: `${senderName} mentioned you`,
+            body: captionText.slice(0, 80),
+            data: notifData,
+          }))
+        ),
+        sendPushToUsers(mentionedIds, {
+          title: `${senderName} mentioned you in a post`,
+          body: captionText.slice(0, 80),
+          data: notifData,
+        }),
+      ]);
+    }
   }
 
   return NextResponse.json({ id: post.id });

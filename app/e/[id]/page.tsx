@@ -1703,10 +1703,10 @@ function BetCard({
         </div>
       )}
 
-      {/* Photo carousel — posts from people who shared with a photo */}
-      {bet.status === "resolved" && (bet.posts ?? []).some((p) => p.photo_url) && (
+      {/* Shared memories carousel — posts with a caption or photo */}
+      {bet.status === "resolved" && (bet.posts ?? []).some((p) => p.photo_url || p.caption) && (
         <div className="mt-4 -mx-4 px-4 overflow-x-auto flex gap-3 pb-1" style={{ scrollbarWidth: "none" }}>
-          {(bet.posts ?? []).filter((p) => p.photo_url).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()).map((post) => {
+          {(bet.posts ?? []).filter((p) => p.photo_url || p.caption).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()).map((post) => {
             const name = post.balances?.display_name ?? post.balances?.username ?? "someone";
             const handle = post.balances?.username ? `@${post.balances.username}` : name;
             return (
@@ -1714,7 +1714,7 @@ function BetCard({
                 className="flex-shrink-0 rounded-[14px] overflow-hidden flex flex-col cursor-pointer"
                 style={{ width: 220, background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-soft)", textDecoration: "none" }}
               >
-                <img src={post.photo_url!} alt="" className="w-full object-cover" style={{ height: 140 }} />
+                {post.photo_url && <img src={post.photo_url} alt="" className="w-full object-cover" style={{ height: 140 }} />}
                 <div className="p-3 flex flex-col gap-1.5">
                   <div className="flex items-center gap-1.5">
                     {post.balances?.avatar_url
@@ -1723,7 +1723,15 @@ function BetCard({
                     }
                     <span className="text-[11px] font-semibold truncate" style={{ color: "var(--muted)" }}>{handle}</span>
                   </div>
-                  {post.caption && <p className="text-[12px] leading-snug line-clamp-3" style={{ color: "var(--text)" }}>{post.caption}</p>}
+                  {post.caption && (
+                    <p className="text-[12px] leading-snug line-clamp-3" style={{ color: "var(--text)" }}>
+                      {post.caption.split(/(@\w+)/g).map((part, i) =>
+                        /^@\w+$/.test(part)
+                          ? <button key={i} onClick={(e) => { e.preventDefault(); e.stopPropagation(); router.push(`/u/${part.slice(1)}`); }} style={{ color: "var(--accent)", fontWeight: 600, background: "none", border: "none", padding: 0, cursor: "pointer" }}>{part}</button>
+                          : part
+                      )}
+                    </p>
+                  )}
                 </div>
               </a>
             );
