@@ -17,7 +17,7 @@ type EmbeddedBet = {
   event_id: string | null;
   events: { name: string } | null;
   bet_options: BetOption[];
-  bet_entries: { user_id: string; option_id: string; points_staked: number; balances: { display_name: string | null; avatar_url: string | null } | null }[];
+  bet_entries: { user_id: string; option_id: string; points_staked: number; balances: { display_name: string | null; avatar_url: string | null; username: string | null } | null }[];
   balances: { display_name: string | null; avatar_url: string | null; username: string | null } | null;
 };
 type FeedBet = EmbeddedBet & { type: "bet"; audience: string };
@@ -67,6 +67,7 @@ export default function FeedPage() {
   const [seenBetIds, setSeenBetIds] = useState<Set<string>>(() => {
     try { return new Set(JSON.parse(sessionStorage.getItem("seenFeedBetIds") ?? "[]")); } catch { return new Set(); }
   });
+  const [followedIds, setFollowedIds] = useState<Set<string>>(new Set());
 
   // New bet sheet
   const [showPost, setShowPost] = useState(false);
@@ -101,6 +102,7 @@ export default function FeedPage() {
     const incoming: FeedItem[] = feedData.items ?? [];
     setItems((prev) => cursor ? [...prev, ...incoming] : incoming);
     setNextCursor(feedData.nextCursor ?? null);
+    if (!cursor && feedData.followedIds) setFollowedIds(new Set(feedData.followedIds as string[]));
     // Mark all loaded items as seen after this render
     setTimeout(() => {
       setSeenBetIds((prev) => {
@@ -154,7 +156,7 @@ export default function FeedPage() {
     if (res.ok) {
       setItems((prev) => prev.map((item) => {
         if (item.type !== "bet" || item.id !== betId) return item;
-        return { ...item, bet_entries: [...item.bet_entries, { user_id: privyUser!.id, option_id: optionId, points_staked: 50 }] };
+        return { ...item, bet_entries: [...item.bet_entries, { user_id: privyUser!.id, option_id: optionId, points_staked: 50, balances: null }] };
       }));
       if (myPoints !== null) setMyPoints((p) => (p ?? 0) - 50);
     }
@@ -269,6 +271,7 @@ export default function FeedPage() {
                 key={`post-${item.id}`}
                 item={item}
                 currentUserId={privyUser?.id}
+                followedIds={followedIds}
                 getAccessToken={getAccessToken}
                 onDelete={() => setItems((prev) => prev.filter((i) => i.id !== item.id))}
               />
@@ -501,11 +504,13 @@ export default function FeedPage() {
 function PostCard({
   item,
   currentUserId,
+  followedIds,
   getAccessToken,
   onDelete,
 }: {
   item: FeedPost;
   currentUserId?: string;
+  followedIds: Set<string>;
   getAccessToken: () => Promise<string | null>;
   onDelete: () => void;
 }) {
@@ -525,6 +530,7 @@ function PostCard({
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [voterSheet, setVoterSheet] = useState<{ label: string; voters: EmbeddedBet["bet_entries"] } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [pendingGif, setPendingGif] = useState<string | null>(null);
   const [gifPickerOpen, setGifPickerOpen] = useState(false);
@@ -698,15 +704,24 @@ function PostCard({
                 {voters.length > 0 && (
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <div className="flex items-center">
-                      {voters.slice(0, 5).map((e, i) => (
-                        e.balances?.avatar_url
-                          ? <img key={e.user_id} src={e.balances.avatar_url} alt="" className="w-4 h-4 rounded-full object-cover border border-[var(--card)]" style={{ marginLeft: i === 0 ? 0 : -4, zIndex: voters.length - i }} />
-                          : <div key={e.user_id} className="w-4 h-4 rounded-full flex items-center justify-center text-[7px] font-black border border-[var(--card)]" style={{ marginLeft: i === 0 ? 0 : -4, zIndex: voters.length - i, background: e.user_id === currentUserId ? "var(--accent)" : "rgba(255,255,255,0.15)", color: e.user_id === currentUserId ? "#fff" : "var(--muted)" }}>
-                              {e.user_id === currentUserId ? "me" : (e.balances?.display_name?.[0]?.toUpperCase() ?? "?")}
-                            </div>
-                      ))}
+                      {voters.slice(0, 5).map((e, i) => {
+                        const isFriend = followedIds.has(e.user_id);
+                        const isMe = e.user_id === currentUserId;
+                        const borderColor = isMe ? "var(--accent)" : isFriend ? "var(--accent-border)" : "var(--card)";
+                        return e.balances?.avatar_url
+                          ? <button key={e.user_id} onClick={() => e.balances?.username && router.push(`/u/${e.balances.username}`)} style={{ marginLeft: i === 0 ? 0 : -4, zIndex: voters.length - i, borderRadius: "50%", border: `1.5px solid ${borderColor}`, padding: 0, lineHeight: 0, cursor: e.balances?.username ? "pointer" : "default" }}>
+                              <img src={e.balances.avatar_url} alt="" style={{ width: 16, height: 16, borderRadius: "50%", display: "block", objectFit: "cover" }} />
+                            </button>
+                          : <button key={e.user_id} onClick={() => e.balances?.username && router.push(`/u/${e.balances.username}`)} className="w-4 h-4 rounded-full flex items-center justify-center text-[7px] font-black" style={{ marginLeft: i === 0 ? 0 : -4, zIndex: voters.length - i, border: `1.5px solid ${borderColor}`, background: isMe ? "var(--accent)" : "rgba(255,255,255,0.15)", color: isMe ? "#fff" : "var(--muted)", cursor: e.balances?.username ? "pointer" : "default" }}>
+                              {isMe ? "me" : (e.balances?.display_name?.[0]?.toUpperCase() ?? "?")}
+                            </button>;
+                      })}
                     </div>
-                    {voters.length > 5 && <span className="text-[10px]" style={{ color: "var(--dimmer)" }}>+{voters.length - 5}</span>}
+                    {voters.length > 5 && (
+                      <button onClick={() => setVoterSheet({ label: opt.label, voters })} className="text-[10px] font-semibold" style={{ color: "var(--accent)" }}>
+                        +{voters.length - 5}
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -831,6 +846,40 @@ function PostCard({
                   post
                 </button>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Voter sheet modal */}
+      {voterSheet && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,0.6)" }} onClick={() => setVoterSheet(null)}>
+          <div className="w-full max-w-sm rounded-t-[20px] pb-8 flex flex-col" style={{ background: "var(--card)", border: "1px solid var(--border-soft)" }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: "1px solid var(--border-soft)" }}>
+              <p className="text-[14px] font-black" style={{ color: "var(--text)", fontFamily: "var(--font-nunito)" }}>voted: {voterSheet.label}</p>
+              <button onClick={() => setVoterSheet(null)} className="text-[18px]" style={{ color: "var(--muted)" }}>✕</button>
+            </div>
+            <div className="flex flex-col divide-y overflow-y-auto" style={{ maxHeight: 360, borderColor: "rgba(255,255,255,0.04)" }}>
+              {voterSheet.voters.map((e) => {
+                const isFriend = followedIds.has(e.user_id);
+                const isMe = e.user_id === currentUserId;
+                const name = e.balances?.display_name ?? e.balances?.username ?? "someone";
+                return (
+                  <button key={e.user_id} onClick={() => e.balances?.username && (setVoterSheet(null), router.push(`/u/${e.balances.username}`))} className="flex items-center gap-3 px-5 py-3" style={{ cursor: e.balances?.username ? "pointer" : "default" }}>
+                    <div className="rounded-full flex-shrink-0 overflow-hidden flex items-center justify-center" style={{ width: 32, height: 32, border: `2px solid ${isMe ? "var(--accent)" : isFriend ? "var(--accent-border)" : "rgba(255,255,255,0.1)"}`, background: "var(--accent-dim)" }}>
+                      {e.balances?.avatar_url
+                        ? <img src={e.balances.avatar_url} alt="" className="w-full h-full object-cover" />
+                        : <span className="text-[11px] font-black" style={{ color: "var(--accent)" }}>{name[0]?.toUpperCase() ?? "?"}</span>
+                      }
+                    </div>
+                    <div className="text-left flex-1 min-w-0">
+                      <p className="text-[13px] font-bold truncate" style={{ color: isMe ? "var(--accent)" : "var(--text)" }}>{isMe ? "you" : name}</p>
+                      {e.balances?.username && <p className="text-[11px]" style={{ color: "var(--dimmer)" }}>@{e.balances.username}</p>}
+                    </div>
+                    {isFriend && !isMe && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: "var(--accent-dim)", color: "var(--accent)", border: "1px solid var(--accent-border)" }}>following</span>}
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>

@@ -53,7 +53,9 @@ export async function GET(req: NextRequest) {
       .select(`
         id, name, ends_at, type, host_id, invite_token, cover_url,
         event_guests!inner(user_id),
-        bets(id, status, visibility, creator_id, created_at)
+        bets(id, status, visibility, creator_id, created_at, deadline,
+          bet_entries(user_id)
+        )
       `)
       .eq("event_guests.user_id", user.userId)
       .order("created_at", { ascending: false }),
@@ -76,7 +78,12 @@ export async function GET(req: NextRequest) {
     const hasNew = visibleBets.some(
       (b: any) => b.creator_id !== user.userId && (!seenAt || new Date(b.created_at) > new Date(seenAt))
     );
-    return { ...event, bets: visibleBets, hasNew };
+    const hasUnvotedOpen = visibleBets.some(
+      (b: any) => b.status === "open" && new Date(b.deadline) > new Date() &&
+        !(b.bet_entries ?? []).some((e: any) => e.user_id === user.userId)
+    );
+    const betsStripped = visibleBets.map(({ bet_entries: _, ...rest }: any) => rest);
+    return { ...event, bets: betsStripped, hasNew, hasUnvotedOpen };
   });
 
   return NextResponse.json({ events: eventsWithNew });

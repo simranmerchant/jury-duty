@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
       bet_options!bet_id(id, label, tagged_user_id,
         balances:tagged_user_id(display_name, avatar_url, username)
       ),
-      bet_entries(user_id, option_id, points_staked, is_anonymous, balances:user_id(display_name, avatar_url)),
+      bet_entries(user_id, option_id, points_staked, is_anonymous, balances:user_id(display_name, avatar_url, username)),
       balances:creator_id(display_name, avatar_url, username)
     `)
     .eq("audience", "followers")
@@ -51,7 +51,7 @@ export async function GET(req: NextRequest) {
       bets:bet_id(
         id, question, deadline, status, winning_option_id, creator_id, created_at, event_id,
         bet_options!bet_id(id, label),
-        bet_entries(user_id, option_id, points_staked, balances:user_id(display_name, avatar_url)),
+        bet_entries(user_id, option_id, points_staked, balances:user_id(display_name, avatar_url, username)),
         balances:creator_id(display_name, avatar_url, username),
         events:event_id(name)
       )
@@ -76,5 +76,5 @@ export async function GET(req: NextRequest) {
 
   const nextCursor = merged.length === 20 ? merged[merged.length - 1].created_at : null;
 
-  return NextResponse.json({ items: merged, nextCursor });
+  return NextResponse.json({ items: merged, nextCursor, followedIds });
 }

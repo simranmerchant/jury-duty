@@ -23,6 +23,7 @@ type Event = {
   cover_url: string | null;
   bets: Bet[];
   hasNew: boolean;
+  hasUnvotedOpen: boolean;
 };
 
 export default function EventsPage() {
@@ -174,8 +175,11 @@ export default function EventsPage() {
               group
             </span>
           )}
-          {!isGroup && event.hasNew && !isPast && (
-            <span className="text-[10px] font-bold" style={{ color: "var(--accent)", letterSpacing: "0.02em" }}>new</span>
+          {!isPast && (
+            <div className="flex items-center gap-1">
+              {!isGroup && event.hasNew && <span className="text-[10px] font-bold" style={{ color: "var(--accent)", letterSpacing: "0.02em" }}>new</span>}
+              {event.hasUnvotedOpen && <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: "#f97316" }} />}
+            </div>
           )}
         </div>
       </button>
@@ -233,11 +237,14 @@ export default function EventsPage() {
                     <div className="absolute inset-0" style={{ background: "var(--card)" }} />
                   )}
                   <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, rgba(255,143,163,0.18) 0%, transparent 55%), linear-gradient(to top, rgba(16,14,12,0.75) 0%, transparent 60%)" }} />
-                  {featured.hasNew && (
-                    <span className="absolute top-2.5 right-2.5 text-[10px] font-bold text-white px-2.5 py-1 rounded-full" style={{ background: "var(--accent)" }}>
-                      new
-                    </span>
-                  )}
+                  <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5">
+                    {featured.hasNew && (
+                      <span className="text-[10px] font-bold text-white px-2.5 py-1 rounded-full" style={{ background: "var(--accent)" }}>new</span>
+                    )}
+                    {featured.hasUnvotedOpen && (
+                      <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#f97316" }} />
+                    )}
+                  </div>
                   <div className="absolute bottom-0 left-0 right-0 p-3.5">
                     <p className="font-black text-[19px] text-white leading-tight" style={{ fontFamily: "var(--font-nunito)", letterSpacing: "-0.02em" }}>{featured.name}</p>
                     <p className="text-[11px] mt-0.5 italic" style={{ color: "rgba(255,255,255,0.55)" }}>
