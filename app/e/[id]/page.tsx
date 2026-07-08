@@ -4,6 +4,7 @@ import { usePrivy } from "@privy-io/react-auth";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { filterTagPickerGuests } from "../../../lib/tag-picker";
+import { detectMention, insertMention } from "../../../lib/mention";
 import { parseQuestion, extractTaggedUserIds, insertMentionAt, removeMention, getWordTokens } from "../../../lib/question-tags";
 
 type BetOption = { id: string; label: string; tagged_user_id?: string | null; balances?: { display_name: string | null; avatar_url: string | null; username?: string | null } | null };
@@ -698,6 +699,8 @@ function BetCard({
   const [sharePhoto, setSharePhoto] = useState<File | null>(null);
   const [sharePhotoPreview, setSharePhotoPreview] = useState<string | null>(null);
   const sharePhotoInputRef = useRef<HTMLInputElement>(null);
+  const [captionMentionSearch, setCaptionMentionSearch] = useState<string | null>(null);
+  const captionTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   async function fetchComments() {
     setCommentsLoading(true);
@@ -1986,27 +1989,73 @@ function BetCard({
       <div
         className="fixed inset-0 z-50 flex items-end justify-center"
         style={{ background: "rgba(0,0,0,0.6)" }}
-        onClick={(e) => { if (e.target === e.currentTarget) { setShowShareFeed(false); setShareCaption(""); setSharePhoto(null); setSharePhotoPreview(null); } }}
+        onClick={(e) => { if (e.target === e.currentTarget) { setShowShareFeed(false); setShareCaption(""); setSharePhoto(null); setSharePhotoPreview(null); setCaptionMentionSearch(null); } }}
       >
         <div className="w-full max-w-lg rounded-t-[20px] p-6 flex flex-col gap-4"
           style={{ background: "var(--card)", border: "1px solid var(--border-soft)" }}>
           <div className="flex items-center justify-between">
             <h2 className="font-black text-[18px]" style={{ fontFamily: "var(--font-nunito)", color: "var(--text)" }}>share to feed</h2>
-            <button onClick={() => { setShowShareFeed(false); setShareCaption(""); setSharePhoto(null); setSharePhotoPreview(null); }} style={{ color: "var(--muted)" }}>
+            <button onClick={() => { setShowShareFeed(false); setShareCaption(""); setSharePhoto(null); setSharePhotoPreview(null); setCaptionMentionSearch(null); }} style={{ color: "var(--muted)" }}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
             </button>
           </div>
           <p className="text-[13px]" style={{ color: "var(--muted)" }}>your followers will see this in their feed</p>
           <div className="flex flex-col gap-1.5">
             <label className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: "var(--dimmer)" }}>caption (optional)</label>
-            <textarea
-              className="w-full rounded-[12px] px-4 py-3 text-[14px] resize-none outline-none"
-              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-soft)", color: "var(--text)", minHeight: 80 }}
-              placeholder="say something about this prediction..."
-              value={shareCaption}
-              onChange={(e) => setShareCaption(e.target.value.slice(0, 280))}
-              maxLength={280}
-            />
+            <div className="relative">
+              <textarea
+                ref={captionTextareaRef}
+                className="w-full rounded-[12px] px-4 py-3 text-[14px] resize-none outline-none"
+                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-soft)", color: "var(--text)", minHeight: 80 }}
+                placeholder="say something about this prediction..."
+                value={shareCaption}
+                onChange={(e) => {
+                  const val = e.target.value.slice(0, 280);
+                  setShareCaption(val);
+                  const cursor = e.target.selectionStart ?? val.length;
+                  const { search } = detectMention(val, cursor);
+                  setCaptionMentionSearch(search);
+                }}
+                onKeyUp={(e) => {
+                  const el = e.currentTarget;
+                  const { search } = detectMention(el.value, el.selectionStart ?? el.value.length);
+                  setCaptionMentionSearch(search);
+                }}
+                onClick={(e) => {
+                  const el = e.currentTarget;
+                  const { search } = detectMention(el.value, el.selectionStart ?? el.value.length);
+                  setCaptionMentionSearch(search);
+                }}
+                maxLength={280}
+              />
+              {captionMentionSearch !== null && (() => {
+                const filtered = filterTagPickerGuests(eventGuests, userId, captionMentionSearch);
+                if (filtered.length === 0) return null;
+                return (
+                  <div className="absolute bottom-full left-0 right-0 mb-1 rounded-[12px] overflow-hidden shadow-xl z-10" style={{ border: "1px solid var(--border-soft)", background: "var(--card)" }}>
+                    {filtered.slice(0, 5).map((g) => (
+                      <button key={g.user_id} type="button" className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-white/5"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          const u = g.balances?.username ?? g.balances?.display_name?.replace(/\s+/g, "") ?? "unknown";
+                          const el = captionTextareaRef.current;
+                          const cursor = el?.selectionStart ?? shareCaption.length;
+                          const { newQuestion, newCursor } = insertMention(shareCaption, cursor, u);
+                          setShareCaption(newQuestion.slice(0, 280));
+                          setCaptionMentionSearch(null);
+                          setTimeout(() => { el?.focus(); el?.setSelectionRange(newCursor, newCursor); }, 0);
+                        }}>
+                        <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black flex-shrink-0 overflow-hidden" style={{ background: "var(--accent-dim)", color: "var(--accent)" }}>
+                          {g.balances?.avatar_url ? <img src={g.balances.avatar_url} className="w-6 h-6 object-cover" /> : (g.balances?.display_name?.[0] ?? "?").toUpperCase()}
+                        </div>
+                        <span className="text-[13px] font-semibold" style={{ color: "var(--text)" }}>{g.balances?.display_name ?? "unknown"}</span>
+                        {g.balances?.username && <span className="text-[11px]" style={{ color: "var(--dimmer)" }}>@{g.balances.username}</span>}
+                      </button>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
             {shareCaption.length > 200 && (
               <p className="text-[11px] text-right" style={{ color: "var(--dimmer)" }}>{280 - shareCaption.length} left</p>
             )}
