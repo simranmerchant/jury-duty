@@ -49,10 +49,11 @@ export async function GET(req: NextRequest) {
       post_likes(user_id),
       post_comments!post_id(id),
       bets:bet_id(
-        id, question, deadline, status, winning_option_id, creator_id, created_at,
+        id, question, deadline, status, winning_option_id, creator_id, created_at, event_id,
         bet_options!bet_id(id, label),
         bet_entries(user_id, option_id, points_staked),
-        balances:creator_id(display_name, avatar_url, username)
+        balances:creator_id(display_name, avatar_url, username),
+        events:event_id(name)
       )
     `)
     .in("user_id", feedUserIds)

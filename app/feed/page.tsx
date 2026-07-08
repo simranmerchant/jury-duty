@@ -14,6 +14,8 @@ type EmbeddedBet = {
   winning_option_id: string | null;
   creator_id: string;
   created_at: string;
+  event_id: string | null;
+  events: { name: string } | null;
   bet_options: BetOption[];
   bet_entries: { user_id: string; option_id: string; points_staked: number }[];
   balances: { display_name: string | null; avatar_url: string | null; username: string | null } | null;
@@ -667,6 +669,14 @@ function PostCard({
 
       {/* Embedded bet */}
       <div className="rounded-[12px] p-3 flex flex-col gap-2" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+        {bet.events?.name && bet.event_id && (
+          <a href={`/e/${bet.event_id}`} className="flex items-center gap-1 w-fit" style={{ textDecoration: "none" }}>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--dimmer)" }}>
+              <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
+            </svg>
+            <span className="text-[11px] font-semibold" style={{ color: "var(--dimmer)" }}>{bet.events.name}</span>
+          </a>
+        )}
         <p className="text-[14px] font-bold leading-snug" style={{ color: "var(--text)" }}>{bet.question}</p>
         <div className="flex flex-col gap-1.5">
           {bet.bet_options.map((opt) => {
