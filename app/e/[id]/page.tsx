@@ -1713,7 +1713,7 @@ function BetCard({
             const name = post.balances?.display_name ?? post.balances?.username ?? "someone";
             const handle = post.balances?.username ? `@${post.balances.username}` : name;
             return (
-              <a key={post.id} href="/feed"
+              <a key={post.id} href={`/feed/post/${post.id}`}
                 className="flex-shrink-0 rounded-[14px] overflow-hidden flex flex-col cursor-pointer"
                 style={{ width: 220, background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-soft)", textDecoration: "none" }}
               >
