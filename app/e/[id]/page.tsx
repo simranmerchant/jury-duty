@@ -148,7 +148,7 @@ export default function EventPage() {
         fetch(`/api/v1/events/${eventId}`, { headers: { Authorization: `Bearer ${token}` } }),
         fetch("/api/v1/me", { headers: { Authorization: `Bearer ${token}` } }),
       ]);
-      if (res.status === 404) { router.replace("/events"); return; }
+      if (res.status === 404) { router.back(); return; }
       const data = await res.json();
       const meData = await meRes.json();
       if (!res.ok) { setFetchError(data.error ?? `error ${res.status}`); setLoading(false); return; }
