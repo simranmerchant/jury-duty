@@ -1,7 +1,16 @@
 /**
- * Pure logic for @mention detection and insertion in the bet question textarea.
- * Extracted here so it can be unit-tested independently of React.
+ * Pure logic for @mention detection, insertion, and extraction.
+ * Extracted here so it can be unit-tested independently of React / Next.js.
  */
+
+/**
+ * Extracts all @mentioned usernames from a text string.
+ * Returns the raw username portion (no @ prefix) in the order they appear.
+ * Duplicates are preserved — callers can deduplicate if needed.
+ */
+export function extractMentions(text: string): string[] {
+  return [...text.matchAll(/@(\w+)/g)].map((m) => m[1]);
+}
 
 export interface MentionState {
   /** Non-null when a mention is being typed; the partial word after @ */

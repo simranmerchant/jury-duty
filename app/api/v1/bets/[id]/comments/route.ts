@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/privy";
 import { supabase } from "@/lib/supabase";
 import { sendPushToUsers } from "@/lib/push";
 import { validateComment } from "@/lib/comment-validation";
+import { extractMentions } from "@/lib/mention";
 
 export async function GET(
   req: NextRequest,
@@ -58,7 +59,7 @@ export async function POST(
 
   // Fetch bet + sender profile for notifications (always needed now)
   const commentBody = validation.body ?? "";
-  const mentionedUsernames = [...commentBody.matchAll(/@(\w+)/g)].map((m) => m[1]);
+  const mentionedUsernames = extractMentions(commentBody);
   const [senderProfileRes, betRes, mentionedRes] = await Promise.all([
     supabase.from("balances").select("display_name, username").eq("user_id", user.userId).single(),
     supabase.from("bets").select("event_id, creator_id, question").eq("id", betId).single(),

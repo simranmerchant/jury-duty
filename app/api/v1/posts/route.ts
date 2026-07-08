@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/privy";
 import { supabase } from "@/lib/supabase";
 import { sendPushToUsers } from "@/lib/push";
+import { extractMentions } from "@/lib/mention";
 
 // POST /api/v1/posts — share a resolved public bet to your followers' feed
 export async function POST(req: NextRequest) {
@@ -54,7 +55,7 @@ export async function POST(req: NextRequest) {
 
   // Notify @mentioned users
   const captionText = caption?.trim() ?? "";
-  const mentionedUsernames = [...captionText.matchAll(/@(\w+)/g)].map((m) => m[1]);
+  const mentionedUsernames = extractMentions(captionText);
   if (mentionedUsernames.length > 0) {
     const [senderRes, mentionedRes] = await Promise.all([
       supabase.from("balances").select("display_name, username").eq("user_id", user.userId).single(),

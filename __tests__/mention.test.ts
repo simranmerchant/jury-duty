@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { detectMention, insertMention } from "../lib/mention";
+import { detectMention, extractMentions, insertMention } from "../lib/mention";
 
 describe("detectMention", () => {
   it("returns null search when no @ present", () => {
@@ -43,6 +43,66 @@ describe("detectMention", () => {
     const val = "@jake";
     // Cursor at position 0, before the @
     expect(detectMention(val, 0)).toEqual({ search: null, filter: "" });
+  });
+});
+
+describe("extractMentions", () => {
+  it("returns empty array for empty string", () => {
+    expect(extractMentions("")).toEqual([]);
+  });
+
+  it("returns empty array when no mentions present", () => {
+    expect(extractMentions("no tags here just words")).toEqual([]);
+  });
+
+  it("extracts a single mention", () => {
+    expect(extractMentions("great game @simran")).toEqual(["simran"]);
+  });
+
+  it("extracts multiple distinct mentions", () => {
+    expect(extractMentions("@alice and @bob both called it")).toEqual(["alice", "bob"]);
+  });
+
+  it("extracts a mention at the start of the string", () => {
+    expect(extractMentions("@jake was right")).toEqual(["jake"]);
+  });
+
+  it("extracts a mention at the end of the string", () => {
+    expect(extractMentions("congrats @taylor")).toEqual(["taylor"]);
+  });
+
+  it("preserves the original casing of usernames", () => {
+    expect(extractMentions("hey @Jake")).toEqual(["Jake"]);
+  });
+
+  it("preserves duplicate mentions", () => {
+    expect(extractMentions("@sam and @sam again")).toEqual(["sam", "sam"]);
+  });
+
+  it("handles mentions with numbers in the username", () => {
+    expect(extractMentions("shoutout @user123")).toEqual(["user123"]);
+  });
+
+  it("ignores a lone @ with no word after it", () => {
+    expect(extractMentions("email me @ work")).toEqual([]);
+  });
+
+  it("stops the mention at punctuation (period after username)", () => {
+    const result = extractMentions("thanks @alex. you were right");
+    expect(result).toEqual(["alex"]);
+  });
+
+  it("stops the mention at punctuation (comma after username)", () => {
+    const result = extractMentions("@mike, you called it");
+    expect(result).toEqual(["mike"]);
+  });
+
+  it("handles mentions separated by newlines", () => {
+    expect(extractMentions("@alice\n@bob")).toEqual(["alice", "bob"]);
+  });
+
+  it("returns empty array for caption with only whitespace", () => {
+    expect(extractMentions("   ")).toEqual([]);
   });
 });
 
