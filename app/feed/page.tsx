@@ -17,7 +17,7 @@ type EmbeddedBet = {
   event_id: string | null;
   events: { name: string } | null;
   bet_options: BetOption[];
-  bet_entries: { user_id: string; option_id: string; points_staked: number }[];
+  bet_entries: { user_id: string; option_id: string; points_staked: number; balances: { display_name: string | null; avatar_url: string | null } | null }[];
   balances: { display_name: string | null; avatar_url: string | null; username: string | null } | null;
 };
 type FeedBet = EmbeddedBet & { type: "bet"; audience: string };
@@ -680,19 +680,35 @@ function PostCard({
         <p className="text-[14px] font-bold leading-snug" style={{ color: "var(--text)" }}>{bet.question}</p>
         <div className="flex flex-col gap-1.5">
           {bet.bet_options.map((opt) => {
-            const optTotal = bet.bet_entries.filter((e) => e.option_id === opt.id).reduce((s, e) => s + e.points_staked, 0);
+            const voters = bet.bet_entries.filter((e) => e.option_id === opt.id);
+            const optTotal = voters.reduce((s, e) => s + e.points_staked, 0);
             const pct = totalStaked > 0 ? Math.round((optTotal / totalStaked) * 100) : 0;
             const isWinner = bet.winning_option_id === opt.id;
+            const isMe = voters.some((e) => e.user_id === currentUserId);
             return (
               <div key={opt.id} className="rounded-[10px] p-2.5 flex flex-col gap-1.5"
                 style={{ background: isWinner ? "var(--win-dim)" : "rgba(255,255,255,0.03)", border: `1px solid ${isWinner ? "var(--win-border)" : "rgba(255,255,255,0.06)"}` }}>
                 <div className="flex items-center justify-between">
-                  <span className="text-[13px] font-semibold" style={{ color: isWinner ? "var(--win)" : "var(--text)" }}>{opt.label}</span>
+                  <span className="text-[13px] font-semibold" style={{ color: isWinner ? "var(--win)" : isMe ? "var(--accent)" : "var(--text)" }}>{opt.label}</span>
                   <span className="text-[13px] font-bold" style={{ color: "var(--muted)" }}>{pct}%</span>
                 </div>
                 <div className="rounded-full overflow-hidden" style={{ height: 3, background: "rgba(255,255,255,0.06)" }}>
-                  <div className="h-full rounded-full" style={{ width: `${pct}%`, background: isWinner ? "var(--win-border)" : "rgba(255,255,255,0.18)" }} />
+                  <div className="h-full rounded-full" style={{ width: `${pct}%`, background: isWinner ? "var(--win-border)" : isMe ? "var(--accent)" : "rgba(255,255,255,0.18)" }} />
                 </div>
+                {voters.length > 0 && (
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <div className="flex items-center">
+                      {voters.slice(0, 5).map((e, i) => (
+                        e.balances?.avatar_url
+                          ? <img key={e.user_id} src={e.balances.avatar_url} alt="" className="w-4 h-4 rounded-full object-cover border border-[var(--card)]" style={{ marginLeft: i === 0 ? 0 : -4, zIndex: voters.length - i }} />
+                          : <div key={e.user_id} className="w-4 h-4 rounded-full flex items-center justify-center text-[7px] font-black border border-[var(--card)]" style={{ marginLeft: i === 0 ? 0 : -4, zIndex: voters.length - i, background: e.user_id === currentUserId ? "var(--accent)" : "rgba(255,255,255,0.15)", color: e.user_id === currentUserId ? "#fff" : "var(--muted)" }}>
+                              {e.user_id === currentUserId ? "me" : (e.balances?.display_name?.[0]?.toUpperCase() ?? "?")}
+                            </div>
+                      ))}
+                    </div>
+                    {voters.length > 5 && <span className="text-[10px]" style={{ color: "var(--dimmer)" }}>+{voters.length - 5}</span>}
+                  </div>
+                )}
               </div>
             );
           })}

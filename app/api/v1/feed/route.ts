@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
       bet_options!bet_id(id, label, tagged_user_id,
         balances:tagged_user_id(display_name, avatar_url, username)
       ),
-      bet_entries(user_id, option_id, points_staked, is_anonymous),
+      bet_entries(user_id, option_id, points_staked, is_anonymous, balances:user_id(display_name, avatar_url)),
       balances:creator_id(display_name, avatar_url, username)
     `)
     .eq("audience", "followers")
@@ -51,7 +51,7 @@ export async function GET(req: NextRequest) {
       bets:bet_id(
         id, question, deadline, status, winning_option_id, creator_id, created_at, event_id,
         bet_options!bet_id(id, label),
-        bet_entries(user_id, option_id, points_staked),
+        bet_entries(user_id, option_id, points_staked, balances:user_id(display_name, avatar_url)),
         balances:creator_id(display_name, avatar_url, username),
         events:event_id(name)
       )
