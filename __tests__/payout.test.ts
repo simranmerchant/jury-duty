@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computePayouts, type BetEntry } from "../lib/payout";
+import { computePayouts, calculateRefunds, type BetEntry } from "../lib/payout";
 
 function entry(userId: string, optionId: string, staked: number): BetEntry {
   return { userId, optionId, staked };
@@ -102,5 +102,51 @@ describe("computePayouts — edge cases", () => {
     // pot=200, winners_count=2 (both alice entries), payout_each=100, alice total=200
     expect(result.alice).toBe(200);
     expect(result.bob).toBeUndefined();
+  });
+});
+
+// ─── calculateRefunds ──────────────────────────────────────────────────────────
+// Used when a bet is deleted — every entrant gets their stake back.
+
+describe("calculateRefunds", () => {
+  it("returns empty object for no entries", () => {
+    expect(calculateRefunds([])).toEqual({});
+  });
+
+  it("refunds each user their staked amount", () => {
+    const entries = [
+      { user_id: "alice", points_staked: 100 },
+      { user_id: "bob", points_staked: 200 },
+    ];
+    expect(calculateRefunds(entries)).toEqual({ alice: 100, bob: 200 });
+  });
+
+  it("sums multiple stakes for the same user", () => {
+    const entries = [
+      { user_id: "alice", points_staked: 50 },
+      { user_id: "alice", points_staked: 75 },
+    ];
+    expect(calculateRefunds(entries)).toEqual({ alice: 125 });
+  });
+
+  it("handles mixed users with multiple entries", () => {
+    const entries = [
+      { user_id: "alice", points_staked: 100 },
+      { user_id: "bob", points_staked: 50 },
+      { user_id: "alice", points_staked: 25 },
+      { user_id: "carol", points_staked: 200 },
+    ];
+    expect(calculateRefunds(entries)).toEqual({ alice: 125, bob: 50, carol: 200 });
+  });
+
+  it("total refunded equals total staked", () => {
+    const entries = [
+      { user_id: "alice", points_staked: 100 },
+      { user_id: "bob", points_staked: 150 },
+      { user_id: "carol", points_staked: 75 },
+    ];
+    const result = calculateRefunds(entries);
+    const total = Object.values(result).reduce((s, v) => s + v, 0);
+    expect(total).toBe(325);
   });
 });

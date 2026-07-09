@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/privy";
 import { supabase } from "@/lib/supabase";
 import { generateInviteToken } from "@/lib/invite";
+import { hasUnvotedOpen as computeHasUnvotedOpen, hasNewBets } from "@/lib/events";
 
 export async function POST(req: NextRequest) {
   const token = req.headers.get("authorization")?.replace("Bearer ", "");
@@ -75,14 +76,9 @@ export async function GET(req: NextRequest) {
       b.visibility !== "private" || b.creator_id === user.userId
     );
     const seenAt = seenMap.get(event.id);
-    const hasNew = visibleBets.some(
-      (b: any) => b.creator_id !== user.userId && (!seenAt || new Date(b.created_at) > new Date(seenAt))
-    );
-    const hasUnvotedOpen = visibleBets.some(
-      (b: any) => b.status === "open" && new Date(b.deadline) > new Date() &&
-        b.creator_id !== user.userId &&
-        !(b.bet_entries ?? []).some((e: any) => e.user_id === user.userId)
-    );
+    const normalised = visibleBets.map((b: any) => ({ ...b, bet_entries: b.bet_entries ?? [] }));
+    const hasNew = hasNewBets(normalised, user.userId, seenAt);
+    const hasUnvotedOpen = computeHasUnvotedOpen(normalised, user.userId);
     const betsStripped = visibleBets.map(({ bet_entries: _, ...rest }: any) => rest);
     return { ...event, bets: betsStripped, hasNew, hasUnvotedOpen };
   });

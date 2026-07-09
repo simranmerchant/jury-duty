@@ -1,5 +1,17 @@
 export type BetEntry = { userId: string; optionId: string; staked: number };
 
+// Aggregates stakes by user for bet-deletion refunds.
+// Uses the snake_case field names that come directly from Supabase rows.
+export function calculateRefunds(
+  entries: { user_id: string; points_staked: number }[]
+): Record<string, number> {
+  const refunds: Record<string, number> = {};
+  for (const e of entries) {
+    refunds[e.user_id] = (refunds[e.user_id] ?? 0) + e.points_staked;
+  }
+  return refunds;
+}
+
 // Mirrors the resolve_bet Postgres function's payout logic.
 // Returns a map of userId → points to credit.
 // winningOptionId=null means void (refund everyone).

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/privy";
 import { supabase } from "@/lib/supabase";
+import { calculateRefunds } from "@/lib/payout";
 
 export async function GET(
   req: NextRequest,
@@ -118,8 +119,7 @@ export async function DELETE(
       .select("user_id, points_staked")
       .eq("bet_id", id);
     if (entries && entries.length > 0) {
-      const refunds: Record<string, number> = {};
-      for (const e of entries) refunds[e.user_id] = (refunds[e.user_id] ?? 0) + e.points_staked;
+      const refunds = calculateRefunds(entries);
       await Promise.all(
         Object.entries(refunds).map(([uid, pts]) =>
           supabase.rpc("increment_balance", { p_user_id: uid, p_amount: pts })

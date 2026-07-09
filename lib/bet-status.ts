@@ -12,6 +12,22 @@ export function canPlaceBet(phase: BetPhase, hasEntry: boolean): boolean {
   return phase === "open" && !hasEntry;
 }
 
+// Creator or event host can edit/delete a bet.
+export function canEditBet(opts: {
+  isCreator: boolean;
+  isHost: boolean;
+  status: string;
+}): boolean {
+  return (opts.isCreator || opts.isHost) && opts.status === "open";
+}
+
+export function canDeleteBet(opts: {
+  isCreator: boolean;
+  isHost: boolean;
+}): boolean {
+  return opts.isCreator || opts.isHost;
+}
+
 // Mirrors the authorization check in resolve_bet SQL function.
 // resolverIsMember is only relevant for event bets (eventId !== null).
 export function canResolve(opts: {
