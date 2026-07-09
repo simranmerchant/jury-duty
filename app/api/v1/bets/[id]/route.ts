@@ -21,7 +21,9 @@ export async function GET(
       event_id,
       bet_options!bet_id(id, label),
       bet_entries(user_id, option_id, points_staked, is_anonymous),
-      balances:creator_id(display_name, avatar_url, username)
+      balances:creator_id(display_name, avatar_url, username),
+      bet_reactions(user_id, emoji),
+      bet_comments!bet_id(id)
     `)
     .eq("id", id)
     .single();
