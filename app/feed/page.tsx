@@ -657,22 +657,6 @@ function PostCard({
         </div>
       </div>
 
-      {/* Caption */}
-      {item.caption && (
-        <p className="text-[14px] leading-snug" style={{ color: "var(--text)" }}>
-          {item.caption.split(/(@\w+)/g).map((part, i) =>
-            /^@\w+$/.test(part)
-              ? <a key={i} href={`/u/${part.slice(1)}`} style={{ color: "var(--accent)", fontWeight: 600, textDecoration: "none" }}>{part}</a>
-              : part
-          )}
-        </p>
-      )}
-
-      {/* Photo */}
-      {item.photo_url && (
-        <img src={item.photo_url} alt="" className="w-full rounded-[12px] object-cover" style={{ maxHeight: 340 }} />
-      )}
-
       {/* Embedded bet */}
       <div className="rounded-[12px] p-3 flex flex-col gap-2" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
         {bet.events?.name && bet.event_id && (
@@ -730,6 +714,22 @@ function PostCard({
         </div>
         {winOpt && <p className="text-[12px] font-bold" style={{ color: "var(--win)" }}>✓ {winOpt.label} won</p>}
       </div>
+
+      {/* Photo */}
+      {item.photo_url && (
+        <img src={item.photo_url} alt="" className="w-full rounded-[12px] object-cover" style={{ maxHeight: 340 }} />
+      )}
+
+      {/* Caption */}
+      {item.caption && (
+        <p className="text-[14px] leading-snug" style={{ color: "var(--text)" }}>
+          {item.caption.split(/(@\w+)/g).map((part, i) =>
+            /^@\w+$/.test(part)
+              ? <a key={i} href={`/u/${part.slice(1)}`} style={{ color: "var(--accent)", fontWeight: 600, textDecoration: "none" }}>{part}</a>
+              : part
+          )}
+        </p>
+      )}
 
       {/* Footer: votes + like + comment */}
       <div className="flex items-center justify-between pt-2.5 mt-0.5" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
