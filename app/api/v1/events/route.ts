@@ -80,6 +80,7 @@ export async function GET(req: NextRequest) {
     );
     const hasUnvotedOpen = visibleBets.some(
       (b: any) => b.status === "open" && new Date(b.deadline) > new Date() &&
+        b.creator_id !== user.userId &&
         !(b.bet_entries ?? []).some((e: any) => e.user_id === user.userId)
     );
     const betsStripped = visibleBets.map(({ bet_entries: _, ...rest }: any) => rest);
