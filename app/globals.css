@@ -17,6 +17,9 @@
   --win: #38bdf8;
   --win-dim: rgba(56, 189, 248, 0.12);
   --win-border: rgba(56, 189, 248, 0.30);
+  --loss: #e05252;
+  --loss-dim: rgba(224, 82, 82, 0.10);
+  --loss-border: rgba(224, 82, 82, 0.28);
 }
 
 @theme inline {
