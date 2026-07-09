@@ -1336,6 +1336,7 @@ function BetCard({
             .filter((e) => e.option_id === opt.id)
             .reduce((s, e) => s + e.points_staked, 0);
           const isWinner = bet.winning_option_id === opt.id;
+          const isLoss = bet.winning_option_id !== null && !isWinner;
           const myPick = myEntry?.option_id === opt.id;
           const pct = totalPot > 0 ? Math.round((optTotal / totalPot) * 100) : 0;
           const isSelectedForResolve = resolveOption === opt.id;
@@ -1361,11 +1362,12 @@ function BetCard({
                 <div className="flex items-center gap-2 flex-1 min-w-0">
                   <span
                     className="text-[15px] font-bold truncate"
-                    style={{ color: isWinner ? "var(--win)" : isSelectedForResolve ? "var(--win)" : selectedOption === opt.id ? "var(--accent)" : "var(--text)" }}
+                    style={{ color: isWinner ? "var(--win)" : isLoss && !isSelectedForResolve ? "var(--loss)" : isSelectedForResolve ? "var(--win)" : selectedOption === opt.id ? "var(--accent)" : "var(--text)" }}
                   >
                     {label}
                   </span>
                   {isWinner && <span className="text-[11px] font-bold flex-shrink-0" style={{ color: "var(--win)" }}>won</span>}
+                  {isLoss && !resolving && <span className="text-[11px] font-bold flex-shrink-0" style={{ color: "var(--loss)" }}>lost</span>}
                   {/* Tag / untag buttons */}
                   {opt.tagged_user_id && bet.creator_id === userId && isOpen && !resolving && (
                     <span role="button" onClick={(e) => { e.stopPropagation(); submitTag(opt.id, null); }} className="text-[10px] flex-shrink-0 cursor-pointer" style={{ color: "var(--dimmer)" }}>✕</span>
@@ -1441,7 +1443,7 @@ function BetCard({
                   className="h-full rounded-full"
                   style={{
                     width: `${pct}%`,
-                    background: isWinner ? "var(--win)" : isSelectedForResolve ? "var(--win)" : myPick ? "var(--accent)" : "rgba(255,255,255,0.25)",
+                    background: isWinner ? "var(--win)" : isLoss && !isSelectedForResolve ? "var(--loss-border)" : isSelectedForResolve ? "var(--win)" : myPick ? "var(--accent)" : "rgba(255,255,255,0.25)",
                     transition: "width 0.3s ease",
                   }}
                 />

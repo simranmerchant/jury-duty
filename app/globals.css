@@ -14,9 +14,9 @@
   --text: #ede8e0;
   --muted: #6e6860;
   --dimmer: #3d3830;
-  --win: #38bdf8;
-  --win-dim: rgba(56, 189, 248, 0.12);
-  --win-border: rgba(56, 189, 248, 0.30);
+  --win: #2ea87a;
+  --win-dim: rgba(46, 168, 122, 0.12);
+  --win-border: rgba(46, 168, 122, 0.30);
   --loss: #e05252;
   --loss-dim: rgba(224, 82, 82, 0.10);
   --loss-border: rgba(224, 82, 82, 0.28);

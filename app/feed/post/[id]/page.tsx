@@ -192,16 +192,17 @@ export default function PostDetailPage() {
                   const optTotal = voters.reduce((s, e) => s + e.points_staked, 0);
                   const pct = totalStaked > 0 ? Math.round((optTotal / totalStaked) * 100) : 0;
                   const isWinner = bet.winning_option_id === opt.id;
+                  const isLoss = bet.winning_option_id !== null && !isWinner;
                   const isMe = voters.some((e) => e.user_id === privyUser?.id);
                   return (
                     <div key={opt.id} className="rounded-[10px] p-2.5 flex flex-col gap-1.5"
-                      style={{ background: isWinner ? "var(--win-dim)" : "rgba(255,255,255,0.03)", border: `1px solid ${isWinner ? "var(--win-border)" : "rgba(255,255,255,0.06)"}` }}>
+                      style={{ background: isWinner ? "var(--win-dim)" : isLoss ? "var(--loss-dim)" : "rgba(255,255,255,0.03)", border: `1px solid ${isWinner ? "var(--win-border)" : isLoss ? "var(--loss-border)" : "rgba(255,255,255,0.06)"}` }}>
                       <div className="flex items-center justify-between">
-                        <span className="text-[13px] font-semibold" style={{ color: isWinner ? "var(--win)" : isMe ? "var(--accent)" : "var(--text)" }}>{opt.label}</span>
+                        <span className="text-[13px] font-semibold" style={{ color: isWinner ? "var(--win)" : isLoss ? "var(--loss)" : isMe ? "var(--accent)" : "var(--text)" }}>{opt.label}</span>
                         <span className="text-[13px] font-bold" style={{ color: "var(--muted)" }}>{pct}%</span>
                       </div>
                       <div className="rounded-full overflow-hidden" style={{ height: 3, background: "rgba(255,255,255,0.06)" }}>
-                        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: isWinner ? "var(--win-border)" : isMe ? "var(--accent)" : "rgba(255,255,255,0.18)" }} />
+                        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: isWinner ? "var(--win-border)" : isLoss ? "var(--loss-border)" : isMe ? "var(--accent)" : "rgba(255,255,255,0.18)" }} />
                       </div>
                     </div>
                   );

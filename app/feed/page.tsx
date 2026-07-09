@@ -724,12 +724,11 @@ function PostCard({
         return (
           <div className="flex flex-col gap-2">
             <div
-              className="flex overflow-x-auto"
-              style={{ scrollSnapType: "x mandatory", scrollbarWidth: "none" } as React.CSSProperties}
+              style={{ display: "flex", overflowX: "auto", width: "100%", scrollSnapType: "x mandatory", scrollbarWidth: "none" } as React.CSSProperties}
               onScroll={(e) => setCarouselPage(Math.round(e.currentTarget.scrollLeft / e.currentTarget.clientWidth))}
             >
-              <div style={{ minWidth: "100%", scrollSnapAlign: "start" }}>{embeddedBet}</div>
-              <div className="flex flex-col gap-2.5" style={{ minWidth: "100%", scrollSnapAlign: "start" }}>
+              <div style={{ minWidth: "100%", flexShrink: 0, scrollSnapAlign: "start" }}>{embeddedBet}</div>
+              <div style={{ minWidth: "100%", flexShrink: 0, scrollSnapAlign: "start", display: "flex", flexDirection: "column", gap: 10 }}>
                 {item.photo_url && <img src={item.photo_url} alt="" className="w-full rounded-[12px] object-cover" style={{ maxHeight: 340 }} />}
                 {item.caption && (
                   <p className="text-[14px] leading-snug" style={{ color: "var(--text)" }}>
