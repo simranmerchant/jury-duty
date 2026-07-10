@@ -652,7 +652,7 @@ function PostCard({
 
       {/* Carousel: page 1 = bet, page 2 = photo + caption */}
       {(() => {
-        const hasMedia = !!(item.photo_url || item.caption);
+        const hasMedia = !!item.photo_url;
         const embeddedBet = (
           <div className="rounded-[12px] p-3 flex flex-col gap-2" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
             {bet.events?.name && bet.event_id && (
@@ -712,7 +712,20 @@ function PostCard({
             {winOpt && <p className="text-[12px] font-bold" style={{ color: "var(--win)" }}>✓ {winOpt.label} won</p>}
           </div>
         );
-        if (!hasMedia) return embeddedBet;
+        if (!hasMedia) return (
+          <>
+            {embeddedBet}
+            {item.caption && (
+              <p className="text-[14px] leading-snug mt-2" style={{ color: "var(--text)" }}>
+                {item.caption.split(/(@\w+)/g).map((part, i) =>
+                  /^@\w+$/.test(part)
+                    ? <a key={i} href={`/u/${part.slice(1)}`} style={{ color: "var(--accent)", fontWeight: 600, textDecoration: "none" }}>{part}</a>
+                    : part
+                )}
+              </p>
+            )}
+          </>
+        );
         return (
           <div className="flex flex-col gap-2">
             <div
