@@ -695,7 +695,7 @@ function BetCard({
   const [showShareFeed, setShowShareFeed] = useState(false);
   const [shareCaption, setShareCaption] = useState("");
   const [sharingToFeed, setSharingToFeed] = useState(false);
-  const [sharedToFeed, setSharedToFeed] = useState(false);
+  const [sharedToFeed, setSharedToFeed] = useState(() => (bet.posts ?? []).some((p) => p.user_id === userId));
   const [sharePhoto, setSharePhoto] = useState<File | null>(null);
   const [sharePhotoPreview, setSharePhotoPreview] = useState<string | null>(null);
   const sharePhotoInputRef = useRef<HTMLInputElement>(null);
