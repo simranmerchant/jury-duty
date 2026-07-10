@@ -530,6 +530,8 @@ function PostCard({
   const [gifSearch, setGifSearch] = useState("");
   const [gifResults, setGifResults] = useState<GifResult[]>([]);
   const [gifLoading, setGifLoading] = useState(false);
+  const [mentionSuggestions, setMentionSuggestions] = useState<{ user_id: string; display_name: string | null; username: string | null; avatar_url: string | null }[]>([]);
+  const mentionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!showMenu) return;
@@ -600,6 +602,28 @@ function PostCard({
     });
     setComments((prev) => prev.filter((c) => c.id !== commentId));
     setCommentCount((c) => c - 1);
+  }
+
+  function onCommentChange(text: string) {
+    setCommentInput(text);
+    const match = text.match(/@(\w+)$/);
+    if (match) {
+      if (mentionTimeoutRef.current) clearTimeout(mentionTimeoutRef.current);
+      mentionTimeoutRef.current = setTimeout(async () => {
+        const token = await getAccessToken();
+        const res = await fetch(`/api/v1/users/search?q=${encodeURIComponent(match[1])}`, { headers: { Authorization: `Bearer ${token}` } });
+        const data = await res.json();
+        setMentionSuggestions(data?.users ?? []);
+      }, 200);
+    } else {
+      if (mentionTimeoutRef.current) clearTimeout(mentionTimeoutRef.current);
+      setMentionSuggestions([]);
+    }
+  }
+
+  function selectMention(username: string) {
+    setCommentInput((prev) => prev.replace(/@\w*$/, `@${username} `));
+    setMentionSuggestions([]);
   }
 
   async function deletePost() {
@@ -823,7 +847,15 @@ function PostCard({
                     </div>
                     <div className="flex-1">
                       <p className="text-[12px] font-bold" style={{ color: "var(--text)" }}>{name}</p>
-                      {c.body && <p className="text-[13px] mt-0.5" style={{ color: "var(--text)" }}>{c.body}</p>}
+                      {c.body && (
+                        <p className="text-[13px] mt-0.5" style={{ color: "var(--text)" }}>
+                          {c.body.split(/(@\w+)/g).map((part, i) =>
+                            /^@\w+$/.test(part)
+                              ? <a key={i} href={`/u/${part.slice(1)}`} style={{ color: "var(--accent)", fontWeight: 600, textDecoration: "none" }}>{part}</a>
+                              : part
+                          )}
+                        </p>
+                      )}
                       {c.gif_url && <img src={c.gif_url} alt="gif" className="rounded-xl mt-1" style={{ maxWidth: 200, maxHeight: 150, objectFit: "cover" }} />}
                     </div>
                     {c.user_id === currentUserId && (
@@ -865,10 +897,25 @@ function PostCard({
                   </div>
                 </div>
               )}
+              {mentionSuggestions.length > 0 && (
+                <div style={{ borderTop: "1px solid var(--border-soft)" }}>
+                  {mentionSuggestions.slice(0, 5).map((u) => (
+                    <button key={u.user_id} type="button" onClick={() => selectMention(u.username!)} className="w-full flex items-center gap-2.5 px-6 py-2.5 text-left hover:bg-white/5" style={{ borderBottom: "1px solid var(--border-soft)" }}>
+                      <div className="w-7 h-7 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0" style={{ background: "var(--accent-dim)" }}>
+                        {u.avatar_url ? <img src={u.avatar_url} alt="" className="w-full h-full object-cover" /> : <span className="text-[10px] font-black" style={{ color: "var(--accent)" }}>{(u.display_name ?? u.username ?? "?")[0].toUpperCase()}</span>}
+                      </div>
+                      <div>
+                        <p className="text-[13px] font-bold" style={{ color: "var(--text)" }}>{u.display_name ?? u.username}</p>
+                        {u.username && <p className="text-[11px]" style={{ color: "var(--dimmer)" }}>@{u.username}</p>}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
               <form onSubmit={submitComment} className="flex gap-2 px-6 py-3 items-center">
                 <input
                   value={commentInput}
-                  onChange={(e) => setCommentInput(e.target.value)}
+                  onChange={(e) => onCommentChange(e.target.value)}
                   placeholder="add a comment..."
                   maxLength={500}
                   className="flex-1 text-[14px] px-4 py-3 rounded-2xl outline-none"
