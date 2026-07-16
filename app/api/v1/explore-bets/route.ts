@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
     const myEntry = entries.find((e) => e.user_id === user.userId) ?? null;
 
     // Only show posts from public accounts on the card
-    const allPosts = (bet.explore_bet_posts ?? []) as Array<{
+    const allPosts = (bet.explore_bet_posts ?? []) as unknown as Array<{
       id: string; caption: string | null; created_at: string;
       user: { user_id: string; display_name: string; username: string; avatar_url: string | null; is_private: boolean } | null;
     }>;

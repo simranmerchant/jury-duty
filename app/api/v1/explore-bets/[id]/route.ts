@@ -38,7 +38,7 @@ export async function GET(
   const totalB = entries.filter((e) => e.side === "b").reduce((s, e) => s + e.points_wagered, 0);
   const myEntry = entries.find((e) => e.user_id === user.userId) ?? null;
 
-  const allPosts = (bet.explore_bet_posts ?? []) as Array<{
+  const allPosts = (bet.explore_bet_posts ?? []) as unknown as Array<{
     id: string; caption: string | null; created_at: string;
     user: { user_id: string; display_name: string; username: string; avatar_url: string | null; is_private: boolean } | null;
   }>;
