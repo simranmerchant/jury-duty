@@ -64,6 +64,15 @@ function UserIcon({ color }: { color: string }) {
   );
 }
 
+function CompassIcon({ color }: { color: string }) {
+  return (
+    <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <path d="m16.24 7.76-2.12 6.36-6.36 2.12 2.12-6.36 6.36-2.12z" />
+    </svg>
+  );
+}
+
 export default function BottomNav() {
   const pathname = usePathname();
   const router = useRouter();
@@ -91,6 +100,7 @@ export default function BottomNav() {
   const tabs = [
     { href: "/feed", icon: (c: string) => <HomeIcon color={c} /> },
     { href: "/events", icon: (c: string) => <CalendarIcon color={c} /> },
+    { href: "/explore", icon: (c: string) => <CompassIcon color={c} /> },
     { href: "/people", icon: (c: string) => <SearchIcon color={c} /> },
     { href: "/notifications", icon: (c: string) => <BellIcon color={c} unread={unread} /> },
     { href: "/profile", icon: (c: string) => <UserIcon color={c} /> },
