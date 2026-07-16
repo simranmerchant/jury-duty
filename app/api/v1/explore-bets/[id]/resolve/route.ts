@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/privy";
 import { supabase } from "@/lib/supabase";
 import { sendPushToUsers } from "@/lib/push";
+import { computeExplorePayout } from "@/lib/explore-payout";
 
 // POST /api/v1/explore-bets/[id]/resolve — resolve bet and pay out winners
 // winning_side: 'a' | 'b' | null (null = void, refund all)
@@ -38,41 +39,8 @@ export async function POST(
     .select("user_id, side, points_wagered")
     .eq("explore_bet_id", id);
 
-  const allEntries = (entries ?? []) as Array<{ user_id: string; side: string; points_wagered: number }>;
-
-  // Compute payouts
-  const payouts: Record<string, number> = {};
-
-  if (winning_side === null) {
-    // Void: refund everyone
-    for (const e of allEntries) {
-      payouts[e.user_id] = (payouts[e.user_id] ?? 0) + e.points_wagered;
-    }
-  } else {
-    const winners = allEntries.filter((e) => e.side === winning_side);
-    const losers = allEntries.filter((e) => e.side !== winning_side);
-
-    if (winners.length === 0) {
-      // No one on winning side — refund all
-      for (const e of allEntries) {
-        payouts[e.user_id] = (payouts[e.user_id] ?? 0) + e.points_wagered;
-      }
-    } else {
-      const totalPot = allEntries.reduce((s, e) => s + e.points_wagered, 0);
-      const winnerTotal = winners.reduce((s, e) => s + e.points_wagered, 0);
-
-      // Proportional payout: each winner gets (their_stake / winner_total) * total_pot
-      let distributed = 0;
-      for (let i = 0; i < winners.length; i++) {
-        const w = winners[i];
-        const share = i < winners.length - 1
-          ? Math.floor((w.points_wagered / winnerTotal) * totalPot)
-          : totalPot - distributed; // last winner gets remainder
-        payouts[w.user_id] = (payouts[w.user_id] ?? 0) + share;
-        distributed += share;
-      }
-    }
-  }
+  const allEntries = (entries ?? []) as Array<{ user_id: string; side: "a" | "b"; points_wagered: number }>;
+  const payouts = computeExplorePayout(allEntries, winning_side);
 
   // Mark resolved
   const { error: updateError } = await supabase
@@ -99,7 +67,7 @@ export async function POST(
         data: { explore_bet_id: id },
       });
     } else {
-      const winnerIds = winners_list(allEntries, winning_side);
+      const winnerIds = allEntries.filter((e) => e.side === winning_side).map((e) => e.user_id);
       const loserIds = allUserIds.filter((uid) => !winnerIds.includes(uid));
       await Promise.all([
         winnerIds.length > 0 && sendPushToUsers(winnerIds, {
@@ -117,8 +85,4 @@ export async function POST(
   }
 
   return NextResponse.json({ ok: true });
-}
-
-function winners_list(entries: Array<{ user_id: string; side: string }>, winning_side: string) {
-  return entries.filter((e) => e.side === winning_side).map((e) => e.user_id);
 }
