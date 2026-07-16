@@ -53,6 +53,7 @@ export default function EventsPage() {
   const [exploreOptB, setExploreOptB] = useState("");
   const [exploreCreating, setExploreCreating] = useState(false);
   const [exploreErr, setExploreErr] = useState<string | null>(null);
+  const [exploreDeadline, setExploreDeadline] = useState("");
   const [activeTab, setActiveTab] = useState<Tab>("events");
   const touchStartX = useRef<number | null>(null);
   const [showCreate, setShowCreate] = useState(false);
@@ -100,7 +101,7 @@ export default function EventsPage() {
     const res = await fetch("/api/v1/explore-bets", {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ question: exploreQ.trim(), option_a: exploreOptA.trim(), option_b: exploreOptB.trim() }),
+      body: JSON.stringify({ question: exploreQ.trim(), option_a: exploreOptA.trim(), option_b: exploreOptB.trim(), closes_at: exploreDeadline ? new Date(exploreDeadline).toISOString() : null }),
     });
     setExploreCreating(false);
     if (!res.ok) {
@@ -108,7 +109,7 @@ export default function EventsPage() {
       setExploreErr(data.error ?? "something went wrong");
       return;
     }
-    setExploreQ(""); setExploreOptA(""); setExploreOptB("");
+    setExploreQ(""); setExploreOptA(""); setExploreOptB(""); setExploreDeadline("");
     setShowExploreCreate(false); setExploreErr(null);
     fetchEvents();
   }
@@ -540,7 +541,7 @@ export default function EventsPage() {
               <h2 className="font-black text-[18px]" style={{ fontFamily: "var(--font-nunito)", color: "var(--text)" }}>
                 new explore bet
               </h2>
-              <button onClick={() => { setShowExploreCreate(false); setExploreQ(""); setExploreOptA(""); setExploreOptB(""); setExploreErr(null); }} style={{ color: "var(--muted)" }}>
+              <button onClick={() => { setShowExploreCreate(false); setExploreQ(""); setExploreOptA(""); setExploreOptB(""); setExploreDeadline(""); setExploreErr(null); }} style={{ color: "var(--muted)" }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                   <path d="M18 6 6 18M6 6l12 12" />
                 </svg>
@@ -570,6 +571,17 @@ export default function EventsPage() {
                   style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-soft)", color: "var(--text)" }}
                   placeholder="No" value={exploreOptB} onChange={(e) => setExploreOptB(e.target.value.slice(0, 80))} maxLength={80} />
               </div>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[12px] font-semibold" style={{ color: "var(--muted)" }}>deadline (optional)</label>
+              <input
+                type="datetime-local"
+                className="rounded-[12px] px-3 py-2.5 text-[14px] outline-none"
+                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-soft)", color: "var(--text)", colorScheme: "dark" }}
+                min={new Date(Date.now() + 60000).toISOString().slice(0, 16)}
+                value={exploreDeadline}
+                onChange={(e) => setExploreDeadline(e.target.value)}
+              />
             </div>
             {exploreErr && <p className="text-[13px]" style={{ color: "var(--loss)" }}>{exploreErr}</p>}
             <button

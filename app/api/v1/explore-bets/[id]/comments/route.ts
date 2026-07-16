@@ -17,19 +17,23 @@ export async function GET(
 
   const { data: raw, error } = await supabase
     .from("explore_bet_comments")
-    .select(`id, body, created_at, user_id, user:user_id(display_name, username, avatar_url)`)
+    .select(`id, body, gif_url, parent_id, created_at, user_id, user:user_id(display_name, username, avatar_url), explore_bet_comment_likes(user_id)`)
     .eq("explore_bet_id", id)
     .order("created_at", { ascending: true })
     .limit(200);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const comments = (raw ?? []).map((c) => ({
+  const comments = (raw ?? []).map((c: any) => ({
     id: c.id,
     body: c.body,
+    gif_url: c.gif_url ?? null,
+    parent_id: c.parent_id ?? null,
     created_at: c.created_at,
+    user_id: c.user_id,
     is_mine: c.user_id === user.userId,
-    user: (c.user as any) ?? null,
+    user: c.user ?? null,
+    comment_likes: (c.explore_bet_comment_likes ?? []) as { user_id: string }[],
   }));
 
   return NextResponse.json({ comments });
@@ -48,10 +52,10 @@ export async function POST(
 
   const { id } = await params;
   const body = await req.json().catch(() => ({}));
-  const { text } = body;
+  const { text, gif_url, parent_id } = body;
 
-  if (!text?.trim()) return NextResponse.json({ error: "comment cannot be empty" }, { status: 400 });
-  if (text.trim().length > 500) return NextResponse.json({ error: "comment too long" }, { status: 400 });
+  if (!text?.trim() && !gif_url) return NextResponse.json({ error: "comment cannot be empty" }, { status: 400 });
+  if (text?.trim().length > 500) return NextResponse.json({ error: "comment too long" }, { status: 400 });
 
   const { data: bet } = await supabase
     .from("explore_bets")
@@ -63,11 +67,23 @@ export async function POST(
 
   const { data: comment, error } = await supabase
     .from("explore_bet_comments")
-    .insert({ explore_bet_id: id, user_id: user.userId, body: text.trim() })
-    .select("id, body, created_at")
+    .insert({
+      explore_bet_id: id,
+      user_id: user.userId,
+      body: text?.trim() || null,
+      gif_url: gif_url ?? null,
+      parent_id: parent_id ?? null,
+    })
+    .select(`id, body, gif_url, parent_id, created_at, user_id, user:user_id(display_name, username, avatar_url)`)
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  return NextResponse.json({ comment }, { status: 201 });
+  return NextResponse.json({
+    comment: {
+      ...(comment as any),
+      is_mine: true,
+      comment_likes: [],
+    },
+  }, { status: 201 });
 }

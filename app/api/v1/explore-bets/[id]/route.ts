@@ -28,7 +28,7 @@ export async function GET(
       ),
       explore_bet_likes(user_id),
       explore_bet_reactions(user_id, emoji),
-      explore_bet_comments(id, body, created_at, user_id, user:user_id(display_name, username, avatar_url))
+      explore_bet_comments(id, body, gif_url, parent_id, created_at, user_id, user:user_id(display_name, username, avatar_url), explore_bet_comment_likes(user_id))
     `)
     .eq("id", id)
     .single();
@@ -54,17 +54,23 @@ export async function GET(
 
   // Comments
   const rawComments = (bet.explore_bet_comments ?? []) as unknown as Array<{
-    id: string; body: string; created_at: string; user_id: string;
+    id: string; body: string | null; gif_url: string | null; parent_id: string | null;
+    created_at: string; user_id: string;
     user: { display_name: string; username: string; avatar_url: string | null } | null;
+    explore_bet_comment_likes: { user_id: string }[];
   }>;
   const comments = rawComments
     .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
     .map((c) => ({
       id: c.id,
       body: c.body,
+      gif_url: c.gif_url,
+      parent_id: c.parent_id,
       created_at: c.created_at,
+      user_id: c.user_id,
       is_mine: c.user_id === user.userId,
       user: c.user ?? null,
+      comment_likes: c.explore_bet_comment_likes ?? [],
     }));
 
   const allPosts = (bet.explore_bet_posts ?? []) as unknown as Array<{
@@ -85,6 +91,7 @@ export async function GET(
       explore_bet_likes: undefined,
       explore_bet_reactions: undefined,
       explore_bet_comments: undefined,
+      explore_bet_comment_likes: undefined,
       is_mine: bet.creator_id === user.userId,
       like_count: likes.length,
       liked_by_me: likedByMe,
