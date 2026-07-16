@@ -5,12 +5,12 @@ import { useRouter } from "next/navigation";
 import BottomNav from "@/components/BottomNav";
 import { useEffect, useState, useCallback, useRef } from "react";
 
-type Tab = "events" | "groups" | "past" | "explore";
+type Tab = "explore" | "events" | "groups" | "past";
 const TABS: { key: Tab; label: string }[] = [
+  { key: "explore", label: "explore" },
   { key: "events", label: "events" },
   { key: "groups", label: "groups" },
   { key: "past", label: "past" },
-  { key: "explore", label: "explore" },
 ];
 
 type Bet = { id: string; status: string; visibility: string };
@@ -54,7 +54,7 @@ export default function EventsPage() {
   const [exploreCreating, setExploreCreating] = useState(false);
   const [exploreErr, setExploreErr] = useState<string | null>(null);
   const [exploreDeadline, setExploreDeadline] = useState("");
-  const [activeTab, setActiveTab] = useState<Tab>("events");
+  const [activeTab, setActiveTab] = useState<Tab>("explore");
   const touchStartX = useRef<number | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [showJoin, setShowJoin] = useState(false);

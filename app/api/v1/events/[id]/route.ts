@@ -132,6 +132,7 @@ export async function GET(
           bet_entries(id, user_id, option_id, points_staked, is_anonymous),
           bet_invites(user_id),
           bet_reactions(user_id, emoji),
+          bet_likes(user_id),
           bet_comments!bet_comments_bet_id_fkey(id),
           posts!posts_bet_id_fkey(id, user_id, caption, photo_url, created_at, balances:user_id(display_name, avatar_url, username))
         )
@@ -159,10 +160,16 @@ export async function GET(
       if (bet.creator_id === user.userId) return true;
       return bet.bet_invites?.some((inv: any) => inv.user_id === user.userId);
     })
-    .map((bet: any) => ({
-      ...bet,
-      isNew: bet.creator_id !== user.userId && (!seenAt || new Date(bet.created_at) > new Date(seenAt)),
-    }));
+    .map((bet: any) => {
+      const likes = (bet.bet_likes ?? []) as Array<{ user_id: string }>;
+      return {
+        ...bet,
+        bet_likes: undefined,
+        like_count: likes.length,
+        liked_by_me: likes.some((l) => l.user_id === user.userId),
+        isNew: bet.creator_id !== user.userId && (!seenAt || new Date(bet.created_at) > new Date(seenAt)),
+      };
+    });
 
   // Guarantee the host appears in event_guests so the mobile client can resolve
   // voter display names without a separate balances join on bet_entries.
