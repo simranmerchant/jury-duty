@@ -19,7 +19,10 @@ export async function GET(req: NextRequest) {
       explore_bet_posts(
         id, caption, created_at,
         user:user_id(user_id, display_name, username, avatar_url, is_private)
-      )
+      ),
+      explore_bet_likes(user_id),
+      explore_bet_reactions(user_id, emoji),
+      explore_bet_comments(id)
     `)
     .order("created_at", { ascending: false })
     .limit(50);
@@ -44,13 +47,27 @@ export async function GET(req: NextRequest) {
 
     const myPost = allPosts.find((p) => p.user?.user_id === user.userId) ?? null;
 
+    const likes = (bet.explore_bet_likes ?? []) as Array<{ user_id: string }>;
+    const rawReactions = (bet.explore_bet_reactions ?? []) as Array<{ user_id: string; emoji: string }>;
+    const reactionCounts: Record<string, number> = {};
+    for (const r of rawReactions) reactionCounts[r.emoji] = (reactionCounts[r.emoji] ?? 0) + 1;
+    const commentCount = (bet.explore_bet_comments ?? []).length;
+
     return {
       ...bet,
       explore_bet_entries: undefined,
       explore_bet_posts: undefined,
+      explore_bet_likes: undefined,
+      explore_bet_reactions: undefined,
+      explore_bet_comments: undefined,
       total_pts_a: totalA,
       total_pts_b: totalB,
       total_entries: entries.length,
+      like_count: likes.length,
+      liked_by_me: likes.some((l) => l.user_id === user.userId),
+      reactions: Object.entries(reactionCounts).map(([emoji, count]) => ({ emoji, count })),
+      my_reaction: rawReactions.find((r) => r.user_id === user.userId)?.emoji ?? null,
+      comment_count: commentCount,
       my_entry: myEntry ? { side: myEntry.side, points_wagered: myEntry.points_wagered } : null,
       my_post: myPost ? { id: myPost.id, caption: myPost.caption } : null,
       public_posts: publicPosts.map((p) => ({

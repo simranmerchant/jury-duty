@@ -13,6 +13,14 @@ type PublicPost = {
   side: "a" | "b" | null;
 };
 
+type Comment = {
+  id: string;
+  body: string;
+  created_at: string;
+  is_mine: boolean;
+  user: { display_name: string; username: string; avatar_url: string | null } | null;
+};
+
 type ExploreBet = {
   id: string;
   question: string;
@@ -26,10 +34,17 @@ type ExploreBet = {
   total_pts_a: number;
   total_pts_b: number;
   total_entries: number;
+  like_count: number;
+  liked_by_me: boolean;
+  reactions: { emoji: string; count: number }[];
+  my_reaction: string | null;
+  comments: Comment[];
   my_entry: { side: "a" | "b"; points_wagered: number } | null;
   my_post: { id: string; caption: string | null } | null;
   public_posts: PublicPost[];
 };
+
+const REACTION_EMOJIS = ["🔥", "🎯", "💀", "😂", "👀", "🤔"];
 
 function Avatar({ url, name, size = 30 }: { url?: string | null; name?: string; size?: number }) {
   if (url) {
@@ -77,6 +92,13 @@ export default function ExploreBetDetail() {
   const [showDelete, setShowDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  // Engagement
+  const [likePending, setLikePending] = useState(false);
+  const [reactPending, setReactPending] = useState(false);
+  const [showReactions, setShowReactions] = useState(false);
+  const [commentText, setCommentText] = useState("");
+  const [posting, setPosting] = useState(false);
 
   const load = useCallback(async () => {
     const token = await getAccessToken();
@@ -151,6 +173,59 @@ export default function ExploreBetDetail() {
     setDeleting(false);
     if (res.ok) { router.back(); return; }
     setDeleteError(data.error ?? "something went wrong");
+  }
+
+  async function toggleLike() {
+    if (!bet || likePending) return;
+    setLikePending(true);
+    const token = await getAccessToken();
+    const res = await fetch(`/api/v1/explore-bets/${id}/like`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await res.json().catch(() => ({}));
+    setLikePending(false);
+    if (res.ok) setBet((b) => b ? { ...b, liked_by_me: data.liked, like_count: data.like_count } : b);
+  }
+
+  async function react(emoji: string) {
+    if (!bet || reactPending) return;
+    setReactPending(true);
+    setShowReactions(false);
+    const token = await getAccessToken();
+    const res = await fetch(`/api/v1/explore-bets/${id}/react`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ emoji }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setReactPending(false);
+    if (res.ok) setBet((b) => b ? { ...b, my_reaction: data.my_reaction, reactions: data.reactions } : b);
+  }
+
+  async function postComment() {
+    if (!commentText.trim() || posting) return;
+    setPosting(true);
+    const token = await getAccessToken();
+    const res = await fetch(`/api/v1/explore-bets/${id}/comments`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ text: commentText.trim() }),
+    });
+    setPosting(false);
+    if (res.ok) {
+      setCommentText("");
+      await load();
+    }
+  }
+
+  async function deleteComment(commentId: string) {
+    const token = await getAccessToken();
+    await fetch(`/api/v1/explore-bets/${id}/comments/${commentId}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    setBet((b) => b ? { ...b, comments: b.comments.filter((c) => c.id !== commentId) } : b);
   }
 
   async function resolve(winning_side: "a" | "b" | null) {
@@ -378,6 +453,126 @@ export default function ExploreBetDetail() {
           {bet.total_entries} bet{bet.total_entries !== 1 ? "s" : ""} · {total} pts wagered
           {bet.closes_at && isOpen ? ` · closes ${new Date(bet.closes_at).toLocaleDateString()}` : ""}
         </p>
+
+        {/* Engagement bar */}
+        <div className="flex items-center gap-3 relative">
+          {/* Like */}
+          <button
+            onClick={toggleLike}
+            disabled={likePending}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[13px] font-semibold transition-colors"
+            style={{
+              border: `1px solid ${bet.liked_by_me ? "var(--accent-border)" : "var(--border)"}`,
+              background: bet.liked_by_me ? "var(--accent-dim)" : "transparent",
+              color: bet.liked_by_me ? "var(--accent)" : "var(--muted)",
+            }}
+          >
+            <span>{bet.liked_by_me ? "❤️" : "🤍"}</span>
+            {bet.like_count > 0 && <span>{bet.like_count}</span>}
+          </button>
+
+          {/* Reaction toggle */}
+          <button
+            onClick={() => setShowReactions((v) => !v)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[13px] font-semibold"
+            style={{
+              border: `1px solid ${bet.my_reaction ? "var(--accent-border)" : "var(--border)"}`,
+              background: bet.my_reaction ? "var(--accent-dim)" : "transparent",
+              color: bet.my_reaction ? "var(--accent)" : "var(--muted)",
+            }}
+          >
+            <span>{bet.my_reaction ?? "😶"}</span>
+            <span>react</span>
+          </button>
+
+          {/* Reaction summary */}
+          {bet.reactions.length > 0 && (
+            <div className="flex items-center gap-1">
+              {bet.reactions.slice(0, 4).map((r) => (
+                <span key={r.emoji} className="text-[13px]">{r.emoji} {r.count}</span>
+              ))}
+            </div>
+          )}
+
+          {/* Reaction picker */}
+          {showReactions && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setShowReactions(false)} />
+              <div
+                className="absolute top-10 left-0 z-20 flex gap-2 p-3 rounded-[14px]"
+                style={{ background: "var(--card)", border: "1px solid var(--border)", boxShadow: "0 4px 20px rgba(0,0,0,0.4)" }}
+              >
+                {REACTION_EMOJIS.map((emoji) => (
+                  <button
+                    key={emoji}
+                    onClick={() => react(emoji)}
+                    className="text-[22px] transition-transform hover:scale-125"
+                    style={{ opacity: reactPending ? 0.5 : 1 }}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Comments */}
+        <div className="flex flex-col gap-3">
+          {bet.comments.length > 0 && (
+            <>
+              <p className="text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>
+                comments
+              </p>
+              {bet.comments.map((c) => (
+                <div key={c.id} className="flex gap-2.5 items-start">
+                  <Avatar url={c.user?.avatar_url} name={c.user?.display_name ?? "?"} size={26} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[13px] font-semibold" style={{ color: "var(--text)" }}>
+                        {c.user?.display_name ?? "unknown"}
+                      </span>
+                      <span className="text-[11px]" style={{ color: "var(--dimmer)" }}>
+                        {new Date(c.created_at).toLocaleDateString()}
+                      </span>
+                      {c.is_mine && (
+                        <button
+                          onClick={() => deleteComment(c.id)}
+                          className="text-[11px] ml-auto"
+                          style={{ color: "var(--dimmer)" }}
+                        >
+                          delete
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-[14px] leading-snug mt-0.5" style={{ color: "var(--text)" }}>{c.body}</p>
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+
+          {/* Comment input */}
+          <div className="flex gap-2 items-center">
+            <input
+              className="flex-1 rounded-[10px] px-3 py-2 text-[14px] outline-none"
+              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-soft)", color: "var(--text)" }}
+              placeholder="add a comment…"
+              value={commentText}
+              onChange={(e) => setCommentText(e.target.value.slice(0, 500))}
+              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); postComment(); } }}
+              maxLength={500}
+            />
+            <button
+              onClick={postComment}
+              disabled={posting || !commentText.trim()}
+              className="px-3 py-2 rounded-[10px] font-semibold text-[13px] text-white disabled:opacity-40"
+              style={{ background: "var(--accent)" }}
+            >
+              {posting ? "…" : "post"}
+            </button>
+          </div>
+        </div>
 
         {/* Public posts */}
         {bet.public_posts.length > 0 && (

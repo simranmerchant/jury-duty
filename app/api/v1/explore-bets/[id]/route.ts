@@ -25,7 +25,10 @@ export async function GET(
       explore_bet_posts(
         id, caption, created_at,
         user:user_id(user_id, display_name, username, avatar_url, is_private)
-      )
+      ),
+      explore_bet_likes(user_id),
+      explore_bet_reactions(user_id, emoji),
+      explore_bet_comments(id, body, created_at, user_id, user:user_id(display_name, username, avatar_url))
     `)
     .eq("id", id)
     .single();
@@ -38,6 +41,31 @@ export async function GET(
   const totalA = entries.filter((e) => e.side === "a").reduce((s, e) => s + e.points_wagered, 0);
   const totalB = entries.filter((e) => e.side === "b").reduce((s, e) => s + e.points_wagered, 0);
   const myEntry = entries.find((e) => e.user_id === user.userId) ?? null;
+
+  // Likes
+  const likes = (bet.explore_bet_likes ?? []) as Array<{ user_id: string }>;
+  const likedByMe = likes.some((l) => l.user_id === user.userId);
+
+  // Reactions
+  const rawReactions = (bet.explore_bet_reactions ?? []) as Array<{ user_id: string; emoji: string }>;
+  const reactionCounts: Record<string, number> = {};
+  for (const r of rawReactions) reactionCounts[r.emoji] = (reactionCounts[r.emoji] ?? 0) + 1;
+  const myReaction = rawReactions.find((r) => r.user_id === user.userId)?.emoji ?? null;
+
+  // Comments
+  const rawComments = (bet.explore_bet_comments ?? []) as unknown as Array<{
+    id: string; body: string; created_at: string; user_id: string;
+    user: { display_name: string; username: string; avatar_url: string | null } | null;
+  }>;
+  const comments = rawComments
+    .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+    .map((c) => ({
+      id: c.id,
+      body: c.body,
+      created_at: c.created_at,
+      is_mine: c.user_id === user.userId,
+      user: c.user ?? null,
+    }));
 
   const allPosts = (bet.explore_bet_posts ?? []) as unknown as Array<{
     id: string; caption: string | null; created_at: string;
@@ -54,7 +82,15 @@ export async function GET(
       ...bet,
       explore_bet_entries: undefined,
       explore_bet_posts: undefined,
+      explore_bet_likes: undefined,
+      explore_bet_reactions: undefined,
+      explore_bet_comments: undefined,
       is_mine: bet.creator_id === user.userId,
+      like_count: likes.length,
+      liked_by_me: likedByMe,
+      reactions: Object.entries(reactionCounts).map(([emoji, count]) => ({ emoji, count })),
+      my_reaction: myReaction,
+      comments,
       total_pts_a: totalA,
       total_pts_b: totalB,
       total_entries: entries.length,
