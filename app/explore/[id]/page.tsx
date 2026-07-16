@@ -22,7 +22,7 @@ type ExploreBet = {
   winning_side: "a" | "b" | null;
   closes_at: string | null;
   created_at: string;
-  creator: { display_name: string; username: string; avatar_url: string | null } | null;
+  is_mine: boolean;
   total_pts_a: number;
   total_pts_b: number;
   total_entries: number;
@@ -72,6 +72,10 @@ export default function ExploreBetDetail() {
   // Resolve sheet
   const [showResolve, setShowResolve] = useState(false);
   const [resolving, setResolving] = useState(false);
+
+  // Delete sheet
+  const [showDelete, setShowDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
     const token = await getAccessToken();
@@ -134,6 +138,17 @@ export default function ExploreBetDetail() {
     await load();
   }
 
+  async function deleteBet() {
+    setDeleting(true);
+    const token = await getAccessToken();
+    const res = await fetch(`/api/v1/explore-bets/${id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    setDeleting(false);
+    if (res.ok) router.back();
+  }
+
   async function resolve(winning_side: "a" | "b" | null) {
     setResolving(true);
     const token = await getAccessToken();
@@ -166,8 +181,8 @@ export default function ExploreBetDetail() {
   }
 
   const total = bet.total_pts_a + bet.total_pts_b;
-  const pctA = total > 0 ? Math.round((bet.total_pts_a / total) * 100) : 50;
-  const pctB = 100 - pctA;
+  const pctA = total > 0 ? Math.round((bet.total_pts_a / total) * 100) : null;
+  const pctB = pctA !== null ? 100 - pctA : null;
   const hasBet = !!bet.my_entry;
   const isOpen = bet.status === "open";
   const isResolved = bet.status === "resolved";
@@ -193,22 +208,31 @@ export default function ExploreBetDetail() {
           </svg>
           back
         </button>
-        {isOpen && (
-          <button
-            onClick={() => setShowResolve(true)}
-            className="text-[13px] px-3 py-1 rounded-full"
-            style={{ border: "1px solid var(--border)", color: "var(--muted)" }}
-          >
-            resolve
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {isOpen && bet.is_mine && (
+            <button
+              onClick={() => setShowResolve(true)}
+              className="text-[13px] px-3 py-1 rounded-full"
+              style={{ border: "1px solid var(--border)", color: "var(--muted)" }}
+            >
+              resolve
+            </button>
+          )}
+          {bet.is_mine && (
+            <button
+              onClick={() => setShowDelete(true)}
+              className="text-[13px] px-3 py-1 rounded-full"
+              style={{ border: "1px solid var(--loss-border)", color: "var(--loss)" }}
+            >
+              delete
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="max-w-lg mx-auto px-4 pt-5 flex flex-col gap-5">
-        {/* Creator + status */}
+        {/* Status */}
         <div className="flex items-center gap-2">
-          <Avatar url={bet.creator?.avatar_url} name={bet.creator?.display_name ?? "?"} size={22} />
-          <span className="text-[13px] flex-1" style={{ color: "var(--muted)" }}>@{bet.creator?.username}</span>
           <span
             className="text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full"
             style={{
@@ -253,7 +277,7 @@ export default function ExploreBetDetail() {
               >
                 <div style={{
                   position: "absolute", top: 0, left: 0, bottom: 0,
-                  width: `${pct}%`,
+                  width: `${pct ?? 50}%`,
                   background: barColor(side) + "28",
                   transition: "width 0.4s ease",
                 }} />
@@ -262,7 +286,7 @@ export default function ExploreBetDetail() {
                   {label}
                 </span>
                 <div className="relative pr-3 flex items-center gap-2">
-                  <span className="text-[14px] font-semibold" style={{ color: labelColor(side) }}>{pct}%</span>
+                  <span className="text-[14px] font-semibold" style={{ color: labelColor(side) }}>{pct !== null ? `${pct}%` : "—"}</span>
                   <span className="text-[12px]" style={{ color: "var(--muted)" }}>{pts} pts</span>
                 </div>
               </button>
@@ -415,6 +439,40 @@ export default function ExploreBetDetail() {
               style={{ background: "var(--accent)", opacity: sharing ? 0.5 : 1 }}
             >
               {sharing ? "sharing…" : "post"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Delete sheet */}
+      {showDelete && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center"
+          style={{ background: "rgba(0,0,0,0.6)" }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowDelete(false); }}
+        >
+          <div className="w-full max-w-lg rounded-t-[20px] p-6 flex flex-col gap-4"
+            style={{ background: "var(--card)", border: "1px solid var(--border-soft)" }}>
+            <div className="flex items-center justify-between">
+              <h2 className="font-black text-[18px]" style={{ fontFamily: "var(--font-nunito)", color: "var(--text)" }}>
+                delete bet?
+              </h2>
+              <button onClick={() => setShowDelete(false)} style={{ color: "var(--muted)" }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                  <path d="M18 6 6 18M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <p className="text-[14px]" style={{ color: "var(--muted)" }}>
+              this will refund all entries and remove the bet permanently.
+            </p>
+            <button
+              onClick={deleteBet}
+              disabled={deleting}
+              className="w-full py-3 rounded-[12px] font-bold text-[15px] text-white transition-opacity"
+              style={{ background: "var(--loss)", opacity: deleting ? 0.5 : 1 }}
+            >
+              {deleting ? "deleting…" : "delete bet"}
             </button>
           </div>
         </div>

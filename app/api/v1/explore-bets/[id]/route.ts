@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/privy";
 import { supabase } from "@/lib/supabase";
+import { computeExplorePayout } from "@/lib/explore-payout";
 
 // GET /api/v1/explore-bets/[id] — full detail: all entries + all public posts
 export async function GET(
@@ -18,7 +19,7 @@ export async function GET(
   const { data: bet, error } = await supabase
     .from("explore_bets")
     .select(`
-      id, question, option_a, option_b, status, winning_side, closes_at, created_at,
+      id, question, option_a, option_b, status, winning_side, closes_at, created_at, creator_id,
       creator:creator_id(display_name, username, avatar_url),
       explore_bet_entries(user_id, side, points_wagered, created_at),
       explore_bet_posts(
@@ -53,6 +54,7 @@ export async function GET(
       ...bet,
       explore_bet_entries: undefined,
       explore_bet_posts: undefined,
+      is_mine: bet.creator_id === user.userId,
       total_pts_a: totalA,
       total_pts_b: totalB,
       total_entries: entries.length,
@@ -72,4 +74,50 @@ export async function GET(
       })),
     },
   });
+}
+
+// DELETE /api/v1/explore-bets/[id] — creator deletes bet; refunds open entries
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const token = req.headers.get("authorization")?.replace("Bearer ", "");
+  if (!token) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+  const user = await requireUser(token).catch(() => null);
+  if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+  const { id } = await params;
+
+  const { data: bet } = await supabase
+    .from("explore_bets")
+    .select("creator_id, status")
+    .eq("id", id)
+    .single();
+
+  if (!bet) return NextResponse.json({ error: "not found" }, { status: 404 });
+  if (bet.creator_id !== user.userId) return NextResponse.json({ error: "only the creator can delete this" }, { status: 403 });
+
+  // Refund all entries if the bet hasn't been resolved yet
+  if (bet.status === "open") {
+    const { data: entries } = await supabase
+      .from("explore_bet_entries")
+      .select("user_id, side, points_wagered")
+      .eq("explore_bet_id", id);
+
+    const allEntries = (entries ?? []) as Array<{ user_id: string; side: "a" | "b"; points_wagered: number }>;
+    if (allEntries.length > 0) {
+      const refunds = computeExplorePayout(allEntries, null); // null = void/refund all
+      await Promise.all(
+        Object.entries(refunds).map(([uid, pts]) =>
+          supabase.rpc("increment_balance", { p_user_id: uid, p_amount: pts })
+        )
+      );
+    }
+  }
+
+  const { error } = await supabase.from("explore_bets").delete().eq("id", id);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  return NextResponse.json({ ok: true });
 }

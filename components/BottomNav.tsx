@@ -100,7 +100,6 @@ export default function BottomNav() {
   const tabs = [
     { href: "/feed", icon: (c: string) => <HomeIcon color={c} /> },
     { href: "/events", icon: (c: string) => <CalendarIcon color={c} /> },
-    { href: "/explore", icon: (c: string) => <CompassIcon color={c} /> },
     { href: "/people", icon: (c: string) => <SearchIcon color={c} /> },
     { href: "/notifications", icon: (c: string) => <BellIcon color={c} unread={unread} /> },
     { href: "/profile", icon: (c: string) => <UserIcon color={c} /> },

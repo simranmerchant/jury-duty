@@ -22,7 +22,7 @@ type ExploreBet = {
   winning_side: "a" | "b" | null;
   closes_at: string | null;
   created_at: string;
-  creator: { display_name: string; username: string; avatar_url: string | null } | null;
+  is_mine: boolean;
   total_pts_a: number;
   total_pts_b: number;
   total_entries: number;
@@ -49,8 +49,8 @@ function Avatar({ url, name, size = 26 }: { url?: string | null; name?: string; 
 
 function BetCard({ bet, onClick }: { bet: ExploreBet; onClick: () => void }) {
   const total = bet.total_pts_a + bet.total_pts_b;
-  const pctA = total > 0 ? Math.round((bet.total_pts_a / total) * 100) : 50;
-  const pctB = 100 - pctA;
+  const pctA = total > 0 ? Math.round((bet.total_pts_a / total) * 100) : null;
+  const pctB = pctA !== null ? 100 - pctA : null;
 
   function barColor(side: "a" | "b") {
     if (bet.status === "resolved") {
@@ -74,10 +74,8 @@ function BetCard({ bet, onClick }: { bet: ExploreBet; onClick: () => void }) {
     >
       {/* Header */}
       <div className="flex items-center gap-2">
-        <Avatar url={bet.creator?.avatar_url} name={bet.creator?.display_name ?? "?"} size={20} />
-        <span style={{ color: "var(--muted)", fontSize: 13 }}>@{bet.creator?.username ?? "unknown"}</span>
         <span
-          className="ml-auto text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full"
+          className="text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full"
           style={{
             background: bet.status === "open" ? "var(--accent-dim)" : "rgba(255,255,255,0.05)",
             color: bet.status === "open" ? "var(--accent)" : "var(--muted)",
@@ -107,14 +105,14 @@ function BetCard({ bet, onClick }: { bet: ExploreBet; onClick: () => void }) {
             >
               <div style={{
                 position: "absolute", top: 0, left: 0, bottom: 0,
-                width: `${pct}%`,
+                width: `${pct ?? 50}%`,
                 background: barColor(side) + "28",
               }} />
               <span className="relative pl-3 flex-1 text-[13px] font-medium truncate" style={{ color: labelColor(side) }}>
                 {label}
               </span>
               <span className="relative pr-3 text-[13px] font-semibold" style={{ color: labelColor(side) }}>
-                {pct}%
+                {pct !== null ? `${pct}%` : "—"}
               </span>
             </div>
           );

@@ -5,11 +5,12 @@ import { useRouter } from "next/navigation";
 import BottomNav from "@/components/BottomNav";
 import { useEffect, useState, useCallback, useRef } from "react";
 
-type Tab = "events" | "groups" | "past";
+type Tab = "events" | "groups" | "past" | "explore";
 const TABS: { key: Tab; label: string }[] = [
   { key: "events", label: "events" },
   { key: "groups", label: "groups" },
   { key: "past", label: "past" },
+  { key: "explore", label: "explore" },
 ];
 
 type Bet = { id: string; status: string; visibility: string };
@@ -26,10 +27,32 @@ type Event = {
   hasUnvotedOpen: boolean;
 };
 
+type ExploreBet = {
+  id: string;
+  question: string;
+  option_a: string;
+  option_b: string;
+  status: "open" | "resolved";
+  winning_side: "a" | "b" | null;
+  closes_at: string | null;
+  total_pts_a: number;
+  total_pts_b: number;
+  total_entries: number;
+  my_entry: { side: "a" | "b"; points_wagered: number } | null;
+  public_posts: { id: string; user: { avatar_url: string | null; display_name: string } | null; caption: string | null }[];
+};
+
 export default function EventsPage() {
   const { ready, authenticated, getAccessToken } = usePrivy();
   const router = useRouter();
   const [events, setEvents] = useState<Event[]>([]);
+  const [exploreBets, setExploreBets] = useState<ExploreBet[]>([]);
+  const [showExploreCreate, setShowExploreCreate] = useState(false);
+  const [exploreQ, setExploreQ] = useState("");
+  const [exploreOptA, setExploreOptA] = useState("");
+  const [exploreOptB, setExploreOptB] = useState("");
+  const [exploreCreating, setExploreCreating] = useState(false);
+  const [exploreErr, setExploreErr] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>("events");
   const touchStartX = useRef<number | null>(null);
   const [showCreate, setShowCreate] = useState(false);
@@ -54,13 +77,41 @@ export default function EventsPage() {
 
   const fetchEvents = useCallback(async () => {
     const token = await getAccessToken();
-    const eventsRes = await fetch("/api/v1/events", { headers: { Authorization: `Bearer ${token}` } });
+    const [eventsRes, exploreRes] = await Promise.all([
+      fetch("/api/v1/events", { headers: { Authorization: `Bearer ${token}` } }),
+      fetch("/api/v1/explore-bets", { headers: { Authorization: `Bearer ${token}` } }),
+    ]);
     const eventsData = await eventsRes.json();
+    const exploreData = await exploreRes.json().catch(() => ({}));
     const seenIds = getSeenIds();
     const rawEvents: Event[] = eventsData.events ?? [];
     setEvents(rawEvents.map((e) => seenIds.has(e.id) ? { ...e, hasNew: false } : e));
-
+    setExploreBets(exploreData.bets ?? []);
   }, [getAccessToken]);
+
+  async function createExploreBet() {
+    if (!exploreQ.trim() || !exploreOptA.trim() || !exploreOptB.trim()) {
+      setExploreErr("fill in all fields");
+      return;
+    }
+    setExploreErr(null);
+    setExploreCreating(true);
+    const token = await getAccessToken();
+    const res = await fetch("/api/v1/explore-bets", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ question: exploreQ.trim(), option_a: exploreOptA.trim(), option_b: exploreOptB.trim() }),
+    });
+    setExploreCreating(false);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setExploreErr(data.error ?? "something went wrong");
+      return;
+    }
+    setExploreQ(""); setExploreOptA(""); setExploreOptB("");
+    setShowExploreCreate(false); setExploreErr(null);
+    fetchEvents();
+  }
 
   useEffect(() => {
     if (!ready) return;
@@ -292,19 +343,99 @@ export default function EventsPage() {
           </>
         )}
 
+        {/* Explore tab */}
+        {activeTab === "explore" && (
+          <>
+            {exploreBets.map((bet) => {
+              const total = bet.total_pts_a + bet.total_pts_b;
+              const pctA = total > 0 ? Math.round((bet.total_pts_a / total) * 100) : null;
+              const pctB = pctA !== null ? 100 - pctA : null;
+              return (
+                <button
+                  key={bet.id}
+                  onClick={() => router.push(`/explore/${bet.id}`)}
+                  className="w-full text-left flex flex-col gap-3 rounded-[16px] p-4"
+                  style={{ background: "var(--card)", border: "1px solid var(--border)" }}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full"
+                      style={{ background: bet.status === "open" ? "var(--accent-dim)" : "rgba(255,255,255,0.05)", color: bet.status === "open" ? "var(--accent)" : "var(--muted)" }}>
+                      {bet.status}
+                    </span>
+                    {bet.status === "resolved" && bet.winning_side && (
+                      <span className="text-[12px] font-semibold" style={{ color: "var(--win)" }}>
+                        {bet.winning_side === "a" ? bet.option_a : bet.option_b} won
+                      </span>
+                    )}
+                  </div>
+                  <p className="font-semibold text-[15px] leading-snug" style={{ color: "var(--text)" }}>{bet.question}</p>
+                  <div className="flex flex-col gap-1.5">
+                    {(["a", "b"] as const).map((side) => {
+                      const label = side === "a" ? bet.option_a : bet.option_b;
+                      const pct = side === "a" ? pctA : pctB;
+                      const myPick = bet.my_entry?.side === side;
+                      const isResolved = bet.status === "resolved";
+                      const bc = isResolved ? (bet.winning_side === side ? "var(--win)" : "var(--loss)") : myPick ? "var(--accent)" : "var(--dimmer)";
+                      return (
+                        <div key={side} className="relative flex items-center rounded-[10px] overflow-hidden"
+                          style={{ height: 34, border: `1px solid ${myPick ? "var(--accent-border)" : "var(--border)"}` }}>
+                          <div style={{ position: "absolute", top: 0, left: 0, bottom: 0, width: `${pct ?? 50}%`, background: bc + "28" }} />
+                          <span className="relative pl-3 flex-1 text-[12px] font-medium truncate" style={{ color: bc }}>{label}</span>
+                          <span className="relative pr-3 text-[12px] font-semibold" style={{ color: bc }}>{pct !== null ? `${pct}%` : "—"}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {bet.public_posts.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <div className="flex" style={{ gap: -4 }}>
+                        {bet.public_posts.slice(0, 4).map((p) => (
+                          p.user?.avatar_url
+                            ? <img key={p.id} src={p.user.avatar_url} alt="" style={{ width: 18, height: 18, borderRadius: "50%", objectFit: "cover", marginRight: -5 }} />
+                            : <div key={p.id} style={{ width: 18, height: 18, borderRadius: "50%", background: "var(--accent-dim)", border: "1px solid var(--accent-border)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, color: "var(--accent)", fontWeight: 700, marginRight: -5 }}>
+                                {(p.user?.display_name ?? "?")[0].toUpperCase()}
+                              </div>
+                        ))}
+                      </div>
+                      {bet.public_posts[0]?.caption && (
+                        <span className="text-[12px] italic truncate flex-1" style={{ color: "var(--muted)", marginLeft: 10 }}>
+                          "{bet.public_posts[0].caption}"
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  <p className="text-[12px]" style={{ color: "var(--muted)" }}>
+                    {bet.total_entries} bet{bet.total_entries !== 1 ? "s" : ""}
+                    {bet.closes_at && bet.status === "open" ? ` · closes ${new Date(bet.closes_at).toLocaleDateString()}` : ""}
+                    {bet.my_entry ? ` · you picked ${bet.my_entry.side === "a" ? bet.option_a : bet.option_b}` : ""}
+                  </p>
+                </button>
+              );
+            })}
+            {exploreBets.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-20 gap-2">
+                <p className="text-[15px] font-semibold italic" style={{ color: "var(--muted)" }}>no bets yet</p>
+                <p className="text-[13px]" style={{ color: "var(--dimmer)" }}>tap + new to post the first explore bet</p>
+              </div>
+            )}
+          </>
+        )}
+
       </div>
 
       {/* Floating action buttons */}
       <div className="fixed bottom-0 left-0 right-0 flex gap-2.5 px-4 pb-[76px] pt-3" style={{ zIndex: 10, background: "linear-gradient(to top, var(--bg) 65%, transparent 100%)" }}>
+        {activeTab !== "explore" && (
+          <button
+            onClick={() => setShowJoin(true)}
+            className="flex-1 py-3.5 rounded-[12px] font-semibold text-[14px]"
+            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border)", color: "var(--muted)" }}
+          >
+            join
+          </button>
+        )}
         <button
-          onClick={() => setShowJoin(true)}
-          className="flex-1 py-3.5 rounded-[12px] font-semibold text-[14px]"
-          style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border)", color: "var(--muted)" }}
-        >
-          join
-        </button>
-        <button
-          onClick={() => setShowCreate(true)}
+          onClick={() => activeTab === "explore" ? setShowExploreCreate(true) : setShowCreate(true)}
           className="flex-[2] py-3.5 rounded-[12px] font-black text-[15px] text-white"
           style={{ background: "var(--accent)", fontFamily: "var(--font-nunito)", letterSpacing: "-0.01em" }}
         >
@@ -391,6 +522,63 @@ export default function EventsPage() {
               style={{ background: "var(--accent)", fontFamily: "var(--font-nunito)" }}
             >
               {creating ? "creating..." : `create ${createType}`}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Explore create modal */}
+      {showExploreCreate && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center"
+          style={{ background: "rgba(0,0,0,0.6)" }}
+          onClick={(e) => { if (e.target === e.currentTarget) { setShowExploreCreate(false); setExploreQ(""); setExploreOptA(""); setExploreOptB(""); setExploreErr(null); } }}
+        >
+          <div className="w-full max-w-lg rounded-t-[20px] p-6 flex flex-col gap-4"
+            style={{ background: "var(--card)", border: "1px solid var(--border-soft)" }}>
+            <div className="flex items-center justify-between">
+              <h2 className="font-black text-[18px]" style={{ fontFamily: "var(--font-nunito)", color: "var(--text)" }}>
+                new explore bet
+              </h2>
+              <button onClick={() => { setShowExploreCreate(false); setExploreQ(""); setExploreOptA(""); setExploreOptB(""); setExploreErr(null); }} style={{ color: "var(--muted)" }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                  <path d="M18 6 6 18M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[12px] font-semibold" style={{ color: "var(--muted)" }}>question</label>
+              <textarea
+                className="w-full rounded-[12px] px-4 py-3 text-[14px] resize-none outline-none"
+                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-soft)", color: "var(--text)", minHeight: 72 }}
+                placeholder="e.g. Will it snow in NYC this winter?"
+                value={exploreQ}
+                onChange={(e) => setExploreQ(e.target.value.slice(0, 200))}
+                autoFocus
+              />
+            </div>
+            <div className="flex gap-3">
+              <div className="flex-1 flex flex-col gap-1">
+                <label className="text-[12px] font-semibold" style={{ color: "var(--muted)" }}>option A</label>
+                <input className="rounded-[12px] px-3 py-2.5 text-[14px] outline-none"
+                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-soft)", color: "var(--text)" }}
+                  placeholder="Yes" value={exploreOptA} onChange={(e) => setExploreOptA(e.target.value.slice(0, 80))} maxLength={80} />
+              </div>
+              <div className="flex-1 flex flex-col gap-1">
+                <label className="text-[12px] font-semibold" style={{ color: "var(--muted)" }}>option B</label>
+                <input className="rounded-[12px] px-3 py-2.5 text-[14px] outline-none"
+                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-soft)", color: "var(--text)" }}
+                  placeholder="No" value={exploreOptB} onChange={(e) => setExploreOptB(e.target.value.slice(0, 80))} maxLength={80} />
+              </div>
+            </div>
+            {exploreErr && <p className="text-[13px]" style={{ color: "var(--loss)" }}>{exploreErr}</p>}
+            <button
+              onClick={createExploreBet}
+              disabled={exploreCreating || !exploreQ.trim() || !exploreOptA.trim() || !exploreOptB.trim()}
+              className="w-full py-3 rounded-[12px] font-bold text-[15px] text-white transition-opacity disabled:opacity-40"
+              style={{ background: "var(--accent)" }}
+            >
+              {exploreCreating ? "posting…" : "post bet"}
             </button>
           </div>
         </div>
