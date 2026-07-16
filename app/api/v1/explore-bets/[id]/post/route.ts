@@ -21,11 +21,12 @@ export async function POST(
 
   const { data: bet } = await supabase
     .from("explore_bets")
-    .select("id")
+    .select("id, status")
     .eq("id", id)
     .single();
 
   if (!bet) return NextResponse.json({ error: "not found" }, { status: 404 });
+  if (bet.status !== "resolved") return NextResponse.json({ error: "bet must be resolved before sharing" }, { status: 422 });
 
   const { data: post, error } = await supabase
     .from("explore_bet_posts")
