@@ -15,7 +15,7 @@ export async function POST(
 
   const { id } = await params;
   const body = await req.json().catch(() => ({}));
-  const { caption } = body;
+  const { caption, photo_url, targeted_user_ids } = body;
 
   if (caption && caption.length > 280) return NextResponse.json({ error: "caption too long" }, { status: 400 });
 
@@ -26,11 +26,17 @@ export async function POST(
     .single();
 
   if (!bet) return NextResponse.json({ error: "not found" }, { status: 404 });
-  if (bet.status !== "resolved") return NextResponse.json({ error: "bet must be resolved before sharing" }, { status: 422 });
+  if (bet.status !== "resolved") return NextResponse.json({ error: "prediction must be resolved before sharing" }, { status: 422 });
 
   const { data: post, error } = await supabase
     .from("explore_bet_posts")
-    .insert({ explore_bet_id: id, user_id: user.userId, caption: caption?.trim() || null })
+    .insert({
+      explore_bet_id: id,
+      user_id: user.userId,
+      caption: caption?.trim() || null,
+      photo_url: photo_url ?? null,
+      targeted_user_ids: Array.isArray(targeted_user_ids) && targeted_user_ids.length > 0 ? targeted_user_ids : null,
+    })
     .select("id")
     .single();
 
