@@ -53,6 +53,7 @@ export async function GET(req: NextRequest) {
       reactions: Object.entries(reactionCounts).map(([emoji, count]) => ({ emoji, count })),
       my_reaction: rawReactions.find((r) => r.user_id === user.userId)?.emoji ?? null,
       comment_count: commentCount,
+      is_mine: poll.creator_id === user.userId,
     };
   });
 

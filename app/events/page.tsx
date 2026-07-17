@@ -66,6 +66,7 @@ type ExplorePoll = {
   reactions: { emoji: string; count: number }[];
   my_reaction: string | null;
   comment_count: number;
+  is_mine: boolean;
 };
 
 type ExploreComment = {
@@ -400,9 +401,10 @@ function ExploreCard({ bet: initialBet, getAccessToken, onDelete }: {
   );
 }
 
-function ExplorePollCard({ poll: initialPoll, getAccessToken }: {
+function ExplorePollCard({ poll: initialPoll, getAccessToken, onDelete }: {
   poll: ExplorePoll;
   getAccessToken: () => Promise<string | null>;
+  onDelete: () => void;
 }) {
   const [votesA, setVotesA] = useState(initialPoll.votes_a);
   const [votesB, setVotesB] = useState(initialPoll.votes_b);
@@ -428,6 +430,7 @@ function ExplorePollCard({ poll: initialPoll, getAccessToken }: {
   const [userSearchQ, setUserSearchQ] = useState("");
   const [userSearchResults, setUserSearchResults] = useState<{ user_id: string; display_name: string | null; username: string | null; avatar_url: string | null }[]>([]);
   const userSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [showMenu, setShowMenu] = useState(false);
 
   const totalVotes = votesA + votesB;
   const pctA = totalVotes > 0 ? Math.round((votesA / totalVotes) * 100) : null;
@@ -485,6 +488,15 @@ function ExplorePollCard({ poll: initialPoll, getAccessToken }: {
     if (data?.comment) { setComments((prev) => [...prev, data.comment]); setCommentCount((n) => n + 1); }
   }
 
+  async function deletePoll() {
+    const token = await getAccessToken();
+    const res = await fetch(`/api/v1/polls/${initialPoll.id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token ?? ""}` },
+    });
+    if (res.ok) onDelete();
+  }
+
   async function searchUsers(q: string) {
     setUserSearchQ(q);
     if (userSearchTimer.current) clearTimeout(userSearchTimer.current);
@@ -536,6 +548,20 @@ function ExplorePollCard({ poll: initialPoll, getAccessToken }: {
         </span>
         {initialPoll.closes_at && new Date(initialPoll.closes_at) > new Date() && (
           <span className="text-[11px]" style={{ color: "var(--muted)" }}>closes {new Date(initialPoll.closes_at).toLocaleDateString()}</span>
+        )}
+        {initialPoll.is_mine && (
+          <div className="relative ml-auto">
+            <button onClick={() => setShowMenu((v) => !v)} className="w-7 h-7 flex items-center justify-center rounded-full text-[15px] font-bold leading-none"
+              style={{ background: "rgba(255,255,255,0.04)", color: "var(--muted)" }}>⋯</button>
+            {showMenu && (
+              <div className="absolute top-full right-0 mt-1 rounded-[10px] overflow-hidden z-20"
+                style={{ background: "var(--card)", border: "1px solid var(--border-soft)", minWidth: 120, boxShadow: "0 8px 24px rgba(0,0,0,0.5)" }}>
+                <button onClick={() => { setShowMenu(false); deletePoll(); }}
+                  className="w-full px-4 py-2.5 text-left text-[13px] font-semibold"
+                  style={{ color: "var(--loss)" }}>delete poll</button>
+              </div>
+            )}
+          </div>
         )}
       </div>
       {/* Question */}
@@ -600,13 +626,10 @@ function ExplorePollCard({ poll: initialPoll, getAccessToken }: {
           </svg>
           {commentCount > 0 ? `comments ${commentCount}` : "comment"}
         </button>
-        <button onClick={() => setShowShare((v) => !v)}
+        <button onClick={() => setShowShare(true)}
           className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-bold"
-          style={{ background: "rgba(255,255,255,0.04)", border: `1px solid ${shared ? "var(--purple-border)" : "rgba(255,255,255,0.1)"}`, color: shared ? "var(--purple)" : "var(--muted)" }}>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8M16 6l-4-4-4 4M12 2v13" />
-          </svg>
-          {shared ? "shared" : "share"}
+          style={{ background: shared ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: shared ? "var(--win)" : "var(--muted)" }}>
+          {shared ? "shared ✓" : "share"}
         </button>
       </div>
       {/* Share modal */}
@@ -1082,7 +1105,7 @@ export default function EventsPage() {
               {items.map((item) =>
                 item.kind === "bet"
                   ? <ExploreCard key={`bet-${item.id}`} bet={item.data} getAccessToken={getAccessToken} onDelete={() => setExploreBets((prev) => prev.filter((b) => b.id !== item.id))} />
-                  : <ExplorePollCard key={`poll-${item.id}`} poll={item.data} getAccessToken={getAccessToken} />
+                  : <ExplorePollCard key={`poll-${item.id}`} poll={item.data} getAccessToken={getAccessToken} onDelete={() => setExplorePolls((prev) => prev.filter((p) => p.id !== item.id))} />
               )}
               {items.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-20 gap-2">
