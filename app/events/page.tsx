@@ -45,6 +45,7 @@ type ExploreBet = {
   reactions: { emoji: string; count: number }[];
   my_reaction: string | null;
   comment_count: number;
+  is_mine: boolean;
 };
 
 type ExploreComment = {
@@ -57,12 +58,11 @@ type ExploreComment = {
 
 const EXPLORE_EMOJIS = ["🔥", "👀", "💀", "😂", "🤝", "🫡", "🙏"];
 
-function ExploreCard({ bet: initialBet, getAccessToken }: {
+function ExploreCard({ bet: initialBet, getAccessToken, onDelete }: {
   bet: ExploreBet;
   getAccessToken: () => Promise<string | null>;
+  onDelete: () => void;
 }) {
-  const [likeCount, setLikeCount] = useState(initialBet.like_count);
-  const [likedByMe, setLikedByMe] = useState(initialBet.liked_by_me);
   const [reactions, setReactions] = useState(initialBet.reactions);
   const [myReaction, setMyReaction] = useState(initialBet.my_reaction);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -80,14 +80,13 @@ function ExploreCard({ bet: initialBet, getAccessToken }: {
   const grouped: Record<string, number> = {};
   for (const r of reactions) grouped[r.emoji] = r.count;
 
-  async function toggleLike() {
+  async function deleteBet() {
     const token = await getAccessToken();
-    const res = await fetch(`/api/v1/explore-bets/${initialBet.id}/like`, {
-      method: "POST",
+    const res = await fetch(`/api/v1/explore-bets/${initialBet.id}`, {
+      method: "DELETE",
       headers: { Authorization: `Bearer ${token ?? ""}` },
     });
-    const data = await res.json().catch(() => null);
-    if (data) { setLikedByMe(data.liked); setLikeCount(data.like_count); }
+    if (res.ok) onDelete();
   }
 
   async function toggleReaction(emoji: string) {
@@ -131,7 +130,7 @@ function ExploreCard({ bet: initialBet, getAccessToken }: {
 
   return (
     <div className="flex flex-col gap-3 rounded-[16px] p-4" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
-      {/* Status + winning */}
+      {/* Status + winning + delete */}
       <div className="flex items-center gap-2">
         <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full"
           style={{ background: initialBet.status === "open" ? "var(--accent-dim)" : "rgba(255,255,255,0.05)", color: initialBet.status === "open" ? "var(--accent)" : "var(--muted)" }}>
@@ -141,6 +140,12 @@ function ExploreCard({ bet: initialBet, getAccessToken }: {
           <span className="text-[12px] font-semibold" style={{ color: "var(--win)" }}>
             {initialBet.winning_side === "a" ? initialBet.option_a : initialBet.option_b} won
           </span>
+        )}
+        {initialBet.is_mine && (
+          <button onClick={deleteBet} className="ml-auto text-[11px] px-2 py-0.5 rounded-full"
+            style={{ color: "var(--muted)", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+            delete
+          </button>
         )}
       </div>
       {/* Question */}
@@ -171,11 +176,6 @@ function ExploreCard({ bet: initialBet, getAccessToken }: {
       </p>
       {/* Reactions row */}
       <div className="relative flex items-center gap-1.5 flex-wrap pt-2 border-t" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
-        <button onClick={toggleLike} className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[13px]"
-          style={{ background: likedByMe ? "var(--accent-dim)" : "rgba(255,255,255,0.05)", border: `1px solid ${likedByMe ? "var(--accent-border)" : "rgba(255,255,255,0.1)"}`, color: likedByMe ? "var(--accent)" : "var(--muted)" }}>
-          <span>♥</span>
-          {likeCount > 0 && <span className="font-bold text-[11px]">{likeCount}</span>}
-        </button>
         {Object.entries(grouped).map(([emoji, count]) => {
           const isMe = myReaction === emoji;
           return (
@@ -567,7 +567,7 @@ export default function EventsPage() {
         {activeTab === "explore" && (
           <>
             {exploreBets.map((bet) => (
-              <ExploreCard key={bet.id} bet={bet} getAccessToken={getAccessToken} />
+              <ExploreCard key={bet.id} bet={bet} getAccessToken={getAccessToken} onDelete={() => setExploreBets((prev) => prev.filter((b) => b.id !== bet.id))} />
             ))}
             {exploreBets.length === 0 && (
               <div className="flex flex-col items-center justify-center py-20 gap-2">

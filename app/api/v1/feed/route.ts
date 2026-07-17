@@ -60,17 +60,57 @@ export async function GET(req: NextRequest) {
     .order("created_at", { ascending: false })
     .limit(25);
 
+  const pollPostQuery = supabase
+    .from("poll_posts")
+    .select(`
+      id: poll_id, poll_id, user_id, caption, created_at,
+      balances:user_id(display_name, avatar_url, username),
+      polls:poll_id(id, question, option_a, option_b, creator_id, created_at, closes_at,
+        poll_votes(user_id, side),
+        poll_likes(user_id),
+        poll_reactions(user_id, emoji)
+      )
+    `)
+    .in("user_id", feedUserIds)
+    .order("created_at", { ascending: false })
+    .limit(25);
+
   const applyCursor = (q: any) => cursor ? q.lt("created_at", cursor) : q;
 
-  const [{ data: bets }, { data: posts }] = await Promise.all([
+  const [{ data: bets }, { data: posts }, { data: pollPosts }] = await Promise.all([
     applyCursor(betQuery),
     applyCursor(postQuery),
+    applyCursor(pollPostQuery),
   ]);
 
   const betItems = (bets ?? []).map((b: any) => ({ type: "bet" as const, ...b }));
   const postItems = (posts ?? []).map((p: any) => ({ type: "post" as const, ...p }));
+  const pollPostItems = (pollPosts ?? []).map((pp: any) => {
+    const poll = pp.polls as any;
+    if (poll) {
+      const votes = (poll.poll_votes ?? []) as Array<{ user_id: string; side: string }>;
+      const votes_a = votes.filter((v: any) => v.side === "a").length;
+      const votes_b = votes.filter((v: any) => v.side === "b").length;
+      const likes = (poll.poll_likes ?? []) as Array<{ user_id: string }>;
+      const rawReactions = (poll.poll_reactions ?? []) as Array<{ user_id: string; emoji: string }>;
+      const reactionCounts: Record<string, number> = {};
+      for (const r of rawReactions) reactionCounts[r.emoji] = (reactionCounts[r.emoji] ?? 0) + 1;
+      pp.polls = {
+        ...poll,
+        poll_votes: undefined,
+        poll_likes: undefined,
+        poll_reactions: undefined,
+        votes_a,
+        votes_b,
+        total_votes: votes_a + votes_b,
+        like_count: likes.length,
+        reactions: Object.entries(reactionCounts).map(([emoji, count]) => ({ emoji, count })),
+      };
+    }
+    return { type: "poll_post" as const, ...pp };
+  });
 
-  const merged = [...betItems, ...postItems]
+  const merged = [...betItems, ...postItems, ...pollPostItems]
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     .slice(0, 20);
 

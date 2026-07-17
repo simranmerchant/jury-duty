@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
   const { data: bets, error } = await supabase
     .from("explore_bets")
     .select(`
-      id, question, option_a, option_b, status, winning_side, closes_at, created_at,
+      id, question, option_a, option_b, status, winning_side, closes_at, created_at, creator_id,
       creator:creator_id(display_name, username, avatar_url),
       explore_bet_entries(user_id, side, points_wagered),
       explore_bet_posts(
@@ -69,6 +69,7 @@ export async function GET(req: NextRequest) {
       my_reaction: rawReactions.find((r) => r.user_id === user.userId)?.emoji ?? null,
       comment_count: commentCount,
       my_entry: myEntry ? { side: myEntry.side, points_wagered: myEntry.points_wagered } : null,
+      is_mine: (bet as any).creator_id === user.userId,
       my_post: myPost ? { id: myPost.id, caption: myPost.caption } : null,
       public_posts: publicPosts.map((p) => ({
         id: p.id,

@@ -135,6 +135,13 @@ export async function GET(
           bet_likes(user_id),
           bet_comments!bet_comments_bet_id_fkey(id),
           posts!posts_bet_id_fkey(id, user_id, caption, photo_url, created_at, balances:user_id(display_name, avatar_url, username))
+        ),
+        polls(
+          id, question, option_a, option_b, creator_id, created_at, closes_at,
+          poll_votes(user_id, side),
+          poll_likes(user_id),
+          poll_reactions(user_id, emoji),
+          poll_comments!poll_comments_poll_id_fkey(id)
         )
       `)
       .eq("id", id)
@@ -171,6 +178,37 @@ export async function GET(
       };
     });
 
+  // Map polls with aggregates
+  const mappedPolls = ((event as any).polls ?? []).map((poll: any) => {
+    const votes = (poll.poll_votes ?? []) as Array<{ user_id: string; side: string }>;
+    const votes_a = votes.filter((v: any) => v.side === "a").length;
+    const votes_b = votes.filter((v: any) => v.side === "b").length;
+    const myVote = votes.find((v: any) => v.user_id === user.userId)?.side ?? null;
+
+    const likes = (poll.poll_likes ?? []) as Array<{ user_id: string }>;
+    const rawReactions = (poll.poll_reactions ?? []) as Array<{ user_id: string; emoji: string }>;
+    const reactionCounts: Record<string, number> = {};
+    for (const r of rawReactions) reactionCounts[r.emoji] = (reactionCounts[r.emoji] ?? 0) + 1;
+    const commentCount = (poll.poll_comments ?? []).length;
+
+    return {
+      ...poll,
+      poll_votes: undefined,
+      poll_likes: undefined,
+      poll_reactions: undefined,
+      poll_comments: undefined,
+      votes_a,
+      votes_b,
+      total_votes: votes_a + votes_b,
+      my_vote: myVote,
+      like_count: likes.length,
+      liked_by_me: likes.some((l: any) => l.user_id === user.userId),
+      reactions: Object.entries(reactionCounts).map(([emoji, count]) => ({ emoji, count })),
+      my_reaction: rawReactions.find((r: any) => r.user_id === user.userId)?.emoji ?? null,
+      comment_count: commentCount,
+    };
+  });
+
   // Guarantee the host appears in event_guests so the mobile client can resolve
   // voter display names without a separate balances join on bet_entries.
   const { host_balance, ...eventFields } = event as any;
@@ -180,7 +218,7 @@ export async function GET(
     : [...event.event_guests, { user_id: event.host_id, balances: host_balance ?? null }];
 
   return NextResponse.json({
-    event: { ...eventFields, event_guests: eventGuests, bets: filteredBets },
+    event: { ...eventFields, event_guests: eventGuests, bets: filteredBets, polls: mappedPolls },
     userId: user.userId,
   });
 }
