@@ -247,7 +247,6 @@ export default function FeedPage() {
         </div>
       </div>
 
-      <p className="text-[10px] font-semibold px-5 pb-3" style={{ color: "var(--dimmer)", letterSpacing: "0.14em", textTransform: "uppercase" }}>feed</p>
 
       {/* Feed list */}
       <div className="px-4 pb-36 flex flex-col gap-3">
@@ -356,10 +355,10 @@ export default function FeedPage() {
                   style={{ opacity: creator?.username ? 1 : 0.7 }}
                 >
                   <div className="rounded-full flex items-center justify-center overflow-hidden flex-shrink-0"
-                    style={{ width: 32, height: 32, background: "var(--accent-dim)", border: "1px solid var(--accent-border)" }}>
+                    style={{ width: 38, height: 38, background: "var(--accent-dim)", border: "1px solid var(--accent-border)" }}>
                     {creator?.avatar_url
                       ? <img src={creator.avatar_url} alt="" className="w-full h-full object-cover" />
-                      : <span className="text-[12px] font-black" style={{ color: "var(--accent)", fontFamily: "var(--font-nunito)" }}>{creatorName[0]?.toUpperCase() ?? "?"}</span>
+                      : <span className="text-[14px] font-black" style={{ color: "var(--accent)", fontFamily: "var(--font-nunito)" }}>{creatorName[0]?.toUpperCase() ?? "?"}</span>
                     }
                   </div>
                   <div className="text-left">
@@ -403,7 +402,7 @@ export default function FeedPage() {
               </div>
 
               {/* Question */}
-              <p className="text-[15px] font-bold leading-snug" style={{ color: "var(--text)" }}>{bet.question}</p>
+              <p className="text-[19px] font-black leading-tight" style={{ color: "var(--text)", letterSpacing: "-0.015em", fontFamily: "var(--font-nunito)" }}>{bet.question}</p>
 
               {/* Options */}
               <div className="flex flex-col gap-2">
@@ -416,21 +415,19 @@ export default function FeedPage() {
 
                   if (hasVoted || !isOpen) {
                     return (
-                      <div key={opt.id} className="rounded-[10px] p-2.5 flex flex-col gap-1.5"
+                      <div key={opt.id} className="relative rounded-[11px] overflow-hidden flex items-center"
                         style={{
+                          height: 40,
                           background: isWinner ? "var(--win-dim)" : isMine ? "var(--accent-dim)" : "rgba(255,255,255,0.03)",
                           border: `1px solid ${isWinner ? "var(--win-border)" : isMine ? "var(--accent-border)" : "rgba(255,255,255,0.06)"}`,
                         }}>
-                        <div className="flex items-center justify-between">
-                          <span className="text-[13px] font-semibold" style={{ color: isMine || isWinner ? (isMine ? "var(--accent)" : "var(--win)") : "var(--text)" }}>{opt.label}</span>
-                          <span className="text-[13px] font-bold" style={{ color: isMine ? "var(--accent)" : "var(--muted)" }}>{pct}%</span>
-                        </div>
-                        <div className="rounded-full overflow-hidden" style={{ height: 3, background: "rgba(255,255,255,0.06)" }}>
-                          <div className="h-full rounded-full" style={{
-                            width: `${pct}%`,
-                            background: isWinner ? "var(--win-border)" : isMine ? "var(--accent-border)" : "rgba(255,255,255,0.18)",
-                          }} />
-                        </div>
+                        <div className="absolute inset-y-0 left-0" style={{
+                          width: `${pct}%`,
+                          background: isWinner ? "var(--win)" : isMine ? "var(--accent)" : "rgba(255,255,255,0.12)",
+                          opacity: 0.28,
+                        }} />
+                        <span className="relative pl-3 flex-1 text-[13px] font-semibold truncate" style={{ color: isMine ? "var(--accent)" : isWinner ? "var(--win)" : "var(--text)" }}>{opt.label}</span>
+                        <span className="relative pr-3 text-[14px] font-black" style={{ color: isMine ? "var(--accent)" : isWinner ? "var(--win)" : "var(--muted)" }}>{pct}%</span>
                       </div>
                     );
                   }
@@ -439,12 +436,18 @@ export default function FeedPage() {
                     <button key={opt.id}
                       onClick={() => vote(bet.id, opt.id)}
                       disabled={!!isVoting}
-                      className="rounded-[10px] py-2.5 px-3 text-[14px] font-semibold text-center transition-opacity"
+                      className="rounded-[11px] text-left transition-opacity"
                       style={{
+                        height: 40,
+                        paddingLeft: 14,
                         background: "rgba(255,255,255,0.04)",
-                        border: "1px solid rgba(255,255,255,0.07)",
+                        border: "1px solid rgba(255,255,255,0.08)",
                         color: "var(--text)",
+                        fontSize: 14,
+                        fontWeight: 600,
                         opacity: isVoting ? 0.5 : 1,
+                        display: "block",
+                        width: "100%",
                       }}>
                       {isVoting ? "…" : opt.label}
                     </button>
@@ -453,10 +456,10 @@ export default function FeedPage() {
               </div>
 
               {/* Footer */}
-              <div className="flex items-center justify-between pt-1" style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}>
-                <span className="text-[11px]" style={{ color: "var(--dimmer)" }}>
+              <div className="flex items-center justify-between" style={{ borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: 8, marginTop: 2 }}>
+                <span className="text-[12px]" style={{ color: "var(--muted)" }}>
+                  {totalStaked > 0 && <><span className="font-black text-[13px]" style={{ color: "var(--text)" }}>{totalStaked.toLocaleString()}</span>{" pts · "}</>}
                   {bet.bet_entries.length} {bet.bet_entries.length === 1 ? "vote" : "votes"}
-                  {totalStaked > 0 ? ` · ${totalStaked.toLocaleString()} pts` : ""}
                 </span>
                 <span className="text-[11px]" style={{ color: "var(--dimmer)" }}>
                   {isOpen ? "closes " : "closed "}
@@ -753,7 +756,7 @@ function PostCard({
                 <span className="text-[11px] font-semibold" style={{ color: "var(--muted)" }}>{bet.events.name}</span>
               </a>
             )}
-            <p className="text-[14px] font-bold leading-snug" style={{ color: "var(--text)" }}>{bet.question}</p>
+            <p className="text-[15px] font-bold leading-snug" style={{ color: "var(--text)" }}>{bet.question}</p>
             <div className="flex flex-col gap-1.5">
               {bet.bet_options.map((opt) => {
                 const voters = bet.bet_entries.filter((e) => e.option_id === opt.id);
@@ -769,8 +772,8 @@ function PostCard({
                       <span className="text-[13px] font-semibold" style={{ color: isWinner ? "var(--win)" : isLoss ? "var(--loss)" : isMe ? "var(--accent)" : "var(--text)" }}>{opt.label}</span>
                       <span className="text-[13px] font-bold" style={{ color: "var(--muted)" }}>{pct}%</span>
                     </div>
-                    <div className="rounded-full overflow-hidden" style={{ height: 3, background: "rgba(255,255,255,0.06)" }}>
-                      <div className="h-full rounded-full" style={{ width: `${pct}%`, background: isWinner ? "var(--win-border)" : isLoss ? "var(--loss-border)" : isMe ? "var(--accent)" : "rgba(255,255,255,0.18)" }} />
+                    <div className="rounded-full overflow-hidden" style={{ height: 5, background: "rgba(255,255,255,0.06)" }}>
+                      <div className="h-full rounded-full" style={{ width: `${pct}%`, background: isWinner ? "var(--win-border)" : isLoss ? "var(--loss-border)" : isMe ? "var(--accent)" : "rgba(255,255,255,0.22)" }} />
                     </div>
                     {voters.length > 0 && (
                       <div className="flex items-center gap-1.5 mt-0.5">

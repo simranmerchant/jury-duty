@@ -423,6 +423,11 @@ function ExplorePollCard({ poll: initialPoll, getAccessToken }: {
   const [sharing, setSharing] = useState(false);
   const [shared, setShared] = useState(false);
   const sharePhotoInputRef = useRef<HTMLInputElement>(null);
+  const [shareMode, setShareMode] = useState<"followers" | "specific">("followers");
+  const [targetUsers, setTargetUsers] = useState<{ user_id: string; display_name: string | null; username: string | null; avatar_url: string | null }[]>([]);
+  const [userSearchQ, setUserSearchQ] = useState("");
+  const [userSearchResults, setUserSearchResults] = useState<{ user_id: string; display_name: string | null; username: string | null; avatar_url: string | null }[]>([]);
+  const userSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const totalVotes = votesA + votesB;
   const pctA = totalVotes > 0 ? Math.round((votesA / totalVotes) * 100) : null;
@@ -480,6 +485,18 @@ function ExplorePollCard({ poll: initialPoll, getAccessToken }: {
     if (data?.comment) { setComments((prev) => [...prev, data.comment]); setCommentCount((n) => n + 1); }
   }
 
+  async function searchUsers(q: string) {
+    setUserSearchQ(q);
+    if (userSearchTimer.current) clearTimeout(userSearchTimer.current);
+    if (!q.trim()) { setUserSearchResults([]); return; }
+    userSearchTimer.current = setTimeout(async () => {
+      const token = await getAccessToken();
+      const res = await fetch(`/api/v1/users/search?q=${encodeURIComponent(q.trim())}`, { headers: { Authorization: `Bearer ${token ?? ""}` } });
+      const data = await res.json().catch(() => ({}));
+      setUserSearchResults(data.users ?? []);
+    }, 300);
+  }
+
   async function sharePoll() {
     if (sharing) return;
     setSharing(true);
@@ -495,12 +512,17 @@ function ExplorePollCard({ poll: initialPoll, getAccessToken }: {
     const res = await fetch(`/api/v1/polls/${initialPoll.id}/post`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token ?? ""}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ caption: shareCaption.trim() || null, photo_url }),
+      body: JSON.stringify({
+        caption: shareCaption.trim() || null,
+        photo_url,
+        targeted_user_ids: shareMode === "specific" && targetUsers.length > 0 ? targetUsers.map((u) => u.user_id) : undefined,
+      }),
     });
     setSharing(false);
     if (res.ok) {
       setShared(true); setShowShare(false);
       setShareCaption(""); setSharePhoto(null); setSharePhotoPreview(null);
+      setShareMode("followers"); setTargetUsers([]); setUserSearchQ(""); setUserSearchResults([]);
     }
   }
 
@@ -589,32 +611,102 @@ function ExplorePollCard({ poll: initialPoll, getAccessToken }: {
       </div>
       {/* Share modal */}
       {showShare && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,0.7)" }} onClick={() => setShowShare(false)}>
-          <div className="w-full max-w-lg rounded-t-[24px] p-6 flex flex-col gap-4" style={{ background: "var(--card)", border: "1px solid var(--purple-border)" }} onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,0.6)" }}
+          onClick={(e) => { if (e.target === e.currentTarget) { setShowShare(false); setShareCaption(""); setSharePhoto(null); setSharePhotoPreview(null); setShareMode("followers"); setTargetUsers([]); setUserSearchQ(""); setUserSearchResults([]); } }}>
+          <div className="w-full max-w-lg rounded-t-3xl p-6 flex flex-col gap-4" style={{ background: "var(--card)", border: "1px solid var(--border-soft)" }}>
             <div className="flex items-center justify-between">
-              <span className="text-[17px] font-black" style={{ color: "var(--text)" }}>share poll</span>
-              <button onClick={() => setShowShare(false)} className="w-8 h-8 flex items-center justify-center rounded-full text-[14px]" style={{ background: "rgba(255,255,255,0.06)", color: "var(--muted)" }}>✕</button>
+              <p className="font-extrabold text-[16px]" style={{ fontFamily: "var(--font-nunito)" }}>share poll to feed</p>
+              <button onClick={() => { setShowShare(false); setShareCaption(""); setSharePhoto(null); setSharePhotoPreview(null); setShareMode("followers"); setTargetUsers([]); setUserSearchQ(""); setUserSearchResults([]); }} style={{ color: "var(--muted)" }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
+              </button>
             </div>
-            <p className="text-[13px] font-semibold leading-snug" style={{ color: "var(--dimmer)" }}>{initialPoll.question}</p>
-            <textarea
-              className="w-full rounded-[12px] px-3 py-2.5 text-[14px] outline-none resize-none"
-              style={{ background: "rgba(255,255,255,0.07)", border: "1px solid var(--border-soft)", color: "var(--text)", minHeight: 70 }}
-              placeholder="add a caption... (optional)"
-              value={shareCaption}
-              maxLength={280}
-              onChange={(e) => setShareCaption(e.target.value)}
-            />
-            {sharePhotoPreview ? (
-              <div className="relative self-start">
-                <img src={sharePhotoPreview} alt="" className="rounded-[12px] object-cover" style={{ maxWidth: 200, maxHeight: 140 }} />
-                <button onClick={() => { setSharePhoto(null); setSharePhotoPreview(null); }} className="absolute -top-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold" style={{ background: "rgba(0,0,0,0.65)", color: "#fff" }}>✕</button>
+            {/* Audience toggle */}
+            <div className="flex rounded-2xl overflow-hidden" style={{ border: "1px solid var(--border-soft)" }}>
+              {(["followers", "specific"] as const).map((mode) => (
+                <button key={mode} onClick={() => setShareMode(mode)}
+                  className="flex-1 py-2.5 text-[13px] font-bold"
+                  style={{ background: shareMode === mode ? "var(--accent-dim)" : "transparent", color: shareMode === mode ? "var(--accent)" : "var(--muted)" }}>
+                  {mode === "followers" ? "all followers" : "specific people"}
+                </button>
+              ))}
+            </div>
+            {shareMode === "specific" && (
+              <div className="flex flex-col gap-2">
+                {targetUsers.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {targetUsers.map((u) => (
+                      <button key={u.user_id} onClick={() => setTargetUsers((prev) => prev.filter((t) => t.user_id !== u.user_id))}
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[12px] font-bold"
+                        style={{ background: "var(--accent-dim)", color: "var(--accent)", border: "1px solid var(--accent-border)" }}>
+                        {u.display_name ?? u.username ?? "user"} ✕
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <div className="relative">
+                  <input
+                    className="w-full rounded-2xl px-4 py-3 text-[14px] outline-none"
+                    style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-soft)", color: "var(--text)" }}
+                    placeholder="search by name or @username..."
+                    value={userSearchQ}
+                    onChange={(e) => searchUsers(e.target.value)}
+                  />
+                  {userSearchResults.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 mt-1 rounded-[12px] overflow-hidden z-10 flex flex-col"
+                      style={{ background: "var(--card)", border: "1px solid var(--border-soft)", maxHeight: 200, overflowY: "auto" }}>
+                      {userSearchResults.filter((u) => !targetUsers.some((t) => t.user_id === u.user_id)).slice(0, 8).map((u) => (
+                        <button key={u.user_id} type="button"
+                          className="flex items-center gap-2.5 px-3 py-2.5 text-left"
+                          style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}
+                          onMouseDown={(e) => { e.preventDefault(); setTargetUsers((prev) => [...prev, u]); setUserSearchQ(""); setUserSearchResults([]); }}>
+                          <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black overflow-hidden flex-shrink-0" style={{ background: "var(--accent-dim)", color: "var(--accent)" }}>
+                            {u.avatar_url ? <img src={u.avatar_url} className="w-7 h-7 object-cover" alt="" /> : (u.display_name?.[0] ?? "?").toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="text-[13px] font-semibold" style={{ color: "var(--text)" }}>{u.display_name ?? u.username}</p>
+                            {u.username && <p className="text-[11px]" style={{ color: "var(--dimmer)" }}>@{u.username}</p>}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-            ) : (
-              <button onClick={() => sharePhotoInputRef.current?.click()} className="w-full py-2.5 rounded-[12px] text-[13px] font-semibold" style={{ border: "1px dashed var(--border-soft)", color: "var(--muted)", background: "rgba(255,255,255,0.02)" }}>+ add photo</button>
             )}
-            <input ref={sharePhotoInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; setSharePhoto(f); setSharePhotoPreview(URL.createObjectURL(f)); e.target.value = ""; }} />
-            <button onClick={sharePoll} disabled={sharing} className="w-full py-3.5 rounded-[14px] text-[15px] font-black text-white disabled:opacity-50" style={{ background: "var(--purple)" }}>
-              {sharing ? "sharing…" : "share to feed"}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: "var(--dimmer)" }}>caption (optional)</label>
+              <textarea
+                className="w-full rounded-[12px] px-4 py-3 text-[14px] resize-none outline-none"
+                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-soft)", color: "var(--text)", minHeight: 80 }}
+                placeholder="say something about this poll..."
+                value={shareCaption}
+                onChange={(e) => setShareCaption(e.target.value.slice(0, 280))}
+                maxLength={280}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: "var(--dimmer)" }}>photo (optional)</label>
+              {sharePhotoPreview ? (
+                <div className="relative">
+                  <img src={sharePhotoPreview} alt="" className="w-full rounded-[12px] object-cover" style={{ maxHeight: 200 }} />
+                  <button onClick={() => { setSharePhoto(null); setSharePhotoPreview(null); }}
+                    className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center text-[13px] font-bold"
+                    style={{ background: "rgba(0,0,0,0.65)", color: "#fff" }}>✕</button>
+                </div>
+              ) : (
+                <button onClick={() => sharePhotoInputRef.current?.click()}
+                  className="w-full py-3 rounded-[12px] text-[13px] font-semibold"
+                  style={{ border: "1px dashed var(--border-soft)", color: "var(--muted)", background: "rgba(255,255,255,0.02)" }}>
+                  + add photo
+                </button>
+              )}
+              <input ref={sharePhotoInputRef} type="file" accept="image/*" className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; setSharePhoto(f); setSharePhotoPreview(URL.createObjectURL(f)); e.target.value = ""; }} />
+            </div>
+            <button onClick={sharePoll} disabled={sharing || (shareMode === "specific" && targetUsers.length === 0)}
+              className="w-full py-4 rounded-[14px] text-[15px] font-black"
+              style={{ background: "var(--purple)", color: "#fff", opacity: sharing || (shareMode === "specific" && targetUsers.length === 0) ? 0.5 : 1, fontFamily: "var(--font-nunito)" }}>
+              {sharing ? "sharing…" : shareMode === "specific" ? `share to ${targetUsers.length} ${targetUsers.length === 1 ? "person" : "people"}` : "share to feed"}
             </button>
           </div>
         </div>
