@@ -40,7 +40,226 @@ type ExploreBet = {
   total_entries: number;
   my_entry: { side: "a" | "b"; points_wagered: number } | null;
   public_posts: { id: string; user: { avatar_url: string | null; display_name: string } | null; caption: string | null }[];
+  like_count: number;
+  liked_by_me: boolean;
+  reactions: { emoji: string; count: number }[];
+  my_reaction: string | null;
+  comment_count: number;
 };
+
+type ExploreComment = {
+  id: string;
+  body: string | null;
+  gif_url: string | null;
+  created_at: string;
+  user: { display_name: string; username: string; avatar_url: string | null } | null;
+};
+
+const EXPLORE_EMOJIS = ["🔥", "👀", "💀", "😂", "🤝", "🫡", "🙏"];
+
+function ExploreCard({ bet: initialBet, getAccessToken }: {
+  bet: ExploreBet;
+  getAccessToken: () => Promise<string | null>;
+}) {
+  const [likeCount, setLikeCount] = useState(initialBet.like_count);
+  const [likedByMe, setLikedByMe] = useState(initialBet.liked_by_me);
+  const [reactions, setReactions] = useState(initialBet.reactions);
+  const [myReaction, setMyReaction] = useState(initialBet.my_reaction);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showComments, setShowComments] = useState(false);
+  const [comments, setComments] = useState<ExploreComment[]>([]);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [commentInput, setCommentInput] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [commentCount, setCommentCount] = useState(initialBet.comment_count);
+
+  const total = initialBet.total_pts_a + initialBet.total_pts_b;
+  const pctA = total > 0 ? Math.round((initialBet.total_pts_a / total) * 100) : null;
+  const pctB = pctA !== null ? 100 - pctA : null;
+
+  const grouped: Record<string, number> = {};
+  for (const r of reactions) grouped[r.emoji] = r.count;
+
+  async function toggleLike() {
+    const token = await getAccessToken();
+    const res = await fetch(`/api/v1/explore-bets/${initialBet.id}/like`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token ?? ""}` },
+    });
+    const data = await res.json().catch(() => null);
+    if (data) { setLikedByMe(data.liked); setLikeCount(data.like_count); }
+  }
+
+  async function toggleReaction(emoji: string) {
+    setShowEmojiPicker(false);
+    const token = await getAccessToken();
+    const res = await fetch(`/api/v1/explore-bets/${initialBet.id}/react`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token ?? ""}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ emoji }),
+    });
+    const data = await res.json().catch(() => null);
+    if (data) { setMyReaction(data.my_reaction); setReactions(data.reactions); }
+  }
+
+  async function fetchComments() {
+    setCommentsLoading(true);
+    const token = await getAccessToken();
+    const res = await fetch(`/api/v1/explore-bets/${initialBet.id}/comments`, {
+      headers: { Authorization: `Bearer ${token ?? ""}` },
+    });
+    const data = await res.json().catch(() => ({}));
+    setComments(data.comments ?? []);
+    setCommentsLoading(false);
+  }
+
+  async function submitComment() {
+    if (submitting || !commentInput.trim()) return;
+    setSubmitting(true);
+    const body = commentInput.trim();
+    setCommentInput("");
+    const token = await getAccessToken();
+    const res = await fetch(`/api/v1/explore-bets/${initialBet.id}/comments`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token ?? ""}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ text: body }),
+    });
+    const data = await res.json().catch(() => null);
+    setSubmitting(false);
+    if (data?.comment) { setComments((prev) => [...prev, data.comment]); setCommentCount((n) => n + 1); }
+  }
+
+  return (
+    <div className="flex flex-col gap-3 rounded-[16px] p-4" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
+      {/* Status + winning */}
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full"
+          style={{ background: initialBet.status === "open" ? "var(--accent-dim)" : "rgba(255,255,255,0.05)", color: initialBet.status === "open" ? "var(--accent)" : "var(--muted)" }}>
+          {initialBet.status}
+        </span>
+        {initialBet.status === "resolved" && initialBet.winning_side && (
+          <span className="text-[12px] font-semibold" style={{ color: "var(--win)" }}>
+            {initialBet.winning_side === "a" ? initialBet.option_a : initialBet.option_b} won
+          </span>
+        )}
+      </div>
+      {/* Question */}
+      <p className="font-semibold text-[15px] leading-snug" style={{ color: "var(--text)" }}>{initialBet.question}</p>
+      {/* Bars */}
+      <div className="flex flex-col gap-1.5">
+        {(["a", "b"] as const).map((side) => {
+          const label = side === "a" ? initialBet.option_a : initialBet.option_b;
+          const pct = side === "a" ? pctA : pctB;
+          const myPick = initialBet.my_entry?.side === side;
+          const isResolved = initialBet.status === "resolved";
+          const bc = isResolved ? (initialBet.winning_side === side ? "var(--win)" : "var(--loss)") : myPick ? "var(--accent)" : "var(--dimmer)";
+          return (
+            <div key={side} className="relative flex items-center rounded-[10px] overflow-hidden"
+              style={{ height: 34, border: `1px solid ${myPick ? "var(--accent-border)" : "var(--border)"}` }}>
+              <div style={{ position: "absolute", top: 0, left: 0, bottom: 0, width: `${pct ?? 50}%`, background: bc + "28" }} />
+              <span className="relative pl-3 flex-1 text-[12px] font-medium truncate" style={{ color: bc }}>{label}</span>
+              <span className="relative pr-3 text-[12px] font-semibold" style={{ color: bc }}>{pct !== null ? `${pct}%` : "—"}</span>
+            </div>
+          );
+        })}
+      </div>
+      {/* Meta */}
+      <p className="text-[12px]" style={{ color: "var(--muted)" }}>
+        {initialBet.total_entries} bet{initialBet.total_entries !== 1 ? "s" : ""}
+        {initialBet.closes_at && initialBet.status === "open" ? ` · closes ${new Date(initialBet.closes_at).toLocaleDateString()}` : ""}
+        {initialBet.my_entry ? ` · you picked ${initialBet.my_entry.side === "a" ? initialBet.option_a : initialBet.option_b}` : ""}
+      </p>
+      {/* Reactions row */}
+      <div className="relative flex items-center gap-1.5 flex-wrap pt-2 border-t" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
+        <button onClick={toggleLike} className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[13px]"
+          style={{ background: likedByMe ? "var(--accent-dim)" : "rgba(255,255,255,0.05)", border: `1px solid ${likedByMe ? "var(--accent-border)" : "rgba(255,255,255,0.1)"}`, color: likedByMe ? "var(--accent)" : "var(--muted)" }}>
+          <span>♥</span>
+          {likeCount > 0 && <span className="font-bold text-[11px]">{likeCount}</span>}
+        </button>
+        {Object.entries(grouped).map(([emoji, count]) => {
+          const isMe = myReaction === emoji;
+          return (
+            <button key={emoji} onClick={() => toggleReaction(emoji)} className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[13px]"
+              style={{ background: isMe ? "var(--accent-dim)" : "rgba(255,255,255,0.05)", border: `1px solid ${isMe ? "var(--accent-border)" : "rgba(255,255,255,0.1)"}`, color: isMe ? "var(--accent)" : "var(--muted)" }}>
+              <span>{emoji}</span>
+              <span className="font-bold text-[11px]">{count}</span>
+            </button>
+          );
+        })}
+        <div className="relative">
+          <button onClick={() => setShowEmojiPicker((v) => !v)} className="px-2.5 py-1 rounded-full text-[13px] font-bold"
+            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: "var(--muted)" }}>
+            ＋
+          </button>
+          {showEmojiPicker && (
+            <div className="absolute bottom-full left-0 mb-2 flex gap-1 p-2 rounded-[12px] z-10"
+              style={{ background: "var(--card)", border: "1px solid var(--border)", boxShadow: "0 8px 32px rgba(0,0,0,0.5)" }}>
+              {EXPLORE_EMOJIS.map((e) => (
+                <button key={e} onClick={() => toggleReaction(e)}
+                  className="text-[18px] w-8 h-8 flex items-center justify-center rounded-[8px]"
+                  style={{ background: "rgba(255,255,255,0.05)" }}>
+                  {e}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <button onClick={() => { if (!showComments) fetchComments(); setShowComments((v) => !v); }}
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-bold ml-auto"
+          style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: "var(--muted)" }}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+          </svg>
+          {commentCount > 0 ? `comments ${commentCount}` : "comment"}
+        </button>
+      </div>
+      {/* Inline comments */}
+      {showComments && (
+        <div className="flex flex-col gap-3 pt-2 border-t" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
+          {commentsLoading ? (
+            <p className="text-[12px] text-center py-2" style={{ color: "var(--muted)" }}>loading...</p>
+          ) : comments.length === 0 ? (
+            <p className="text-[12px] text-center py-2" style={{ color: "var(--dimmer)" }}>no comments yet — be first</p>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {comments.map((c) => (
+                <div key={c.id} className="flex gap-2.5">
+                  <div className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-[10px] font-bold"
+                    style={{ background: "var(--accent-dim)", color: "var(--accent)", border: "1px solid var(--accent-border)" }}>
+                    {(c.user?.display_name ?? "?")[0].toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-[12px] font-bold" style={{ color: "var(--text)" }}>{c.user?.display_name ?? "someone"}</span>
+                      <span className="text-[10px]" style={{ color: "var(--dimmer)" }}>{new Date(c.created_at).toLocaleDateString()}</span>
+                    </div>
+                    {c.body && <p className="text-[13px] mt-0.5 leading-snug" style={{ color: "var(--text)" }}>{c.body}</p>}
+                    {c.gif_url && <img src={c.gif_url} alt="" className="mt-1 rounded-[8px]" style={{ maxWidth: 160, height: 100, objectFit: "cover" }} />}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="flex gap-2">
+            <input
+              className="flex-1 rounded-[10px] px-3 py-2 text-[13px] outline-none"
+              style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)", color: "var(--text)" }}
+              placeholder="add a comment..."
+              value={commentInput}
+              onChange={(e) => setCommentInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitComment(); } }}
+            />
+            <button onClick={submitComment} disabled={!commentInput.trim() || submitting}
+              className="px-3 py-2 rounded-[10px] text-[13px] font-bold text-white disabled:opacity-40"
+              style={{ background: "var(--accent)" }}>
+              {submitting ? "..." : "post"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function EventsPage() {
   const { ready, authenticated, getAccessToken } = usePrivy();
@@ -347,72 +566,9 @@ export default function EventsPage() {
         {/* Explore tab */}
         {activeTab === "explore" && (
           <>
-            {exploreBets.map((bet) => {
-              const total = bet.total_pts_a + bet.total_pts_b;
-              const pctA = total > 0 ? Math.round((bet.total_pts_a / total) * 100) : null;
-              const pctB = pctA !== null ? 100 - pctA : null;
-              return (
-                <button
-                  key={bet.id}
-                  onClick={() => router.push(`/explore/${bet.id}`)}
-                  className="w-full text-left flex flex-col gap-3 rounded-[16px] p-4"
-                  style={{ background: "var(--card)", border: "1px solid var(--border)" }}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full"
-                      style={{ background: bet.status === "open" ? "var(--accent-dim)" : "rgba(255,255,255,0.05)", color: bet.status === "open" ? "var(--accent)" : "var(--muted)" }}>
-                      {bet.status}
-                    </span>
-                    {bet.status === "resolved" && bet.winning_side && (
-                      <span className="text-[12px] font-semibold" style={{ color: "var(--win)" }}>
-                        {bet.winning_side === "a" ? bet.option_a : bet.option_b} won
-                      </span>
-                    )}
-                  </div>
-                  <p className="font-semibold text-[15px] leading-snug" style={{ color: "var(--text)" }}>{bet.question}</p>
-                  <div className="flex flex-col gap-1.5">
-                    {(["a", "b"] as const).map((side) => {
-                      const label = side === "a" ? bet.option_a : bet.option_b;
-                      const pct = side === "a" ? pctA : pctB;
-                      const myPick = bet.my_entry?.side === side;
-                      const isResolved = bet.status === "resolved";
-                      const bc = isResolved ? (bet.winning_side === side ? "var(--win)" : "var(--loss)") : myPick ? "var(--accent)" : "var(--dimmer)";
-                      return (
-                        <div key={side} className="relative flex items-center rounded-[10px] overflow-hidden"
-                          style={{ height: 34, border: `1px solid ${myPick ? "var(--accent-border)" : "var(--border)"}` }}>
-                          <div style={{ position: "absolute", top: 0, left: 0, bottom: 0, width: `${pct ?? 50}%`, background: bc + "28" }} />
-                          <span className="relative pl-3 flex-1 text-[12px] font-medium truncate" style={{ color: bc }}>{label}</span>
-                          <span className="relative pr-3 text-[12px] font-semibold" style={{ color: bc }}>{pct !== null ? `${pct}%` : "—"}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  {bet.public_posts.length > 0 && (
-                    <div className="flex items-center gap-2">
-                      <div className="flex" style={{ gap: -4 }}>
-                        {bet.public_posts.slice(0, 4).map((p) => (
-                          p.user?.avatar_url
-                            ? <img key={p.id} src={p.user.avatar_url} alt="" style={{ width: 18, height: 18, borderRadius: "50%", objectFit: "cover", marginRight: -5 }} />
-                            : <div key={p.id} style={{ width: 18, height: 18, borderRadius: "50%", background: "var(--accent-dim)", border: "1px solid var(--accent-border)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, color: "var(--accent)", fontWeight: 700, marginRight: -5 }}>
-                                {(p.user?.display_name ?? "?")[0].toUpperCase()}
-                              </div>
-                        ))}
-                      </div>
-                      {bet.public_posts[0]?.caption && (
-                        <span className="text-[12px] italic truncate flex-1" style={{ color: "var(--muted)", marginLeft: 10 }}>
-                          "{bet.public_posts[0].caption}"
-                        </span>
-                      )}
-                    </div>
-                  )}
-                  <p className="text-[12px]" style={{ color: "var(--muted)" }}>
-                    {bet.total_entries} bet{bet.total_entries !== 1 ? "s" : ""}
-                    {bet.closes_at && bet.status === "open" ? ` · closes ${new Date(bet.closes_at).toLocaleDateString()}` : ""}
-                    {bet.my_entry ? ` · you picked ${bet.my_entry.side === "a" ? bet.option_a : bet.option_b}` : ""}
-                  </p>
-                </button>
-              );
-            })}
+            {exploreBets.map((bet) => (
+              <ExploreCard key={bet.id} bet={bet} getAccessToken={getAccessToken} />
+            ))}
             {exploreBets.length === 0 && (
               <div className="flex flex-col items-center justify-center py-20 gap-2">
                 <p className="text-[15px] font-semibold italic" style={{ color: "var(--muted)" }}>no bets yet</p>
