@@ -400,7 +400,7 @@ export default function FeedPage() {
                             className="w-full px-4 py-3 text-left text-[13px] font-semibold"
                             style={{ color: "var(--accent)" }}
                           >
-                            {deletingId === bet.id ? "deleting…" : "delete bet"}
+                            {deletingId === bet.id ? "deleting…" : "delete prediction"}
                           </button>
                         </div>
                       )}
