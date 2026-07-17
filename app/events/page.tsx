@@ -291,7 +291,7 @@ function ExploreCard({ bet: initialBet, getAccessToken, onDelete }: {
           <button onClick={placeBet} disabled={!stakeInput || placing}
             className="w-full py-2 rounded-[10px] text-[13px] font-bold text-white disabled:opacity-40"
             style={{ background: "var(--accent)" }}>
-            {placing ? "placing..." : `bet on ${selectedSide === "a" ? initialBet.option_a : initialBet.option_b}`}
+            {placing ? "placing..." : `predict ${selectedSide === "a" ? initialBet.option_a : initialBet.option_b}`}
           </button>
         </div>
       )}
@@ -363,7 +363,7 @@ function ExploreCard({ bet: initialBet, getAccessToken, onDelete }: {
                 <>
                   <button onClick={() => setShowReport(true)} className="w-full px-4 py-2.5 text-left text-[13px] font-semibold" style={{ color: "var(--text)" }}>report</button>
                   {initialBet.is_mine && (
-                    <button onClick={() => { setShowMenu(false); deleteBet(); }} className="w-full px-4 py-2.5 text-left text-[13px] font-semibold" style={{ color: "var(--loss)", borderTop: "1px solid rgba(255,255,255,0.06)" }}>delete bet</button>
+                    <button onClick={() => { setShowMenu(false); deleteBet(); }} className="w-full px-4 py-2.5 text-left text-[13px] font-semibold" style={{ color: "var(--loss)", borderTop: "1px solid rgba(255,255,255,0.06)" }}>delete prediction</button>
                   )}
                 </>
               )}
@@ -407,7 +407,7 @@ function ExploreCard({ bet: initialBet, getAccessToken, onDelete }: {
           onClick={(e) => { if (e.target === e.currentTarget) { setShowShare(false); setShareCaption(""); } }}>
           <div className="w-full max-w-lg rounded-t-3xl p-6 flex flex-col gap-4" style={{ background: "var(--card)", border: "1px solid var(--border-soft)" }}>
             <div className="flex items-center justify-between">
-              <p className="font-extrabold text-[16px]" style={{ fontFamily: "var(--font-nunito)" }}>share bet to feed</p>
+              <p className="font-extrabold text-[16px]" style={{ fontFamily: "var(--font-nunito)" }}>share prediction to feed</p>
               <button onClick={() => { setShowShare(false); setShareCaption(""); }} style={{ color: "var(--muted)" }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
               </button>
@@ -1085,7 +1085,7 @@ export default function EventsPage() {
             {isGroup ? "ongoing" : isPast ? "ended" : event.ends_at
               ? new Date(event.ends_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })
               : ""}
-            {totalBets > 0 ? ` · ${totalBets} bet${totalBets !== 1 ? "s" : ""}` : " · no bets"}
+            {totalBets > 0 ? ` · ${totalBets} prediction${totalBets !== 1 ? "s" : ""}` : " · no predictions"}
           </p>
         </div>
         {/* Right */}
@@ -1170,7 +1170,7 @@ export default function EventsPage() {
                     <p className="font-black text-[19px] text-white leading-tight" style={{ fontFamily: "var(--font-nunito)", letterSpacing: "-0.02em" }}>{featured.name}</p>
                     <p className="text-[11px] mt-0.5 italic" style={{ color: "rgba(255,255,255,0.55)" }}>
                       {featured.ends_at ? new Date(featured.ends_at).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : ""}
-                      {(featured.bets?.length ?? 0) > 0 ? ` · ${featured.bets.length} bet${featured.bets.length !== 1 ? "s" : ""}` : ""}
+                      {(featured.bets?.length ?? 0) > 0 ? ` · ${featured.bets.length} prediction${featured.bets.length !== 1 ? "s" : ""}` : ""}
                     </p>
                   </div>
                 </button>
@@ -1194,7 +1194,7 @@ export default function EventsPage() {
             {groups.length === 0 && (
               <div className="flex flex-col items-center justify-center py-20 gap-2">
                 <p className="text-[15px] font-semibold italic" style={{ color: "var(--muted)" }}>no groups yet</p>
-                <p className="text-[13px]" style={{ color: "var(--dimmer)" }}>groups are ongoing — each bet has its own deadline</p>
+                <p className="text-[13px]" style={{ color: "var(--dimmer)" }}>groups are ongoing — each prediction has its own deadline</p>
               </div>
             )}
           </>
@@ -1229,7 +1229,7 @@ export default function EventsPage() {
               {items.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-20 gap-2">
                   <p className="text-[15px] font-semibold italic" style={{ color: "var(--muted)" }}>nothing here yet</p>
-                  <p className="text-[13px]" style={{ color: "var(--dimmer)" }}>tap + new to post a bet or poll</p>
+                  <p className="text-[13px]" style={{ color: "var(--dimmer)" }}>tap + new to post a prediction or poll</p>
                 </div>
               )}
             </>
@@ -1295,8 +1295,8 @@ export default function EventsPage() {
               </div>
               <p className="text-[12px]" style={{ color: "var(--dimmer)" }}>
                 {createType === "event"
-                  ? "time-boxed — bets close when the event ends"
-                  : "ongoing — each bet has its own deadline"}
+                  ? "time-boxed — predictions close when the event ends"
+                  : "ongoing — each prediction has its own deadline"}
               </p>
             </div>
 
@@ -1353,15 +1353,15 @@ export default function EventsPage() {
             style={{ background: "var(--card)", border: "1px solid var(--border-soft)" }}>
             <div className="flex items-center justify-between">
               <div className="flex gap-1.5 p-1 rounded-[12px]" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
-                {(["bet", "poll"] as const).map((t) => (
-                  <button key={t} onClick={() => setExploreCreateType(t)}
+                {([{ value: "bet", label: "prediction" }, { value: "poll", label: "poll" }] as const).map(({ value, label }) => (
+                  <button key={value} onClick={() => setExploreCreateType(value)}
                     className="px-4 py-1.5 rounded-[8px] text-[13px] font-bold transition-colors"
                     style={{
-                      background: exploreCreateType === t ? (t === "poll" ? "var(--purple-dim)" : "var(--accent-dim)") : "transparent",
-                      color: exploreCreateType === t ? (t === "poll" ? "var(--purple)" : "var(--accent)") : "var(--muted)",
-                      border: exploreCreateType === t ? `1px solid ${t === "poll" ? "var(--purple-border)" : "var(--accent-border)"}` : "1px solid transparent",
+                      background: exploreCreateType === value ? (value === "poll" ? "var(--purple-dim)" : "var(--accent-dim)") : "transparent",
+                      color: exploreCreateType === value ? (value === "poll" ? "var(--purple)" : "var(--accent)") : "var(--muted)",
+                      border: exploreCreateType === value ? `1px solid ${value === "poll" ? "var(--purple-border)" : "var(--accent-border)"}` : "1px solid transparent",
                     }}>
-                    {t}
+                    {label}
                   </button>
                 ))}
               </div>
@@ -1417,7 +1417,7 @@ export default function EventsPage() {
               className="w-full py-3 rounded-[12px] font-bold text-[15px] text-white transition-opacity disabled:opacity-40"
               style={{ background: exploreCreateType === "poll" ? "var(--purple)" : "var(--accent)" }}
             >
-              {exploreCreating ? "posting…" : `post ${exploreCreateType}`}
+              {exploreCreating ? "posting…" : `post ${exploreCreateType === "bet" ? "prediction" : "poll"}`}
             </button>
           </div>
         </div>
