@@ -48,6 +48,25 @@ type ExploreBet = {
   is_mine: boolean;
 };
 
+type ExplorePoll = {
+  id: string;
+  question: string;
+  option_a: string;
+  option_b: string;
+  creator_id: string;
+  created_at: string;
+  closes_at: string | null;
+  votes_a: number;
+  votes_b: number;
+  total_votes: number;
+  my_vote: "a" | "b" | null;
+  like_count: number;
+  liked_by_me: boolean;
+  reactions: { emoji: string; count: number }[];
+  my_reaction: string | null;
+  comment_count: number;
+};
+
 type ExploreComment = {
   id: string;
   body: string | null;
@@ -261,12 +280,210 @@ function ExploreCard({ bet: initialBet, getAccessToken, onDelete }: {
   );
 }
 
+function ExplorePollCard({ poll: initialPoll, getAccessToken }: {
+  poll: ExplorePoll;
+  getAccessToken: () => Promise<string | null>;
+}) {
+  const [votesA, setVotesA] = useState(initialPoll.votes_a);
+  const [votesB, setVotesB] = useState(initialPoll.votes_b);
+  const [myVote, setMyVote] = useState<"a" | "b" | null>(initialPoll.my_vote);
+  const [reactions, setReactions] = useState(initialPoll.reactions);
+  const [myReaction, setMyReaction] = useState(initialPoll.my_reaction);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showComments, setShowComments] = useState(false);
+  const [comments, setComments] = useState<ExploreComment[]>([]);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [commentInput, setCommentInput] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [commentCount, setCommentCount] = useState(initialPoll.comment_count);
+
+  const totalVotes = votesA + votesB;
+  const pctA = totalVotes > 0 ? Math.round((votesA / totalVotes) * 100) : null;
+  const pctB = pctA !== null ? 100 - pctA : null;
+  const grouped: Record<string, number> = {};
+  for (const r of reactions) grouped[r.emoji] = r.count;
+
+  async function castVote(side: "a" | "b") {
+    const token = await getAccessToken();
+    const res = await fetch(`/api/v1/polls/${initialPoll.id}/vote`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token ?? ""}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ side }),
+    });
+    const data = await res.json().catch(() => null);
+    if (data) { setVotesA(data.votes_a); setVotesB(data.votes_b); setMyVote(data.side); }
+  }
+
+  async function toggleReaction(emoji: string) {
+    setShowEmojiPicker(false);
+    const token = await getAccessToken();
+    const res = await fetch(`/api/v1/polls/${initialPoll.id}/react`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token ?? ""}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ emoji }),
+    });
+    const data = await res.json().catch(() => null);
+    if (data) { setMyReaction(data.my_reaction); setReactions(data.reactions); }
+  }
+
+  async function fetchComments() {
+    setCommentsLoading(true);
+    const token = await getAccessToken();
+    const res = await fetch(`/api/v1/polls/${initialPoll.id}/comments`, {
+      headers: { Authorization: `Bearer ${token ?? ""}` },
+    });
+    const data = await res.json().catch(() => ({}));
+    setComments(data.comments ?? []);
+    setCommentsLoading(false);
+  }
+
+  async function submitComment() {
+    if (submitting || !commentInput.trim()) return;
+    setSubmitting(true);
+    const body = commentInput.trim();
+    setCommentInput("");
+    const token = await getAccessToken();
+    const res = await fetch(`/api/v1/polls/${initialPoll.id}/comments`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token ?? ""}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ text: body }),
+    });
+    const data = await res.json().catch(() => null);
+    setSubmitting(false);
+    if (data?.comment) { setComments((prev) => [...prev, data.comment]); setCommentCount((n) => n + 1); }
+  }
+
+  return (
+    <div className="flex flex-col gap-3 rounded-[16px] p-4" style={{ background: "var(--card)", border: "1px solid var(--purple-border)" }}>
+      {/* Header */}
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full"
+          style={{ background: "var(--purple-dim)", color: "var(--purple)", border: "1px solid var(--purple-border)" }}>
+          poll
+        </span>
+        {initialPoll.closes_at && new Date(initialPoll.closes_at) > new Date() && (
+          <span className="text-[11px]" style={{ color: "var(--muted)" }}>closes {new Date(initialPoll.closes_at).toLocaleDateString()}</span>
+        )}
+      </div>
+      {/* Question */}
+      <p className="font-semibold text-[15px] leading-snug" style={{ color: "var(--text)" }}>{initialPoll.question}</p>
+      {/* Vote bars */}
+      <div className="flex flex-col gap-1.5">
+        {(["a", "b"] as const).map((side) => {
+          const label = side === "a" ? initialPoll.option_a : initialPoll.option_b;
+          const pct = side === "a" ? pctA : pctB;
+          const isMyVote = myVote === side;
+          return (
+            <button key={side} onClick={() => castVote(side)}
+              className="relative flex items-center rounded-[10px] overflow-hidden text-left"
+              style={{ height: 34, border: `1px solid ${isMyVote ? "var(--purple-border)" : "var(--border)"}` }}>
+              <div style={{ position: "absolute", top: 0, left: 0, bottom: 0, width: `${pct ?? 50}%`, background: (isMyVote ? "var(--purple)" : "var(--dimmer)") + "28" }} />
+              <span className="relative pl-3 flex-1 text-[12px] font-medium truncate" style={{ color: isMyVote ? "var(--purple)" : "var(--text)" }}>{label}</span>
+              <span className="relative pr-3 text-[12px] font-semibold" style={{ color: isMyVote ? "var(--purple)" : "var(--muted)" }}>{pct !== null ? `${pct}%` : "—"}</span>
+            </button>
+          );
+        })}
+      </div>
+      {/* Meta */}
+      <p className="text-[12px]" style={{ color: "var(--muted)" }}>
+        {totalVotes} vote{totalVotes !== 1 ? "s" : ""}
+        {myVote ? ` · you voted ${myVote === "a" ? initialPoll.option_a : initialPoll.option_b}` : " · click to vote"}
+      </p>
+      {/* Reactions row */}
+      <div className="relative flex items-center gap-1.5 flex-wrap pt-2 border-t" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
+        {Object.entries(grouped).map(([emoji, count]) => {
+          const isMe = myReaction === emoji;
+          return (
+            <button key={emoji} onClick={() => toggleReaction(emoji)} className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[13px]"
+              style={{ background: isMe ? "var(--accent-dim)" : "rgba(255,255,255,0.05)", border: `1px solid ${isMe ? "var(--accent-border)" : "rgba(255,255,255,0.1)"}`, color: isMe ? "var(--accent)" : "var(--muted)" }}>
+              <span>{emoji}</span>
+              <span className="font-bold text-[11px]">{count}</span>
+            </button>
+          );
+        })}
+        <div className="relative">
+          <button onClick={() => setShowEmojiPicker((v) => !v)} className="px-2.5 py-1 rounded-full text-[13px] font-bold"
+            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: "var(--muted)" }}>
+            ＋
+          </button>
+          {showEmojiPicker && (
+            <div className="absolute bottom-full left-0 mb-2 flex gap-1 p-2 rounded-[12px] z-10"
+              style={{ background: "var(--card)", border: "1px solid var(--border)", boxShadow: "0 8px 32px rgba(0,0,0,0.5)" }}>
+              {EXPLORE_EMOJIS.map((e) => (
+                <button key={e} onClick={() => toggleReaction(e)}
+                  className="text-[18px] w-8 h-8 flex items-center justify-center rounded-[8px]"
+                  style={{ background: "rgba(255,255,255,0.05)" }}>
+                  {e}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <button onClick={() => { if (!showComments) fetchComments(); setShowComments((v) => !v); }}
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-bold ml-auto"
+          style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: "var(--muted)" }}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+          </svg>
+          {commentCount > 0 ? `comments ${commentCount}` : "comment"}
+        </button>
+      </div>
+      {/* Inline comments */}
+      {showComments && (
+        <div className="flex flex-col gap-3 pt-2 border-t" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
+          {commentsLoading ? (
+            <p className="text-[12px] text-center py-2" style={{ color: "var(--muted)" }}>loading...</p>
+          ) : comments.length === 0 ? (
+            <p className="text-[12px] text-center py-2" style={{ color: "var(--dimmer)" }}>no comments yet — be first</p>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {comments.map((c) => (
+                <div key={c.id} className="flex gap-2.5">
+                  <div className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-[10px] font-bold"
+                    style={{ background: "var(--purple-dim)", color: "var(--purple)", border: "1px solid var(--purple-border)" }}>
+                    {(c.user?.display_name ?? "?")[0].toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-[12px] font-bold" style={{ color: "var(--text)" }}>{c.user?.display_name ?? "someone"}</span>
+                      <span className="text-[10px]" style={{ color: "var(--dimmer)" }}>{new Date(c.created_at).toLocaleDateString()}</span>
+                    </div>
+                    {c.body && <p className="text-[13px] mt-0.5 leading-snug" style={{ color: "var(--text)" }}>{c.body}</p>}
+                    {c.gif_url && <img src={c.gif_url} alt="" className="mt-1 rounded-[8px]" style={{ maxWidth: 160, height: 100, objectFit: "cover" }} />}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="flex gap-2">
+            <input
+              className="flex-1 rounded-[10px] px-3 py-2 text-[13px] outline-none"
+              style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)", color: "var(--text)" }}
+              placeholder="add a comment..."
+              value={commentInput}
+              onChange={(e) => setCommentInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitComment(); } }}
+            />
+            <button onClick={submitComment} disabled={!commentInput.trim() || submitting}
+              className="px-3 py-2 rounded-[10px] text-[13px] font-bold text-white disabled:opacity-40"
+              style={{ background: "var(--purple)" }}>
+              {submitting ? "..." : "post"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function EventsPage() {
   const { ready, authenticated, getAccessToken } = usePrivy();
   const router = useRouter();
   const [events, setEvents] = useState<Event[]>([]);
   const [exploreBets, setExploreBets] = useState<ExploreBet[]>([]);
+  const [explorePolls, setExplorePolls] = useState<ExplorePoll[]>([]);
   const [showExploreCreate, setShowExploreCreate] = useState(false);
+  const [exploreCreateType, setExploreCreateType] = useState<"bet" | "poll">("bet");
   const [exploreQ, setExploreQ] = useState("");
   const [exploreOptA, setExploreOptA] = useState("");
   const [exploreOptB, setExploreOptB] = useState("");
@@ -297,19 +514,26 @@ export default function EventsPage() {
 
   const fetchEvents = useCallback(async () => {
     const token = await getAccessToken();
-    const [eventsRes, exploreRes] = await Promise.all([
+    const [eventsRes, exploreRes, pollsRes] = await Promise.all([
       fetch("/api/v1/events", { headers: { Authorization: `Bearer ${token}` } }),
       fetch("/api/v1/explore-bets", { headers: { Authorization: `Bearer ${token}` } }),
+      fetch("/api/v1/polls", { headers: { Authorization: `Bearer ${token}` } }),
     ]);
     const eventsData = await eventsRes.json();
     const exploreData = await exploreRes.json().catch(() => ({}));
+    const pollsData = await pollsRes.json().catch(() => ({}));
     const seenIds = getSeenIds();
     const rawEvents: Event[] = eventsData.events ?? [];
     setEvents(rawEvents.map((e) => seenIds.has(e.id) ? { ...e, hasNew: false } : e));
     setExploreBets(exploreData.bets ?? []);
+    setExplorePolls(pollsData.polls ?? []);
   }, [getAccessToken]);
 
-  async function createExploreBet() {
+  function resetExploreCreate() {
+    setExploreQ(""); setExploreOptA(""); setExploreOptB(""); setExploreDeadline(""); setExploreErr(null); setExploreCreateType("bet");
+  }
+
+  async function createExploreItem() {
     if (!exploreQ.trim() || !exploreOptA.trim() || !exploreOptB.trim()) {
       setExploreErr("fill in all fields");
       return;
@@ -317,7 +541,8 @@ export default function EventsPage() {
     setExploreErr(null);
     setExploreCreating(true);
     const token = await getAccessToken();
-    const res = await fetch("/api/v1/explore-bets", {
+    const endpoint = exploreCreateType === "poll" ? "/api/v1/polls" : "/api/v1/explore-bets";
+    const res = await fetch(endpoint, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       body: JSON.stringify({ question: exploreQ.trim(), option_a: exploreOptA.trim(), option_b: exploreOptB.trim(), closes_at: exploreDeadline ? new Date(exploreDeadline).toISOString() : null }),
@@ -328,8 +553,8 @@ export default function EventsPage() {
       setExploreErr(data.error ?? "something went wrong");
       return;
     }
-    setExploreQ(""); setExploreOptA(""); setExploreOptB(""); setExploreDeadline("");
-    setShowExploreCreate(false); setExploreErr(null);
+    resetExploreCreate();
+    setShowExploreCreate(false);
     fetchEvents();
   }
 
@@ -564,19 +789,27 @@ export default function EventsPage() {
         )}
 
         {/* Explore tab */}
-        {activeTab === "explore" && (
-          <>
-            {exploreBets.map((bet) => (
-              <ExploreCard key={bet.id} bet={bet} getAccessToken={getAccessToken} onDelete={() => setExploreBets((prev) => prev.filter((b) => b.id !== bet.id))} />
-            ))}
-            {exploreBets.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-20 gap-2">
-                <p className="text-[15px] font-semibold italic" style={{ color: "var(--muted)" }}>no bets yet</p>
-                <p className="text-[13px]" style={{ color: "var(--dimmer)" }}>tap + new to post the first explore bet</p>
-              </div>
-            )}
-          </>
-        )}
+        {activeTab === "explore" && (() => {
+          const items = [
+            ...exploreBets.map((b) => ({ kind: "bet" as const, id: b.id, created_at: b.created_at, data: b })),
+            ...explorePolls.map((p) => ({ kind: "poll" as const, id: p.id, created_at: p.created_at, data: p })),
+          ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+          return (
+            <>
+              {items.map((item) =>
+                item.kind === "bet"
+                  ? <ExploreCard key={`bet-${item.id}`} bet={item.data} getAccessToken={getAccessToken} onDelete={() => setExploreBets((prev) => prev.filter((b) => b.id !== item.id))} />
+                  : <ExplorePollCard key={`poll-${item.id}`} poll={item.data} getAccessToken={getAccessToken} />
+              )}
+              {items.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-20 gap-2">
+                  <p className="text-[15px] font-semibold italic" style={{ color: "var(--muted)" }}>nothing here yet</p>
+                  <p className="text-[13px]" style={{ color: "var(--dimmer)" }}>tap + new to post a bet or poll</p>
+                </div>
+              )}
+            </>
+          );
+        })()}
 
       </div>
 
@@ -689,26 +922,39 @@ export default function EventsPage() {
         <div
           className="fixed inset-0 z-50 flex items-end justify-center"
           style={{ background: "rgba(0,0,0,0.6)" }}
-          onClick={(e) => { if (e.target === e.currentTarget) { setShowExploreCreate(false); setExploreQ(""); setExploreOptA(""); setExploreOptB(""); setExploreErr(null); } }}
+          onClick={(e) => { if (e.target === e.currentTarget) { setShowExploreCreate(false); resetExploreCreate(); } }}
         >
           <div className="w-full max-w-lg rounded-t-[20px] p-6 flex flex-col gap-4"
             style={{ background: "var(--card)", border: "1px solid var(--border-soft)" }}>
             <div className="flex items-center justify-between">
-              <h2 className="font-black text-[18px]" style={{ fontFamily: "var(--font-nunito)", color: "var(--text)" }}>
-                new explore bet
-              </h2>
-              <button onClick={() => { setShowExploreCreate(false); setExploreQ(""); setExploreOptA(""); setExploreOptB(""); setExploreDeadline(""); setExploreErr(null); }} style={{ color: "var(--muted)" }}>
+              <div className="flex gap-1.5 p-1 rounded-[12px]" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                {(["bet", "poll"] as const).map((t) => (
+                  <button key={t} onClick={() => setExploreCreateType(t)}
+                    className="px-4 py-1.5 rounded-[8px] text-[13px] font-bold transition-colors"
+                    style={{
+                      background: exploreCreateType === t ? (t === "poll" ? "var(--purple-dim)" : "var(--accent-dim)") : "transparent",
+                      color: exploreCreateType === t ? (t === "poll" ? "var(--purple)" : "var(--accent)") : "var(--muted)",
+                      border: exploreCreateType === t ? `1px solid ${t === "poll" ? "var(--purple-border)" : "var(--accent-border)"}` : "1px solid transparent",
+                    }}>
+                    {t}
+                  </button>
+                ))}
+              </div>
+              <button onClick={() => { setShowExploreCreate(false); resetExploreCreate(); }} style={{ color: "var(--muted)" }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                   <path d="M18 6 6 18M6 6l12 12" />
                 </svg>
               </button>
             </div>
+            <p className="text-[12px]" style={{ color: "var(--muted)" }}>
+              {exploreCreateType === "poll" ? "no points — anyone can vote, no resolution" : "stake points — open to everyone on explore"}
+            </p>
             <div className="flex flex-col gap-1">
               <label className="text-[12px] font-semibold" style={{ color: "var(--muted)" }}>question</label>
               <textarea
                 className="w-full rounded-[12px] px-4 py-3 text-[14px] resize-none outline-none"
                 style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-soft)", color: "var(--text)", minHeight: 72 }}
-                placeholder="e.g. Will it snow in NYC this winter?"
+                placeholder={exploreCreateType === "poll" ? "e.g. Will Taylor Swift release a new album this year?" : "e.g. Will it snow in NYC this winter?"}
                 value={exploreQ}
                 onChange={(e) => setExploreQ(e.target.value.slice(0, 200))}
                 autoFocus
@@ -741,12 +987,12 @@ export default function EventsPage() {
             </div>
             {exploreErr && <p className="text-[13px]" style={{ color: "var(--loss)" }}>{exploreErr}</p>}
             <button
-              onClick={createExploreBet}
+              onClick={createExploreItem}
               disabled={exploreCreating || !exploreQ.trim() || !exploreOptA.trim() || !exploreOptB.trim()}
               className="w-full py-3 rounded-[12px] font-bold text-[15px] text-white transition-opacity disabled:opacity-40"
-              style={{ background: "var(--accent)" }}
+              style={{ background: exploreCreateType === "poll" ? "var(--purple)" : "var(--accent)" }}
             >
-              {exploreCreating ? "posting…" : "post bet"}
+              {exploreCreating ? "posting…" : `post ${exploreCreateType}`}
             </button>
           </div>
         </div>
