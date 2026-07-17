@@ -34,7 +34,9 @@ export async function GET(req: NextRequest) {
         balances:tagged_user_id(display_name, avatar_url, username)
       ),
       bet_entries(user_id, option_id, points_staked, is_anonymous, balances:user_id(display_name, avatar_url, username)),
-      balances:creator_id(display_name, avatar_url, username)
+      balances:creator_id(display_name, avatar_url, username),
+      bet_reactions(user_id, emoji),
+      bet_comments!bet_id(id)
     `)
     .eq("audience", "followers")
     .in("creator_id", feedUserIds)
@@ -69,7 +71,8 @@ export async function GET(req: NextRequest) {
       polls:poll_id(id, question, option_a, option_b, creator_id, created_at, closes_at,
         poll_votes(user_id, side),
         poll_likes(user_id),
-        poll_reactions(user_id, emoji)
+        poll_reactions(user_id, emoji),
+        poll_comments(id)
       )
     `)
     .in("user_id", feedUserIds)
@@ -85,7 +88,21 @@ export async function GET(req: NextRequest) {
     applyCursor(pollPostQuery),
   ]);
 
-  const betItems = (bets ?? []).map((b: any) => ({ type: "bet" as const, ...b }));
+  const betItems = (bets ?? []).map((b: any) => {
+    const rawReactions = (b.bet_reactions ?? []) as Array<{ user_id: string; emoji: string }>;
+    const reactionCounts: Record<string, number> = {};
+    for (const r of rawReactions) reactionCounts[r.emoji] = (reactionCounts[r.emoji] ?? 0) + 1;
+    const my_reaction = rawReactions.find((r) => r.user_id === user.userId)?.emoji ?? null;
+    return {
+      type: "bet" as const,
+      ...b,
+      bet_reactions: undefined,
+      bet_comments: undefined,
+      reactions: Object.entries(reactionCounts).map(([emoji, count]) => ({ emoji, count })),
+      my_reaction,
+      comment_count: (b.bet_comments ?? []).length,
+    };
+  });
   const postItems = (posts ?? []).map((p: any) => ({ type: "post" as const, ...p }));
   const pollPostItems = (pollPosts ?? []).map((pp: any) => {
     const poll = pp.polls as any;
@@ -98,17 +115,21 @@ export async function GET(req: NextRequest) {
       const rawReactions = (poll.poll_reactions ?? []) as Array<{ user_id: string; emoji: string }>;
       const reactionCounts: Record<string, number> = {};
       for (const r of rawReactions) reactionCounts[r.emoji] = (reactionCounts[r.emoji] ?? 0) + 1;
+      const my_reaction = rawReactions.find((r: any) => r.user_id === user.userId)?.emoji ?? null;
       pp.polls = {
         ...poll,
         poll_votes: undefined,
         poll_likes: undefined,
         poll_reactions: undefined,
+        poll_comments: undefined,
         votes_a,
         votes_b,
         total_votes: votes_a + votes_b,
         my_vote,
         like_count: likes.length,
         reactions: Object.entries(reactionCounts).map(([emoji, count]) => ({ emoji, count })),
+        my_reaction,
+        comment_count: (poll.poll_comments ?? []).length,
       };
     }
     return { type: "poll_post" as const, ...pp };
