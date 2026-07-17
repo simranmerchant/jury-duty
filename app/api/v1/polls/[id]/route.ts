@@ -115,6 +115,8 @@ export async function DELETE(
   if (!poll) return NextResponse.json({ error: "not found" }, { status: 404 });
   if (poll.creator_id !== user.userId) return NextResponse.json({ error: "only the creator can delete this" }, { status: 403 });
 
+  await supabase.from("notifications").delete().contains("data", { poll_id: id });
+
   const { error } = await supabase.from("polls").delete().eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
