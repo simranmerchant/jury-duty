@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
   const postQuery = supabase
     .from("posts")
     .select(`
-      id, user_id, bet_id, caption, photo_url, created_at,
+      id, user_id, bet_id, caption, photo_url, targeted_user_ids, created_at,
       balances:user_id(display_name, avatar_url, username),
       post_likes(user_id),
       post_comments!post_id(id),
@@ -57,13 +57,14 @@ export async function GET(req: NextRequest) {
       )
     `)
     .in("user_id", feedUserIds)
+    .or(`targeted_user_ids.is.null,targeted_user_ids.cs.{${user.userId}}`)
     .order("created_at", { ascending: false })
     .limit(25);
 
   const pollPostQuery = supabase
     .from("poll_posts")
     .select(`
-      id: poll_id, poll_id, user_id, caption, created_at,
+      id: poll_id, poll_id, user_id, caption, photo_url, targeted_user_ids, created_at,
       balances:user_id(display_name, avatar_url, username),
       polls:poll_id(id, question, option_a, option_b, creator_id, created_at, closes_at,
         poll_votes(user_id, side),
@@ -72,6 +73,7 @@ export async function GET(req: NextRequest) {
       )
     `)
     .in("user_id", feedUserIds)
+    .or(`targeted_user_ids.is.null,targeted_user_ids.cs.{${user.userId}}`)
     .order("created_at", { ascending: false })
     .limit(25);
 

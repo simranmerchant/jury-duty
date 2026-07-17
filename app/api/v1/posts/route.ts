@@ -13,11 +13,13 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const body = await req.json().catch(() => ({}));
-  const { bet_id, caption, photo_url } = body;
+  const { bet_id, caption, photo_url, targeted_user_ids } = body;
 
   if (!bet_id) return NextResponse.json({ error: "bet_id required" }, { status: 400 });
   if (caption && caption.length > 280) return NextResponse.json({ error: "caption too long" }, { status: 400 });
   if (photo_url && typeof photo_url !== "string") return NextResponse.json({ error: "invalid photo_url" }, { status: 400 });
+  if (targeted_user_ids !== undefined && !Array.isArray(targeted_user_ids))
+    return NextResponse.json({ error: "targeted_user_ids must be an array" }, { status: 400 });
 
   // Validate bet: must exist, be resolved, and be public
   const { data: bet } = await supabase
@@ -44,7 +46,13 @@ export async function POST(req: NextRequest) {
 
   const { data: post, error } = await supabase
     .from("posts")
-    .insert({ user_id: user.userId, bet_id, caption: caption?.trim() || null, photo_url: photo_url || null })
+    .insert({
+      user_id: user.userId,
+      bet_id,
+      caption: caption?.trim() || null,
+      photo_url: photo_url || null,
+      targeted_user_ids: targeted_user_ids?.length ? targeted_user_ids : null,
+    })
     .select("id")
     .single();
 

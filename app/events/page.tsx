@@ -46,6 +46,7 @@ type ExploreBet = {
   my_reaction: string | null;
   comment_count: number;
   is_mine: boolean;
+  created_at: string;
 };
 
 type ExplorePoll = {
@@ -82,6 +83,16 @@ function ExploreCard({ bet: initialBet, getAccessToken, onDelete }: {
   getAccessToken: () => Promise<string | null>;
   onDelete: () => void;
 }) {
+  const [myEntry, setMyEntry] = useState(initialBet.my_entry);
+  const [totalPtsA, setTotalPtsA] = useState(initialBet.total_pts_a);
+  const [totalPtsB, setTotalPtsB] = useState(initialBet.total_pts_b);
+  const [totalEntries, setTotalEntries] = useState(initialBet.total_entries);
+  const [selectedSide, setSelectedSide] = useState<"a" | "b" | null>(null);
+  const [stakeInput, setStakeInput] = useState("");
+  const [placing, setPlacing] = useState(false);
+  const [doubleInput, setDoubleInput] = useState("");
+  const [showDoubleDown, setShowDoubleDown] = useState(false);
+  const [doubling, setDoubling] = useState(false);
   const [reactions, setReactions] = useState(initialBet.reactions);
   const [myReaction, setMyReaction] = useState(initialBet.my_reaction);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -92,12 +103,51 @@ function ExploreCard({ bet: initialBet, getAccessToken, onDelete }: {
   const [submitting, setSubmitting] = useState(false);
   const [commentCount, setCommentCount] = useState(initialBet.comment_count);
 
-  const total = initialBet.total_pts_a + initialBet.total_pts_b;
-  const pctA = total > 0 ? Math.round((initialBet.total_pts_a / total) * 100) : null;
+  const total = totalPtsA + totalPtsB;
+  const pctA = total > 0 ? Math.round((totalPtsA / total) * 100) : null;
   const pctB = pctA !== null ? 100 - pctA : null;
 
   const grouped: Record<string, number> = {};
   for (const r of reactions) grouped[r.emoji] = r.count;
+
+  async function placeBet() {
+    const pts = parseInt(stakeInput, 10);
+    if (!pts || pts < 10 || placing || !selectedSide) return;
+    setPlacing(true);
+    const token = await getAccessToken();
+    const res = await fetch(`/api/v1/explore-bets/${initialBet.id}/bet`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token ?? ""}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ side: selectedSide, points: pts }),
+    });
+    setPlacing(false);
+    if (res.ok) {
+      if (selectedSide === "a") setTotalPtsA((p) => p + pts);
+      else setTotalPtsB((p) => p + pts);
+      setMyEntry({ side: selectedSide, points_wagered: pts });
+      setTotalEntries((n) => n + 1);
+      setStakeInput(""); setSelectedSide(null);
+    }
+  }
+
+  async function doubleDown() {
+    const pts = parseInt(doubleInput, 10);
+    if (!pts || pts < 10 || doubling || !myEntry) return;
+    setDoubling(true);
+    const token = await getAccessToken();
+    const res = await fetch(`/api/v1/explore-bets/${initialBet.id}/double-down`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token ?? ""}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ points: pts }),
+    });
+    setDoubling(false);
+    if (res.ok) {
+      if (myEntry.side === "a") setTotalPtsA((p) => p + pts);
+      else setTotalPtsB((p) => p + pts);
+      setMyEntry((e) => e ? { ...e, points_wagered: e.points_wagered + pts } : e);
+      setDoubleInput(""); setShowDoubleDown(false);
+    }
+  }
 
   async function deleteBet() {
     const token = await getAccessToken();
@@ -170,28 +220,98 @@ function ExploreCard({ bet: initialBet, getAccessToken, onDelete }: {
       {/* Question */}
       <p className="font-semibold text-[15px] leading-snug" style={{ color: "var(--text)" }}>{initialBet.question}</p>
       {/* Bars */}
-      <div className="flex flex-col gap-1.5">
+      <div className="flex flex-col gap-1">
         {(["a", "b"] as const).map((side) => {
           const label = side === "a" ? initialBet.option_a : initialBet.option_b;
           const pct = side === "a" ? pctA : pctB;
-          const myPick = initialBet.my_entry?.side === side;
+          const pts = side === "a" ? totalPtsA : totalPtsB;
+          const myPick = myEntry?.side === side;
+          const isSel = selectedSide === side;
           const isResolved = initialBet.status === "resolved";
-          const bc = isResolved ? (initialBet.winning_side === side ? "var(--win)" : "var(--loss)") : myPick ? "var(--accent)" : "var(--dimmer)";
+          const bc = isResolved ? (initialBet.winning_side === side ? "var(--win)" : "var(--loss)") : (myPick || isSel) ? "var(--accent)" : "var(--dimmer)";
+          const canClick = initialBet.status === "open" && !myEntry;
           return (
-            <div key={side} className="relative flex items-center rounded-[10px] overflow-hidden"
-              style={{ height: 34, border: `1px solid ${myPick ? "var(--accent-border)" : "var(--border)"}` }}>
-              <div style={{ position: "absolute", top: 0, left: 0, bottom: 0, width: `${pct ?? 50}%`, background: bc + "28" }} />
-              <span className="relative pl-3 flex-1 text-[12px] font-medium truncate" style={{ color: bc }}>{label}</span>
-              <span className="relative pr-3 text-[12px] font-semibold" style={{ color: bc }}>{pct !== null ? `${pct}%` : "—"}</span>
+            <div key={side}>
+              <button disabled={!canClick} onClick={() => canClick && setSelectedSide(side)}
+                className="w-full relative flex items-center rounded-[10px] overflow-hidden text-left"
+                style={{ height: 34, border: `1px solid ${(myPick || isSel) ? "var(--accent-border)" : "var(--border)"}`, cursor: canClick ? "pointer" : "default" }}>
+                <div style={{ position: "absolute", top: 0, left: 0, bottom: 0, width: `${pct ?? 50}%`, background: bc + "28" }} />
+                <span className="relative pl-3 flex-1 text-[12px] font-medium truncate" style={{ color: bc }}>{label}</span>
+                <span className="relative pr-3 text-[12px] font-semibold" style={{ color: bc }}>{pct !== null ? `${pct}%` : "—"}</span>
+              </button>
+              <span className="text-[11px] pl-1" style={{ color: "var(--dimmer)" }}>{pts.toLocaleString()} pts</span>
             </div>
           );
         })}
       </div>
+
+      {/* Place initial bet */}
+      {initialBet.status === "open" && !myEntry && selectedSide && (
+        <div className="flex flex-col gap-2 pt-1">
+          <div className="flex gap-2">
+            {[50, 100, 200].map((v) => (
+              <button key={v} onClick={() => setStakeInput(String(v))}
+                className="flex-1 py-1.5 rounded-[8px] text-[12px] font-bold"
+                style={{ background: stakeInput === String(v) ? "var(--accent-dim)" : "rgba(255,255,255,0.04)", border: `1px solid ${stakeInput === String(v) ? "var(--accent-border)" : "rgba(255,255,255,0.1)"}`, color: stakeInput === String(v) ? "var(--accent)" : "var(--muted)" }}>
+                {v}
+              </button>
+            ))}
+            <input
+              className="flex-1 py-1.5 rounded-[8px] text-[12px] text-center outline-none font-bold"
+              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: "var(--text)" }}
+              placeholder="custom"
+              value={[50, 100, 200].map(String).includes(stakeInput) ? "" : stakeInput}
+              onChange={(e) => setStakeInput(e.target.value.replace(/[^0-9]/g, ""))}
+            />
+          </div>
+          <button onClick={placeBet} disabled={!stakeInput || placing}
+            className="w-full py-2 rounded-[10px] text-[13px] font-bold text-white disabled:opacity-40"
+            style={{ background: "var(--accent)" }}>
+            {placing ? "placing..." : `bet on ${selectedSide === "a" ? initialBet.option_a : initialBet.option_b}`}
+          </button>
+        </div>
+      )}
+
+      {/* Double down */}
+      {initialBet.status === "open" && myEntry && (
+        <div>
+          <button onClick={() => setShowDoubleDown((v) => !v)}
+            className="text-[11px] font-bold px-2 py-0.5 rounded-full"
+            style={{ background: "var(--accent-dim)", color: "var(--accent)", border: "1px solid var(--accent-border)" }}>
+            double down · {myEntry.points_wagered.toLocaleString()} pts on {myEntry.side === "a" ? initialBet.option_a : initialBet.option_b}
+          </button>
+          {showDoubleDown && (
+            <div className="flex flex-col gap-2 mt-2">
+              <div className="flex gap-2">
+                {[50, 100, 200].map((v) => (
+                  <button key={v} onClick={() => setDoubleInput(String(v))}
+                    className="flex-1 py-1.5 rounded-[8px] text-[12px] font-bold"
+                    style={{ background: doubleInput === String(v) ? "var(--accent-dim)" : "rgba(255,255,255,0.04)", border: `1px solid ${doubleInput === String(v) ? "var(--accent-border)" : "rgba(255,255,255,0.1)"}`, color: doubleInput === String(v) ? "var(--accent)" : "var(--muted)" }}>
+                    {v}
+                  </button>
+                ))}
+                <input
+                  className="flex-1 py-1.5 rounded-[8px] text-[12px] text-center outline-none font-bold"
+                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: "var(--text)" }}
+                  placeholder="custom"
+                  value={[50, 100, 200].map(String).includes(doubleInput) ? "" : doubleInput}
+                  onChange={(e) => setDoubleInput(e.target.value.replace(/[^0-9]/g, ""))}
+                />
+              </div>
+              <button onClick={doubleDown} disabled={!doubleInput || doubling}
+                className="w-full py-2 rounded-[10px] text-[13px] font-bold text-white disabled:opacity-40"
+                style={{ background: "var(--accent)" }}>
+                {doubling ? "adding..." : "confirm"}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Meta */}
       <p className="text-[12px]" style={{ color: "var(--muted)" }}>
-        {initialBet.total_entries} bet{initialBet.total_entries !== 1 ? "s" : ""}
+        {totalEntries} bet{totalEntries !== 1 ? "s" : ""} · {total.toLocaleString()} pts
         {initialBet.closes_at && initialBet.status === "open" ? ` · closes ${new Date(initialBet.closes_at).toLocaleDateString()}` : ""}
-        {initialBet.my_entry ? ` · you picked ${initialBet.my_entry.side === "a" ? initialBet.option_a : initialBet.option_b}` : ""}
       </p>
       {/* Reactions row */}
       <div className="relative flex items-center gap-1.5 flex-wrap pt-2 border-t" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
@@ -296,6 +416,13 @@ function ExplorePollCard({ poll: initialPoll, getAccessToken }: {
   const [commentInput, setCommentInput] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [commentCount, setCommentCount] = useState(initialPoll.comment_count);
+  const [showShare, setShowShare] = useState(false);
+  const [shareCaption, setShareCaption] = useState("");
+  const [sharePhoto, setSharePhoto] = useState<File | null>(null);
+  const [sharePhotoPreview, setSharePhotoPreview] = useState<string | null>(null);
+  const [sharing, setSharing] = useState(false);
+  const [shared, setShared] = useState(false);
+  const sharePhotoInputRef = useRef<HTMLInputElement>(null);
 
   const totalVotes = votesA + votesB;
   const pctA = totalVotes > 0 ? Math.round((votesA / totalVotes) * 100) : null;
@@ -351,6 +478,30 @@ function ExplorePollCard({ poll: initialPoll, getAccessToken }: {
     const data = await res.json().catch(() => null);
     setSubmitting(false);
     if (data?.comment) { setComments((prev) => [...prev, data.comment]); setCommentCount((n) => n + 1); }
+  }
+
+  async function sharePoll() {
+    if (sharing) return;
+    setSharing(true);
+    const token = await getAccessToken();
+    let photo_url: string | null = null;
+    if (sharePhoto) {
+      const fd = new FormData(); fd.append("file", sharePhoto);
+      const up = await fetch("/api/v1/posts/upload", { method: "POST", headers: { Authorization: `Bearer ${token ?? ""}` }, body: fd });
+      const ud = await up.json().catch(() => null);
+      if (!up.ok || !ud?.url) { setSharing(false); return; }
+      photo_url = ud.url;
+    }
+    const res = await fetch(`/api/v1/polls/${initialPoll.id}/post`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token ?? ""}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ caption: shareCaption.trim() || null, photo_url }),
+    });
+    setSharing(false);
+    if (res.ok) {
+      setShared(true); setShowShare(false);
+      setShareCaption(""); setSharePhoto(null); setSharePhotoPreview(null);
+    }
   }
 
   return (
@@ -427,7 +578,47 @@ function ExplorePollCard({ poll: initialPoll, getAccessToken }: {
           </svg>
           {commentCount > 0 ? `comments ${commentCount}` : "comment"}
         </button>
+        <button onClick={() => setShowShare((v) => !v)}
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-bold"
+          style={{ background: "rgba(255,255,255,0.04)", border: `1px solid ${shared ? "var(--purple-border)" : "rgba(255,255,255,0.1)"}`, color: shared ? "var(--purple)" : "var(--muted)" }}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8M16 6l-4-4-4 4M12 2v13" />
+          </svg>
+          {shared ? "shared" : "share"}
+        </button>
       </div>
+      {/* Share modal */}
+      {showShare && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,0.7)" }} onClick={() => setShowShare(false)}>
+          <div className="w-full max-w-lg rounded-t-[24px] p-6 flex flex-col gap-4" style={{ background: "var(--card)", border: "1px solid var(--purple-border)" }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <span className="text-[17px] font-black" style={{ color: "var(--text)" }}>share poll</span>
+              <button onClick={() => setShowShare(false)} className="w-8 h-8 flex items-center justify-center rounded-full text-[14px]" style={{ background: "rgba(255,255,255,0.06)", color: "var(--muted)" }}>✕</button>
+            </div>
+            <p className="text-[13px] font-semibold leading-snug" style={{ color: "var(--dimmer)" }}>{initialPoll.question}</p>
+            <textarea
+              className="w-full rounded-[12px] px-3 py-2.5 text-[14px] outline-none resize-none"
+              style={{ background: "rgba(255,255,255,0.07)", border: "1px solid var(--border-soft)", color: "var(--text)", minHeight: 70 }}
+              placeholder="add a caption... (optional)"
+              value={shareCaption}
+              maxLength={280}
+              onChange={(e) => setShareCaption(e.target.value)}
+            />
+            {sharePhotoPreview ? (
+              <div className="relative self-start">
+                <img src={sharePhotoPreview} alt="" className="rounded-[12px] object-cover" style={{ maxWidth: 200, maxHeight: 140 }} />
+                <button onClick={() => { setSharePhoto(null); setSharePhotoPreview(null); }} className="absolute -top-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold" style={{ background: "rgba(0,0,0,0.65)", color: "#fff" }}>✕</button>
+              </div>
+            ) : (
+              <button onClick={() => sharePhotoInputRef.current?.click()} className="w-full py-2.5 rounded-[12px] text-[13px] font-semibold" style={{ border: "1px dashed var(--border-soft)", color: "var(--muted)", background: "rgba(255,255,255,0.02)" }}>+ add photo</button>
+            )}
+            <input ref={sharePhotoInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; setSharePhoto(f); setSharePhotoPreview(URL.createObjectURL(f)); e.target.value = ""; }} />
+            <button onClick={sharePoll} disabled={sharing} className="w-full py-3.5 rounded-[14px] text-[15px] font-black text-white disabled:opacity-50" style={{ background: "var(--purple)" }}>
+              {sharing ? "sharing…" : "share to feed"}
+            </button>
+          </div>
+        </div>
+      )}
       {/* Inline comments */}
       {showComments && (
         <div className="flex flex-col gap-3 pt-2 border-t" style={{ borderColor: "rgba(255,255,255,0.06)" }}>

@@ -36,7 +36,21 @@ type FeedPost = {
   post_comments: { id: string }[];
   bets: EmbeddedBet | null;
 };
-type FeedItem = FeedBet | FeedPost;
+type FeedPollPost = {
+  type: "poll_post";
+  poll_id: string;
+  user_id: string;
+  caption: string | null;
+  photo_url: string | null;
+  created_at: string;
+  balances: { display_name: string | null; avatar_url: string | null; username: string | null } | null;
+  polls: {
+    id: string; question: string; option_a: string; option_b: string;
+    votes_a: number; votes_b: number; total_votes: number;
+    reactions: { emoji: string; count: number }[];
+  } | null;
+};
+type FeedItem = FeedBet | FeedPost | FeedPollPost;
 
 function timeAgo(dateString: string): string {
   const seconds = Math.floor((Date.now() - new Date(dateString).getTime()) / 1000);
@@ -267,6 +281,58 @@ export default function FeedPage() {
                 getAccessToken={getAccessToken}
                 onDelete={() => setItems((prev) => prev.filter((i) => i.id !== item.id))}
               />
+            );
+          }
+
+          if (item.type === "poll_post") {
+            const pp = item as FeedPollPost;
+            const poll = pp.polls;
+            const poster = pp.balances;
+            const posterName = poster?.display_name ?? poster?.username ?? "someone";
+            const total = poll ? poll.votes_a + poll.votes_b : 0;
+            const pctA = total > 0 && poll ? Math.round((poll.votes_a / total) * 100) : null;
+            const pctB = pctA !== null ? 100 - pctA : null;
+            return (
+              <div key={`poll-post-${pp.poll_id}`} className="rounded-[16px] p-4 flex flex-col gap-3"
+                style={{ background: "var(--card)", border: "1px solid var(--purple-border, rgba(124,58,237,0.3))" }}>
+                <div className="flex items-center gap-2.5">
+                  <div className="rounded-full flex items-center justify-center overflow-hidden flex-shrink-0"
+                    style={{ width: 32, height: 32, background: "var(--purple-dim, rgba(124,58,237,0.12))", border: "1px solid var(--purple-border, rgba(124,58,237,0.3))" }}>
+                    {poster?.avatar_url
+                      ? <img src={poster.avatar_url} alt="" className="w-full h-full object-cover" />
+                      : <span className="text-[12px] font-black" style={{ color: "var(--purple, #7c3aed)" }}>{(posterName)[0]?.toUpperCase()}</span>}
+                  </div>
+                  <div>
+                    <button onClick={() => poster?.username && router.push(`/u/${poster.username}`)} className="font-bold text-[14px]" style={{ color: "var(--text)" }}>{posterName}</button>
+                    <p className="text-[11px]" style={{ color: "var(--dimmer)" }}>{timeAgo(pp.created_at)}</p>
+                  </div>
+                  <span className="ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                    style={{ background: "var(--purple-dim, rgba(124,58,237,0.12))", color: "var(--purple, #7c3aed)", border: "1px solid var(--purple-border, rgba(124,58,237,0.3))" }}>
+                    poll
+                  </span>
+                </div>
+                {pp.caption && <p className="text-[14px]" style={{ color: "var(--text)" }}>{pp.caption}</p>}
+                {pp.photo_url && <img src={pp.photo_url} alt="" className="w-full rounded-[12px] object-cover" style={{ maxHeight: 300 }} />}
+                {poll && (
+                  <div className="flex flex-col gap-2">
+                    <p className="font-semibold text-[14px]">{poll.question}</p>
+                    <div className="flex flex-col gap-1">
+                      {(["a", "b"] as const).map((side) => {
+                        const label = side === "a" ? poll.option_a : poll.option_b;
+                        const pct = side === "a" ? pctA : pctB;
+                        return (
+                          <div key={side} className="relative flex items-center rounded-[8px] overflow-hidden" style={{ height: 30, border: "1px solid var(--border)" }}>
+                            <div style={{ position: "absolute", top: 0, left: 0, bottom: 0, width: `${pct ?? 50}%`, background: "rgba(124,58,237,0.15)" }} />
+                            <span className="relative pl-3 flex-1 text-[12px] font-medium truncate" style={{ color: "var(--text)" }}>{label}</span>
+                            <span className="relative pr-3 text-[11px] font-semibold" style={{ color: "var(--muted)" }}>{pct !== null ? `${pct}%` : "—"}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <p className="text-[11px]" style={{ color: "var(--dimmer)" }}>{total} vote{total !== 1 ? "s" : ""}</p>
+                  </div>
+                )}
+              </div>
             );
           }
 
