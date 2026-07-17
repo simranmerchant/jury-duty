@@ -186,7 +186,7 @@ export default function FeedPage() {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (res.ok) {
-      setItems((prev) => prev.filter((item) => item.id !== betId));
+      setItems((prev) => prev.filter((item) => (item.type === "poll_post" ? item.poll_id : item.id) !== betId));
     }
     setDeletingId(null);
   }
@@ -244,6 +244,14 @@ export default function FeedPage() {
               {myPoints.toLocaleString()} pts
             </span>
           )}
+          <button onClick={() => setShowPost(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-bold"
+            style={{ background: "var(--accent)", color: "#fff" }}>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            predict
+          </button>
         </div>
       </div>
 
@@ -278,7 +286,7 @@ export default function FeedPage() {
                 currentUserId={privyUser?.id}
                 followedIds={followedIds}
                 getAccessToken={getAccessToken}
-                onDelete={() => setItems((prev) => prev.filter((i) => i.id !== item.id))}
+                onDelete={() => setItems((prev) => prev.filter((i) => (i.type === "poll_post" ? i.poll_id : i.id) !== item.id))}
               />
             );
           }

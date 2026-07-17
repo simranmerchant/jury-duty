@@ -338,85 +338,67 @@ function ExploreCard({ bet: initialBet, getAccessToken, onDelete }: {
         {initialBet.closes_at && initialBet.status === "open" ? ` · closes ${new Date(initialBet.closes_at).toLocaleDateString()}` : ""}
       </p>
       {/* Reactions row */}
-      <div className="relative flex items-center gap-1.5 flex-wrap pt-2 border-t" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
-        {Object.entries(grouped).map(([emoji, count]) => {
-          const isMe = myReaction === emoji;
-          return (
-            <button key={emoji} onClick={() => toggleReaction(emoji)} className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[13px]"
-              style={{ background: isMe ? "var(--accent-dim)" : "rgba(255,255,255,0.05)", border: `1px solid ${isMe ? "var(--accent-border)" : "rgba(255,255,255,0.1)"}`, color: isMe ? "var(--accent)" : "var(--muted)" }}>
-              <span>{emoji}</span>
-              <span className="font-bold text-[11px]">{count}</span>
-            </button>
-          );
-        })}
-        <div className="relative">
-          <button onClick={() => setShowEmojiPicker((v) => !v)} className="px-2.5 py-1 rounded-full text-[13px] font-bold"
-            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: "var(--muted)" }}>
-            ＋
-          </button>
-          {showEmojiPicker && (
-            <div className="absolute bottom-full left-0 mb-2 flex gap-1 p-2 rounded-[12px] z-10"
-              style={{ background: "var(--card)", border: "1px solid var(--border)", boxShadow: "0 8px 32px rgba(0,0,0,0.5)" }}>
-              {EXPLORE_EMOJIS.map((e) => (
-                <button key={e} onClick={() => toggleReaction(e)}
-                  className="text-[18px] w-8 h-8 flex items-center justify-center rounded-[8px]"
-                  style={{ background: "rgba(255,255,255,0.05)" }}>
-                  {e}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-        <button onClick={() => { if (!showComments) fetchComments(); setShowComments((v) => !v); }}
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-bold ml-auto"
-          style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: "var(--muted)" }}>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-          </svg>
-          {commentCount > 0 ? `comments ${commentCount}` : "comment"}
-        </button>
+      <div className="flex items-center gap-1.5 pt-2 border-t" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
+        {/* Left: share + ⋯ */}
         <button onClick={() => setShowShare(true)}
           className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-bold"
           style={{ background: shared ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: shared ? "var(--win)" : "var(--muted)" }}>
-          {shared ? "shared ✓" : (
-            <>
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 19V5M5 12l7-7 7 7" />
-              </svg>
-              share
-            </>
-          )}
+          {shared ? "shared ✓" : (<><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5M5 12l7-7 7 7" /></svg>share</>)}
         </button>
         <div className="relative">
           <button onClick={() => { setShowMenu((v) => !v); setShowReport(false); }}
             className="w-7 h-7 flex items-center justify-center rounded-full text-[15px] font-bold leading-none"
             style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: "var(--muted)" }}>⋯</button>
           {showMenu && (
-            <div className="absolute bottom-full right-0 mb-1 rounded-[10px] overflow-hidden z-20"
+            <div className="absolute top-full left-0 mt-1 rounded-[10px] overflow-hidden z-20"
               style={{ background: "var(--card)", border: "1px solid var(--border-soft)", minWidth: 150, boxShadow: "0 8px 24px rgba(0,0,0,0.5)" }}>
               {showReport ? (
                 <>
                   <p className="px-4 pt-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--dimmer)" }}>report reason</p>
                   {["spam", "harassment", "inappropriate content", "other"].map((r) => (
-                    <button key={r} onClick={() => reportBet(r)}
-                      className="w-full px-4 py-2.5 text-left text-[13px] font-semibold"
-                      style={{ color: "var(--text)" }}>{r}</button>
+                    <button key={r} onClick={() => reportBet(r)} className="w-full px-4 py-2.5 text-left text-[13px] font-semibold" style={{ color: "var(--text)" }}>{r}</button>
                   ))}
                 </>
               ) : (
                 <>
-                  <button onClick={() => setShowReport(true)}
-                    className="w-full px-4 py-2.5 text-left text-[13px] font-semibold"
-                    style={{ color: "var(--text)" }}>report</button>
+                  <button onClick={() => setShowReport(true)} className="w-full px-4 py-2.5 text-left text-[13px] font-semibold" style={{ color: "var(--text)" }}>report</button>
                   {initialBet.is_mine && (
-                    <button onClick={() => { setShowMenu(false); deleteBet(); }}
-                      className="w-full px-4 py-2.5 text-left text-[13px] font-semibold"
-                      style={{ color: "var(--loss)", borderTop: "1px solid rgba(255,255,255,0.06)" }}>delete bet</button>
+                    <button onClick={() => { setShowMenu(false); deleteBet(); }} className="w-full px-4 py-2.5 text-left text-[13px] font-semibold" style={{ color: "var(--loss)", borderTop: "1px solid rgba(255,255,255,0.06)" }}>delete bet</button>
                   )}
                 </>
               )}
             </div>
           )}
+        </div>
+        {/* Right: emoji pills + ＋ + comments */}
+        <div className="flex items-center gap-1.5 ml-auto flex-wrap">
+          {Object.entries(grouped).map(([emoji, count]) => {
+            const isMe = myReaction === emoji;
+            return (
+              <button key={emoji} onClick={() => toggleReaction(emoji)} className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[13px]"
+                style={{ background: isMe ? "var(--accent-dim)" : "rgba(255,255,255,0.05)", border: `1px solid ${isMe ? "var(--accent-border)" : "rgba(255,255,255,0.1)"}`, color: isMe ? "var(--accent)" : "var(--muted)" }}>
+                <span>{emoji}</span><span className="font-bold text-[11px]">{count}</span>
+              </button>
+            );
+          })}
+          <div className="relative">
+            <button onClick={() => setShowEmojiPicker((v) => !v)} className="px-2.5 py-1 rounded-full text-[13px] font-bold"
+              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: "var(--muted)" }}>＋</button>
+            {showEmojiPicker && (
+              <div className="absolute bottom-full right-0 mb-2 flex gap-1 p-2 rounded-[12px] z-10"
+                style={{ background: "var(--card)", border: "1px solid var(--border)", boxShadow: "0 8px 32px rgba(0,0,0,0.5)" }}>
+                {EXPLORE_EMOJIS.map((e) => (
+                  <button key={e} onClick={() => toggleReaction(e)} className="text-[18px] w-8 h-8 flex items-center justify-center rounded-[8px]" style={{ background: "rgba(255,255,255,0.05)" }}>{e}</button>
+                ))}
+              </div>
+            )}
+          </div>
+          <button onClick={() => { if (!showComments) fetchComments(); setShowComments((v) => !v); }}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-bold"
+            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: "var(--muted)" }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
+            {commentCount > 0 ? `${commentCount}` : "comment"}
+          </button>
         </div>
       </div>
       {/* Share modal */}
@@ -682,43 +664,8 @@ function ExplorePollCard({ poll: initialPoll, getAccessToken, onDelete }: {
         {myVote ? ` · you voted ${myVote === "a" ? initialPoll.option_a : initialPoll.option_b}` : " · click to vote"}
       </p>
       {/* Reactions row */}
-      <div className="relative flex items-center gap-1.5 flex-wrap pt-2 border-t" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
-        {Object.entries(grouped).map(([emoji, count]) => {
-          const isMe = myReaction === emoji;
-          return (
-            <button key={emoji} onClick={() => toggleReaction(emoji)} className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[13px]"
-              style={{ background: isMe ? "var(--accent-dim)" : "rgba(255,255,255,0.05)", border: `1px solid ${isMe ? "var(--accent-border)" : "rgba(255,255,255,0.1)"}`, color: isMe ? "var(--accent)" : "var(--muted)" }}>
-              <span>{emoji}</span>
-              <span className="font-bold text-[11px]">{count}</span>
-            </button>
-          );
-        })}
-        <div className="relative">
-          <button onClick={() => setShowEmojiPicker((v) => !v)} className="px-2.5 py-1 rounded-full text-[13px] font-bold"
-            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: "var(--muted)" }}>
-            ＋
-          </button>
-          {showEmojiPicker && (
-            <div className="absolute bottom-full left-0 mb-2 flex gap-1 p-2 rounded-[12px] z-10"
-              style={{ background: "var(--card)", border: "1px solid var(--border)", boxShadow: "0 8px 32px rgba(0,0,0,0.5)" }}>
-              {EXPLORE_EMOJIS.map((e) => (
-                <button key={e} onClick={() => toggleReaction(e)}
-                  className="text-[18px] w-8 h-8 flex items-center justify-center rounded-[8px]"
-                  style={{ background: "rgba(255,255,255,0.05)" }}>
-                  {e}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-        <button onClick={() => { if (!showComments) fetchComments(); setShowComments((v) => !v); }}
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-bold ml-auto"
-          style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: "var(--muted)" }}>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-          </svg>
-          {commentCount > 0 ? `comments ${commentCount}` : "comment"}
-        </button>
+      <div className="flex items-center gap-1.5 pt-2 border-t" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
+        {/* Left: share + ⋯ */}
         <button onClick={() => setShowShare(true)}
           className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-bold"
           style={{ background: shared ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: shared ? "var(--win)" : "var(--muted)" }}>
@@ -738,7 +685,7 @@ function ExplorePollCard({ poll: initialPoll, getAccessToken, onDelete }: {
             className="w-7 h-7 flex items-center justify-center rounded-full text-[15px] font-bold leading-none"
             style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: "var(--muted)" }}>⋯</button>
           {showMenu && (
-            <div className="absolute bottom-full right-0 mb-1 rounded-[10px] overflow-hidden z-20"
+            <div className="absolute top-full left-0 mt-1 rounded-[10px] overflow-hidden z-20"
               style={{ background: "var(--card)", border: "1px solid var(--border-soft)", minWidth: 150, boxShadow: "0 8px 24px rgba(0,0,0,0.5)" }}>
               {showReport ? (
                 <>
@@ -763,6 +710,45 @@ function ExplorePollCard({ poll: initialPoll, getAccessToken, onDelete }: {
               )}
             </div>
           )}
+        </div>
+        {/* Right: emoji pills + ＋ + comments */}
+        <div className="flex items-center gap-1.5 ml-auto flex-wrap">
+          {Object.entries(grouped).map(([emoji, count]) => {
+            const isMe = myReaction === emoji;
+            return (
+              <button key={emoji} onClick={() => toggleReaction(emoji)} className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[13px]"
+                style={{ background: isMe ? "var(--accent-dim)" : "rgba(255,255,255,0.05)", border: `1px solid ${isMe ? "var(--accent-border)" : "rgba(255,255,255,0.1)"}`, color: isMe ? "var(--accent)" : "var(--muted)" }}>
+                <span>{emoji}</span>
+                <span className="font-bold text-[11px]">{count}</span>
+              </button>
+            );
+          })}
+          <div className="relative">
+            <button onClick={() => setShowEmojiPicker((v) => !v)} className="px-2.5 py-1 rounded-full text-[13px] font-bold"
+              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: "var(--muted)" }}>
+              ＋
+            </button>
+            {showEmojiPicker && (
+              <div className="absolute bottom-full left-0 mb-2 flex gap-1 p-2 rounded-[12px] z-10"
+                style={{ background: "var(--card)", border: "1px solid var(--border)", boxShadow: "0 8px 32px rgba(0,0,0,0.5)" }}>
+                {EXPLORE_EMOJIS.map((e) => (
+                  <button key={e} onClick={() => toggleReaction(e)}
+                    className="text-[18px] w-8 h-8 flex items-center justify-center rounded-[8px]"
+                    style={{ background: "rgba(255,255,255,0.05)" }}>
+                    {e}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <button onClick={() => { if (!showComments) fetchComments(); setShowComments((v) => !v); }}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-bold"
+            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: "var(--muted)" }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            </svg>
+            {commentCount > 0 ? commentCount : "comment"}
+          </button>
         </div>
       </div>
       {/* Share modal */}
