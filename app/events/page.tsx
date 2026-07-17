@@ -629,7 +629,16 @@ function ExplorePollCard({ poll: initialPoll, getAccessToken, onDelete }: {
         <button onClick={() => setShowShare(true)}
           className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-bold"
           style={{ background: shared ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: shared ? "var(--win)" : "var(--muted)" }}>
-          {shared ? "shared ✓" : "share"}
+          {shared ? (
+            "posted ✓"
+          ) : (
+            <>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 19V5M5 12l7-7 7 7" />
+              </svg>
+              post
+            </>
+          )}
         </button>
       </div>
       {/* Share modal */}
@@ -638,7 +647,7 @@ function ExplorePollCard({ poll: initialPoll, getAccessToken, onDelete }: {
           onClick={(e) => { if (e.target === e.currentTarget) { setShowShare(false); setShareCaption(""); setSharePhoto(null); setSharePhotoPreview(null); setShareMode("followers"); setTargetUsers([]); setUserSearchQ(""); setUserSearchResults([]); } }}>
           <div className="w-full max-w-lg rounded-t-3xl p-6 flex flex-col gap-4" style={{ background: "var(--card)", border: "1px solid var(--border-soft)" }}>
             <div className="flex items-center justify-between">
-              <p className="font-extrabold text-[16px]" style={{ fontFamily: "var(--font-nunito)" }}>share poll to feed</p>
+              <p className="font-extrabold text-[16px]" style={{ fontFamily: "var(--font-nunito)" }}>post poll to feed</p>
               <button onClick={() => { setShowShare(false); setShareCaption(""); setSharePhoto(null); setSharePhotoPreview(null); setShareMode("followers"); setTargetUsers([]); setUserSearchQ(""); setUserSearchResults([]); }} style={{ color: "var(--muted)" }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
               </button>
@@ -729,7 +738,7 @@ function ExplorePollCard({ poll: initialPoll, getAccessToken, onDelete }: {
             <button onClick={sharePoll} disabled={sharing || (shareMode === "specific" && targetUsers.length === 0)}
               className="w-full py-4 rounded-[14px] text-[15px] font-black"
               style={{ background: "var(--purple)", color: "#fff", opacity: sharing || (shareMode === "specific" && targetUsers.length === 0) ? 0.5 : 1, fontFamily: "var(--font-nunito)" }}>
-              {sharing ? "sharing…" : shareMode === "specific" ? `share to ${targetUsers.length} ${targetUsers.length === 1 ? "person" : "people"}` : "share to feed"}
+              {sharing ? "posting…" : shareMode === "specific" ? `post to ${targetUsers.length} ${targetUsers.length === 1 ? "person" : "people"}` : "post to feed"}
             </button>
           </div>
         </div>

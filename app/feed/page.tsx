@@ -121,7 +121,7 @@ export default function FeedPage() {
     setTimeout(() => {
       setSeenBetIds((prev) => {
         const next = new Set(prev);
-        incoming.forEach((b) => next.add(b.id));
+        incoming.forEach((b) => next.add(b.type === "poll_post" ? b.poll_id : b.id));
         try { sessionStorage.setItem("seenFeedBetIds", JSON.stringify([...next])); } catch {}
         return next;
       });
