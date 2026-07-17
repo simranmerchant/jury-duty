@@ -93,6 +93,7 @@ export async function GET(req: NextRequest) {
       const votes = (poll.poll_votes ?? []) as Array<{ user_id: string; side: string }>;
       const votes_a = votes.filter((v: any) => v.side === "a").length;
       const votes_b = votes.filter((v: any) => v.side === "b").length;
+      const my_vote = votes.find((v: any) => v.user_id === user.userId)?.side ?? null;
       const likes = (poll.poll_likes ?? []) as Array<{ user_id: string }>;
       const rawReactions = (poll.poll_reactions ?? []) as Array<{ user_id: string; emoji: string }>;
       const reactionCounts: Record<string, number> = {};
@@ -105,6 +106,7 @@ export async function GET(req: NextRequest) {
         votes_a,
         votes_b,
         total_votes: votes_a + votes_b,
+        my_vote,
         like_count: likes.length,
         reactions: Object.entries(reactionCounts).map(([emoji, count]) => ({ emoji, count })),
       };
