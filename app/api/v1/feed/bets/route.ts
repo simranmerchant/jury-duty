@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
   const user = await requireUser(token).catch(() => null);
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  const { question, options, deadline } = await req.json();
+  const { question, options, deadline, targeted_user_ids } = await req.json();
 
   const validationError = validateFeedBet({ question, options, deadline });
   if (validationError) return NextResponse.json({ error: validationError }, { status: 400 });
@@ -44,14 +44,18 @@ export async function POST(req: NextRequest) {
   );
   if (optError) return NextResponse.json({ error: optError.message }, { status: 500 });
 
-  // Notify followers
-  const { data: followers } = await supabase
-    .from("follows")
-    .select("follower_id")
-    .eq("following_id", user.userId)
-    .eq("status", "accepted");
-
-  const followerIds = (followers ?? []).map((r) => r.follower_id as string);
+  // Notify followers (or specific targeted users)
+  let followerIds: string[];
+  if (Array.isArray(targeted_user_ids) && targeted_user_ids.length > 0) {
+    followerIds = targeted_user_ids as string[];
+  } else {
+    const { data: followers } = await supabase
+      .from("follows")
+      .select("follower_id")
+      .eq("following_id", user.userId)
+      .eq("status", "accepted");
+    followerIds = (followers ?? []).map((r) => r.follower_id as string);
+  }
   const creatorName = creatorData?.display_name ?? "someone";
   const notif = buildFeedBetNotification(creatorName, question);
 

@@ -90,6 +90,11 @@ export default function FeedPage() {
   const [postDeadline, setPostDeadline] = useState("");
   const [posting, setPosting] = useState(false);
   const [postError, setPostError] = useState<string | null>(null);
+  const [postMode, setPostMode] = useState<"followers" | "specific">("followers");
+  const [postTargetUsers, setPostTargetUsers] = useState<{ user_id: string; display_name: string | null; username: string | null }[]>([]);
+  const [postUserSearchQ, setPostUserSearchQ] = useState("");
+  const [postUserSearchResults, setPostUserSearchResults] = useState<{ user_id: string; display_name: string | null; username: string | null }[]>([]);
+  const postUserSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = useCallback(async (cursor?: string) => {
     const token = await getAccessToken();
@@ -191,6 +196,18 @@ export default function FeedPage() {
     setDeletingId(null);
   }
 
+  function searchPostUsers(q: string) {
+    setPostUserSearchQ(q);
+    if (postUserSearchTimer.current) clearTimeout(postUserSearchTimer.current);
+    if (!q.trim()) { setPostUserSearchResults([]); return; }
+    postUserSearchTimer.current = setTimeout(async () => {
+      const token = await getAccessToken();
+      const res = await fetch(`/api/v1/users/search?q=${encodeURIComponent(q.trim())}`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      setPostUserSearchResults(data?.users ?? []);
+    }, 300);
+  }
+
   async function postBet() {
     const filled = postOptions.filter((o) => o.trim());
     if (!postQuestion.trim() || filled.length < 2 || !postDeadline) return;
@@ -204,12 +221,14 @@ export default function FeedPage() {
         question: postQuestion.trim(),
         options: filled.map((o) => ({ label: o.trim() })),
         deadline: new Date(postDeadline).toISOString(),
+        targeted_user_ids: postMode === "specific" && postTargetUsers.length > 0 ? postTargetUsers.map((u) => u.user_id) : undefined,
       }),
     });
     setPosting(false);
     if (res.ok) {
       setShowPost(false);
       setPostQuestion(""); setPostOptions(["", ""]); setPostDeadline(""); setPostError(null);
+      setPostMode("followers"); setPostTargetUsers([]); setPostUserSearchQ(""); setPostUserSearchResults([]);
       setLoading(true);
       try { await load(); } finally { setLoading(false); }
     } else {
@@ -226,7 +245,8 @@ export default function FeedPage() {
     );
   }
 
-  const canPost = postQuestion.trim() && postOptions.filter((o) => o.trim()).length >= 2 && postDeadline;
+  const canPost = postQuestion.trim() && postOptions.filter((o) => o.trim()).length >= 2 && postDeadline &&
+    (postMode === "followers" || postTargetUsers.length > 0);
 
   return (
     <div className="min-h-screen" style={{ background: "var(--bg)", color: "var(--text)" }}>
@@ -499,10 +519,57 @@ export default function FeedPage() {
             style={{ background: "var(--card)", border: "1px solid var(--border-soft)", maxHeight: "90vh", overflowY: "auto" }}>
             <div className="flex items-center justify-between">
               <h2 className="font-black text-[18px]" style={{ fontFamily: "var(--font-nunito)", color: "var(--text)" }}>new prediction</h2>
-              <button onClick={() => { setShowPost(false); setPostError(null); }} style={{ color: "var(--muted)" }}>
+              <button onClick={() => { setShowPost(false); setPostError(null); setPostMode("followers"); setPostTargetUsers([]); setPostUserSearchQ(""); setPostUserSearchResults([]); }} style={{ color: "var(--muted)" }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
               </button>
             </div>
+
+            {/* Audience toggle */}
+            <div className="flex rounded-[12px] overflow-hidden" style={{ border: "1px solid var(--border-soft)" }}>
+              {(["followers", "specific"] as const).map((mode) => (
+                <button key={mode} onClick={() => setPostMode(mode)} className="flex-1 py-2.5 text-[13px] font-bold transition-colors"
+                  style={{ background: postMode === mode ? "var(--accent-dim)" : "transparent", color: postMode === mode ? "var(--accent)" : "var(--muted)" }}>
+                  {mode === "followers" ? "all followers" : "specific people"}
+                </button>
+              ))}
+            </div>
+            {postMode === "specific" && (
+              <div className="flex flex-col gap-2">
+                {postTargetUsers.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {postTargetUsers.map((u) => (
+                      <button key={u.user_id} onClick={() => setPostTargetUsers((prev) => prev.filter((t) => t.user_id !== u.user_id))}
+                        className="flex items-center gap-1 px-3 py-1 rounded-full text-[12px] font-bold"
+                        style={{ background: "var(--accent-dim)", border: "1px solid var(--accent-border)", color: "var(--accent)" }}>
+                        {u.display_name ?? u.username ?? "user"} ✕
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <input
+                  className="w-full rounded-[12px] px-4 py-3 text-[14px] outline-none"
+                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-soft)", color: "var(--text)" }}
+                  placeholder="search by name or @username…"
+                  value={postUserSearchQ}
+                  onChange={(e) => searchPostUsers(e.target.value)}
+                  autoComplete="off"
+                />
+                {postUserSearchResults.filter((u) => !postTargetUsers.some((t) => t.user_id === u.user_id)).slice(0, 6).map((u) => (
+                  <button key={u.user_id} onClick={() => { setPostTargetUsers((prev) => [...prev, u]); setPostUserSearchQ(""); setPostUserSearchResults([]); }}
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-[10px] text-left"
+                    style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-soft)" }}>
+                    <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black flex-shrink-0"
+                      style={{ background: "var(--accent-dim)", color: "var(--accent)" }}>
+                      {(u.display_name?.[0] ?? "?").toUpperCase()}
+                    </div>
+                    <div>
+                      <p className="text-[13px] font-semibold" style={{ color: "var(--text)" }}>{u.display_name ?? u.username}</p>
+                      {u.username && <p className="text-[11px]" style={{ color: "var(--dimmer)" }}>@{u.username}</p>}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
 
             <div className="flex flex-col gap-1.5">
               <label className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: "var(--dimmer)" }}>question</label>
@@ -561,7 +628,7 @@ export default function FeedPage() {
               disabled={!canPost || posting}
               className="w-full py-4 rounded-[14px] text-[15px] font-black"
               style={{ background: "var(--accent)", color: "#fff", opacity: (!canPost || posting) ? 0.4 : 1, fontFamily: "var(--font-nunito)" }}>
-              {posting ? "posting…" : "post prediction"}
+              {posting ? "posting…" : postMode === "specific" ? `post to ${postTargetUsers.length} ${postTargetUsers.length === 1 ? "person" : "people"}` : "post prediction"}
             </button>
           </div>
         </div>
