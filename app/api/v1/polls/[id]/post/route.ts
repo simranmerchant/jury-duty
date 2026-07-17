@@ -29,20 +29,19 @@ export async function POST(
 
   if (!poll) return NextResponse.json({ error: "not found" }, { status: 404 });
 
+  // Upsert so resharing with photo/caption bumps the post to the top
   const { error } = await supabase
     .from("poll_posts")
-    .insert({
+    .upsert({
       poll_id: id,
       user_id: user.userId,
       caption: caption?.trim() || null,
       photo_url: photo_url || null,
       targeted_user_ids: targeted_user_ids?.length ? targeted_user_ids : null,
-    });
+      created_at: new Date().toISOString(),
+    }, { onConflict: "poll_id,user_id" });
 
-  if (error) {
-    if (error.code === "23505") return NextResponse.json({ error: "already posted" }, { status: 409 });
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   return NextResponse.json({ ok: true }, { status: 201 });
 }

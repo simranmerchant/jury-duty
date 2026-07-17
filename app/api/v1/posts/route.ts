@@ -29,10 +29,9 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (!bet) return NextResponse.json({ error: "bet not found" }, { status: 404 });
-  if (bet.status !== "resolved") return NextResponse.json({ error: "only resolved bets can be shared" }, { status: 400 });
   if (bet.visibility === "private") return NextResponse.json({ error: "private bets cannot be shared" }, { status: 403 });
 
-  // User must have participated in or created the bet
+  // Must be creator or have participated
   const isCreator = bet.creator_id === user.userId;
   if (!isCreator) {
     const { data: entry } = await supabase
@@ -44,22 +43,21 @@ export async function POST(req: NextRequest) {
     if (!entry) return NextResponse.json({ error: "you must have participated in this bet to share it" }, { status: 403 });
   }
 
+  // Upsert so resharing bumps the post to the top of the feed
   const { data: post, error } = await supabase
     .from("posts")
-    .insert({
+    .upsert({
       user_id: user.userId,
       bet_id,
       caption: caption?.trim() || null,
       photo_url: photo_url || null,
       targeted_user_ids: targeted_user_ids?.length ? targeted_user_ids : null,
-    })
+      created_at: new Date().toISOString(),
+    }, { onConflict: "user_id,bet_id" })
     .select("id")
     .single();
 
-  if (error) {
-    if (error.code === "23505") return NextResponse.json({ error: "already shared" }, { status: 409 });
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   // Notify @mentioned users
   const captionText = caption?.trim() ?? "";

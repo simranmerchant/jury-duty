@@ -88,7 +88,14 @@ export async function GET(req: NextRequest) {
     applyCursor(pollPostQuery),
   ]);
 
-  const betItems = (bets ?? []).map((b: any) => {
+  // Suppress bare BetItem when a visible post already exists for that bet
+  const sharedBetIds = new Set(
+    (posts ?? [])
+      .filter((p: any) => !p.targeted_user_ids || p.targeted_user_ids.includes(user.userId))
+      .map((p: any) => p.bet_id as string)
+  );
+
+  const betItems = (bets ?? []).filter((b: any) => !sharedBetIds.has(b.id)).map((b: any) => {
     const rawReactions = (b.bet_reactions ?? []) as Array<{ user_id: string; emoji: string }>;
     const reactionCounts: Record<string, number> = {};
     for (const r of rawReactions) reactionCounts[r.emoji] = (reactionCounts[r.emoji] ?? 0) + 1;
