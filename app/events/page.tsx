@@ -103,6 +103,12 @@ function ExploreCard({ bet: initialBet, getAccessToken, onDelete }: {
   const [commentInput, setCommentInput] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [commentCount, setCommentCount] = useState(initialBet.comment_count);
+  const [showShare, setShowShare] = useState(false);
+  const [shareCaption, setShareCaption] = useState("");
+  const [sharing, setSharing] = useState(false);
+  const [shared, setShared] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
+  const [showReport, setShowReport] = useState(false);
 
   const total = totalPtsA + totalPtsB;
   const pctA = total > 0 ? Math.round((totalPtsA / total) * 100) : null;
@@ -159,6 +165,29 @@ function ExploreCard({ bet: initialBet, getAccessToken, onDelete }: {
     if (res.ok) onDelete();
   }
 
+  async function shareBet() {
+    if (sharing) return;
+    setSharing(true);
+    const token = await getAccessToken();
+    const res = await fetch(`/api/v1/explore-bets/${initialBet.id}/post`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token ?? ""}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ caption: shareCaption.trim() || null }),
+    });
+    setSharing(false);
+    if (res.ok) { setShared(true); setShowShare(false); setShareCaption(""); }
+  }
+
+  async function reportBet(reason: string) {
+    setShowMenu(false); setShowReport(false);
+    const token = await getAccessToken();
+    await fetch("/api/v1/reports", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token ?? ""}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ reported_explore_bet_id: initialBet.id, reason }),
+    });
+  }
+
   async function toggleReaction(emoji: string) {
     setShowEmojiPicker(false);
     const token = await getAccessToken();
@@ -210,12 +239,6 @@ function ExploreCard({ bet: initialBet, getAccessToken, onDelete }: {
           <span className="text-[12px] font-semibold" style={{ color: "var(--win)" }}>
             {initialBet.winning_side === "a" ? initialBet.option_a : initialBet.option_b} won
           </span>
-        )}
-        {initialBet.is_mine && (
-          <button onClick={deleteBet} className="ml-auto text-[11px] px-2 py-0.5 rounded-full"
-            style={{ color: "var(--muted)", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
-            delete
-          </button>
         )}
       </div>
       {/* Question */}
@@ -352,7 +375,80 @@ function ExploreCard({ bet: initialBet, getAccessToken, onDelete }: {
           </svg>
           {commentCount > 0 ? `comments ${commentCount}` : "comment"}
         </button>
+        <button onClick={() => setShowShare(true)}
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-bold"
+          style={{ background: shared ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: shared ? "var(--win)" : "var(--muted)" }}>
+          {shared ? "shared ✓" : (
+            <>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 19V5M5 12l7-7 7 7" />
+              </svg>
+              share
+            </>
+          )}
+        </button>
+        <div className="relative">
+          <button onClick={() => { setShowMenu((v) => !v); setShowReport(false); }}
+            className="w-7 h-7 flex items-center justify-center rounded-full text-[15px] font-bold leading-none"
+            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: "var(--muted)" }}>⋯</button>
+          {showMenu && (
+            <div className="absolute bottom-full right-0 mb-1 rounded-[10px] overflow-hidden z-20"
+              style={{ background: "var(--card)", border: "1px solid var(--border-soft)", minWidth: 150, boxShadow: "0 8px 24px rgba(0,0,0,0.5)" }}>
+              {showReport ? (
+                <>
+                  <p className="px-4 pt-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--dimmer)" }}>report reason</p>
+                  {["spam", "harassment", "inappropriate content", "other"].map((r) => (
+                    <button key={r} onClick={() => reportBet(r)}
+                      className="w-full px-4 py-2.5 text-left text-[13px] font-semibold"
+                      style={{ color: "var(--text)" }}>{r}</button>
+                  ))}
+                </>
+              ) : (
+                <>
+                  <button onClick={() => setShowReport(true)}
+                    className="w-full px-4 py-2.5 text-left text-[13px] font-semibold"
+                    style={{ color: "var(--text)" }}>report</button>
+                  {initialBet.is_mine && (
+                    <button onClick={() => { setShowMenu(false); deleteBet(); }}
+                      className="w-full px-4 py-2.5 text-left text-[13px] font-semibold"
+                      style={{ color: "var(--loss)", borderTop: "1px solid rgba(255,255,255,0.06)" }}>delete bet</button>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </div>
       </div>
+      {/* Share modal */}
+      {showShare && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,0.6)" }}
+          onClick={(e) => { if (e.target === e.currentTarget) { setShowShare(false); setShareCaption(""); } }}>
+          <div className="w-full max-w-lg rounded-t-3xl p-6 flex flex-col gap-4" style={{ background: "var(--card)", border: "1px solid var(--border-soft)" }}>
+            <div className="flex items-center justify-between">
+              <p className="font-extrabold text-[16px]" style={{ fontFamily: "var(--font-nunito)" }}>share bet to feed</p>
+              <button onClick={() => { setShowShare(false); setShareCaption(""); }} style={{ color: "var(--muted)" }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: "var(--dimmer)" }}>caption (optional)</label>
+              <textarea
+                className="w-full rounded-[12px] px-4 py-3 text-[14px] resize-none outline-none"
+                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-soft)", color: "var(--text)", minHeight: 80 }}
+                placeholder="say something about this bet..."
+                value={shareCaption}
+                onChange={(e) => setShareCaption(e.target.value.slice(0, 280))}
+                maxLength={280}
+              />
+            </div>
+            <button onClick={shareBet} disabled={sharing}
+              className="w-full py-4 rounded-[14px] text-[15px] font-black"
+              style={{ background: "var(--accent)", color: "#fff", opacity: sharing ? 0.5 : 1, fontFamily: "var(--font-nunito)" }}>
+              {sharing ? "sharing…" : "share to feed"}
+            </button>
+          </div>
+        </div>
+      )}
       {/* Inline comments */}
       {showComments && (
         <div className="flex flex-col gap-3 pt-2 border-t" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
@@ -431,6 +527,7 @@ function ExplorePollCard({ poll: initialPoll, getAccessToken, onDelete }: {
   const [userSearchResults, setUserSearchResults] = useState<{ user_id: string; display_name: string | null; username: string | null; avatar_url: string | null }[]>([]);
   const userSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showMenu, setShowMenu] = useState(false);
+  const [showReport, setShowReport] = useState(false);
 
   const totalVotes = votesA + votesB;
   const pctA = totalVotes > 0 ? Math.round((votesA / totalVotes) * 100) : null;
@@ -497,6 +594,16 @@ function ExplorePollCard({ poll: initialPoll, getAccessToken, onDelete }: {
     if (res.ok) onDelete();
   }
 
+  async function reportPoll(reason: string) {
+    setShowMenu(false); setShowReport(false);
+    const token = await getAccessToken();
+    await fetch("/api/v1/reports", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token ?? ""}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ reported_poll_id: initialPoll.id, reason }),
+    });
+  }
+
   async function searchUsers(q: string) {
     setUserSearchQ(q);
     if (userSearchTimer.current) clearTimeout(userSearchTimer.current);
@@ -548,20 +655,6 @@ function ExplorePollCard({ poll: initialPoll, getAccessToken, onDelete }: {
         </span>
         {initialPoll.closes_at && new Date(initialPoll.closes_at) > new Date() && (
           <span className="text-[11px]" style={{ color: "var(--muted)" }}>closes {new Date(initialPoll.closes_at).toLocaleDateString()}</span>
-        )}
-        {initialPoll.is_mine && (
-          <div className="relative ml-auto">
-            <button onClick={() => setShowMenu((v) => !v)} className="w-7 h-7 flex items-center justify-center rounded-full text-[15px] font-bold leading-none"
-              style={{ background: "rgba(255,255,255,0.04)", color: "var(--muted)" }}>⋯</button>
-            {showMenu && (
-              <div className="absolute top-full right-0 mt-1 rounded-[10px] overflow-hidden z-20"
-                style={{ background: "var(--card)", border: "1px solid var(--border-soft)", minWidth: 120, boxShadow: "0 8px 24px rgba(0,0,0,0.5)" }}>
-                <button onClick={() => { setShowMenu(false); deletePoll(); }}
-                  className="w-full px-4 py-2.5 text-left text-[13px] font-semibold"
-                  style={{ color: "var(--loss)" }}>delete poll</button>
-              </div>
-            )}
-          </div>
         )}
       </div>
       {/* Question */}
@@ -630,16 +723,47 @@ function ExplorePollCard({ poll: initialPoll, getAccessToken, onDelete }: {
           className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-bold"
           style={{ background: shared ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: shared ? "var(--win)" : "var(--muted)" }}>
           {shared ? (
-            "posted ✓"
+            "shared ✓"
           ) : (
             <>
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 19V5M5 12l7-7 7 7" />
               </svg>
-              post
+              share
             </>
           )}
         </button>
+        <div className="relative">
+          <button onClick={() => { setShowMenu((v) => !v); setShowReport(false); }}
+            className="w-7 h-7 flex items-center justify-center rounded-full text-[15px] font-bold leading-none"
+            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: "var(--muted)" }}>⋯</button>
+          {showMenu && (
+            <div className="absolute bottom-full right-0 mb-1 rounded-[10px] overflow-hidden z-20"
+              style={{ background: "var(--card)", border: "1px solid var(--border-soft)", minWidth: 150, boxShadow: "0 8px 24px rgba(0,0,0,0.5)" }}>
+              {showReport ? (
+                <>
+                  <p className="px-4 pt-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--dimmer)" }}>report reason</p>
+                  {["spam", "harassment", "inappropriate content", "other"].map((r) => (
+                    <button key={r} onClick={() => reportPoll(r)}
+                      className="w-full px-4 py-2.5 text-left text-[13px] font-semibold"
+                      style={{ color: "var(--text)" }}>{r}</button>
+                  ))}
+                </>
+              ) : (
+                <>
+                  <button onClick={() => setShowReport(true)}
+                    className="w-full px-4 py-2.5 text-left text-[13px] font-semibold"
+                    style={{ color: "var(--text)" }}>report</button>
+                  {initialPoll.is_mine && (
+                    <button onClick={() => { setShowMenu(false); deletePoll(); }}
+                      className="w-full px-4 py-2.5 text-left text-[13px] font-semibold"
+                      style={{ color: "var(--loss)", borderTop: "1px solid rgba(255,255,255,0.06)" }}>delete poll</button>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </div>
       </div>
       {/* Share modal */}
       {showShare && (
@@ -647,7 +771,7 @@ function ExplorePollCard({ poll: initialPoll, getAccessToken, onDelete }: {
           onClick={(e) => { if (e.target === e.currentTarget) { setShowShare(false); setShareCaption(""); setSharePhoto(null); setSharePhotoPreview(null); setShareMode("followers"); setTargetUsers([]); setUserSearchQ(""); setUserSearchResults([]); } }}>
           <div className="w-full max-w-lg rounded-t-3xl p-6 flex flex-col gap-4" style={{ background: "var(--card)", border: "1px solid var(--border-soft)" }}>
             <div className="flex items-center justify-between">
-              <p className="font-extrabold text-[16px]" style={{ fontFamily: "var(--font-nunito)" }}>post poll to feed</p>
+              <p className="font-extrabold text-[16px]" style={{ fontFamily: "var(--font-nunito)" }}>share poll to feed</p>
               <button onClick={() => { setShowShare(false); setShareCaption(""); setSharePhoto(null); setSharePhotoPreview(null); setShareMode("followers"); setTargetUsers([]); setUserSearchQ(""); setUserSearchResults([]); }} style={{ color: "var(--muted)" }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
               </button>
@@ -738,7 +862,7 @@ function ExplorePollCard({ poll: initialPoll, getAccessToken, onDelete }: {
             <button onClick={sharePoll} disabled={sharing || (shareMode === "specific" && targetUsers.length === 0)}
               className="w-full py-4 rounded-[14px] text-[15px] font-black"
               style={{ background: "var(--purple)", color: "#fff", opacity: sharing || (shareMode === "specific" && targetUsers.length === 0) ? 0.5 : 1, fontFamily: "var(--font-nunito)" }}>
-              {sharing ? "posting…" : shareMode === "specific" ? `post to ${targetUsers.length} ${targetUsers.length === 1 ? "person" : "people"}` : "post to feed"}
+              {sharing ? "sharing…" : shareMode === "specific" ? `share to ${targetUsers.length} ${targetUsers.length === 1 ? "person" : "people"}` : "share to feed"}
             </button>
           </div>
         </div>
