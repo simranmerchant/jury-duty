@@ -4,7 +4,7 @@ import { supabase } from "@/lib/supabase";
 
 const ALLOWED_EMOJIS = ["🔥", "🎯", "💀", "😂", "👀", "🤔"];
 
-// POST /api/v1/polls/[id]/react — set or toggle reaction
+// POST /api/v1/explore-bets/[id]/react — set or toggle reaction
 // body: { emoji } — send same emoji to remove it, different emoji to switch
 export async function POST(
   req: NextRequest,
@@ -25,33 +25,33 @@ export async function POST(
   }
 
   const { data: existing } = await supabase
-    .from("poll_reactions")
+    .from("explore_bet_reactions")
     .select("emoji")
-    .eq("poll_id", id)
+    .eq("explore_bet_id", id)
     .eq("user_id", user.userId)
     .single();
 
   if (existing?.emoji === emoji) {
     // Same emoji — remove reaction
     await supabase
-      .from("poll_reactions")
+      .from("explore_bet_reactions")
       .delete()
-      .eq("poll_id", id)
+      .eq("explore_bet_id", id)
       .eq("user_id", user.userId);
   } else {
     // New or different emoji — upsert
     await supabase
-      .from("poll_reactions")
+      .from("explore_bet_reactions")
       .upsert(
-        { poll_id: id, user_id: user.userId, emoji },
-        { onConflict: "poll_id,user_id" }
+        { explore_bet_id: id, user_id: user.userId, emoji },
+        { onConflict: "explore_bet_id,user_id" }
       );
   }
 
   const { data: allReactions } = await supabase
-    .from("poll_reactions")
+    .from("explore_bet_reactions")
     .select("emoji")
-    .eq("poll_id", id);
+    .eq("explore_bet_id", id);
 
   const counts: Record<string, number> = {};
   for (const r of allReactions ?? []) {

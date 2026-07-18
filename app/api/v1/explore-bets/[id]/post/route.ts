@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/privy";
 import { supabase } from "@/lib/supabase";
 
-// POST /api/v1/polls/[id]/post — share poll to feed (all followers or specific users)
+// POST /api/v1/explore-bets/[id]/post — share a caption on an explore bet card
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -18,35 +18,37 @@ export async function POST(
   const { caption, photo_url, targeted_user_ids } = body;
 
   if (caption && caption.length > 280) return NextResponse.json({ error: "caption too long" }, { status: 400 });
-  if (targeted_user_ids !== undefined && !Array.isArray(targeted_user_ids))
-    return NextResponse.json({ error: "targeted_user_ids must be an array" }, { status: 400 });
 
-  const { data: poll } = await supabase
-    .from("polls")
-    .select("id")
+  const { data: bet } = await supabase
+    .from("explore_bets")
+    .select("id, status")
     .eq("id", id)
     .single();
 
-  if (!poll) return NextResponse.json({ error: "not found" }, { status: 404 });
+  if (!bet) return NextResponse.json({ error: "not found" }, { status: 404 });
+  if (bet.status !== "resolved") return NextResponse.json({ error: "prediction must be resolved before sharing" }, { status: 422 });
 
-  // Upsert so resharing with photo/caption bumps the post to the top
-  const { error } = await supabase
-    .from("poll_posts")
-    .upsert({
-      poll_id: id,
+  const { data: post, error } = await supabase
+    .from("explore_bet_posts")
+    .insert({
+      explore_bet_id: id,
       user_id: user.userId,
       caption: caption?.trim() || null,
-      photo_url: photo_url || null,
-      targeted_user_ids: targeted_user_ids?.length ? targeted_user_ids : null,
-      created_at: new Date().toISOString(),
-    }, { onConflict: "poll_id,user_id" });
+      photo_url: photo_url ?? null,
+      targeted_user_ids: Array.isArray(targeted_user_ids) && targeted_user_ids.length > 0 ? targeted_user_ids : null,
+    })
+    .select("id")
+    .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    if (error.code === "23505") return NextResponse.json({ error: "already posted" }, { status: 409 });
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 
-  return NextResponse.json({ ok: true }, { status: 201 });
+  return NextResponse.json({ id: post.id }, { status: 201 });
 }
 
-// DELETE /api/v1/polls/[id]/post — unshare poll from feed
+// DELETE /api/v1/explore-bets/[id]/post — remove your post from this explore bet
 export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -60,9 +62,9 @@ export async function DELETE(
   const { id } = await params;
 
   await supabase
-    .from("poll_posts")
+    .from("explore_bet_posts")
     .delete()
-    .eq("poll_id", id)
+    .eq("explore_bet_id", id)
     .eq("user_id", user.userId);
 
   return NextResponse.json({ ok: true });

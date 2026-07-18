@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/privy";
 import { supabase } from "@/lib/supabase";
 
-// GET /api/v1/polls/[id]/comments — list comments oldest-first
+// GET /api/v1/explore-bets/[id]/comments — list comments oldest-first
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -16,9 +16,9 @@ export async function GET(
   const { id } = await params;
 
   const { data: raw, error } = await supabase
-    .from("poll_comments")
-    .select(`id, body, gif_url, parent_id, created_at, user_id, user:user_id(display_name, username, avatar_url), poll_comment_likes(user_id)`)
-    .eq("poll_id", id)
+    .from("explore_bet_comments")
+    .select(`id, body, gif_url, parent_id, created_at, user_id, user:user_id(display_name, username, avatar_url), explore_bet_comment_likes(user_id)`)
+    .eq("explore_bet_id", id)
     .order("created_at", { ascending: true })
     .limit(200);
 
@@ -33,13 +33,13 @@ export async function GET(
     user_id: c.user_id,
     is_mine: c.user_id === user.userId,
     user: c.user ?? null,
-    comment_likes: (c.poll_comment_likes ?? []) as { user_id: string }[],
+    comment_likes: (c.explore_bet_comment_likes ?? []) as { user_id: string }[],
   }));
 
   return NextResponse.json({ comments });
 }
 
-// POST /api/v1/polls/[id]/comments — add a comment
+// POST /api/v1/explore-bets/[id]/comments — add a comment
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -57,18 +57,18 @@ export async function POST(
   if (!text?.trim() && !gif_url) return NextResponse.json({ error: "comment cannot be empty" }, { status: 400 });
   if (text?.trim().length > 500) return NextResponse.json({ error: "comment too long" }, { status: 400 });
 
-  const { data: poll } = await supabase
-    .from("polls")
+  const { data: bet } = await supabase
+    .from("explore_bets")
     .select("id")
     .eq("id", id)
     .single();
 
-  if (!poll) return NextResponse.json({ error: "not found" }, { status: 404 });
+  if (!bet) return NextResponse.json({ error: "not found" }, { status: 404 });
 
   const { data: comment, error } = await supabase
-    .from("poll_comments")
+    .from("explore_bet_comments")
     .insert({
-      poll_id: id,
+      explore_bet_id: id,
       user_id: user.userId,
       body: text?.trim() || null,
       gif_url: gif_url ?? null,
