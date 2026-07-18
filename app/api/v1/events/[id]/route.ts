@@ -134,6 +134,13 @@ export async function GET(
           bet_reactions(user_id, emoji),
           bet_comments!bet_comments_bet_id_fkey(id),
           posts!posts_bet_id_fkey(id, user_id, caption, photo_url, created_at, balances:user_id(display_name, avatar_url, username))
+        ),
+        polls(
+          id, question, option_a, option_b, creator_id, created_at, closes_at,
+          poll_votes(user_id, side),
+          poll_likes(user_id),
+          poll_reactions(user_id, emoji),
+          poll_comments(id)
         )
       `)
       .eq("id", id)
@@ -172,8 +179,36 @@ export async function GET(
     ? event.event_guests
     : [...event.event_guests, { user_id: event.host_id, balances: host_balance ?? null }];
 
+  const transformedPolls = ((event as any).polls ?? []).map((poll: any) => {
+    const votes = (poll.poll_votes ?? []) as Array<{ user_id: string; side: string }>;
+    const votes_a = votes.filter((v) => v.side === "a").length;
+    const votes_b = votes.filter((v) => v.side === "b").length;
+    const my_vote = votes.find((v) => v.user_id === user.userId)?.side ?? null;
+    const likes = (poll.poll_likes ?? []) as Array<{ user_id: string }>;
+    const rawReactions = (poll.poll_reactions ?? []) as Array<{ user_id: string; emoji: string }>;
+    const reactionCounts: Record<string, number> = {};
+    for (const r of rawReactions) reactionCounts[r.emoji] = (reactionCounts[r.emoji] ?? 0) + 1;
+    const my_reaction = rawReactions.find((r) => r.user_id === user.userId)?.emoji ?? null;
+    return {
+      ...poll,
+      poll_votes: undefined,
+      poll_likes: undefined,
+      poll_reactions: undefined,
+      poll_comments: undefined,
+      votes_a,
+      votes_b,
+      total_votes: votes_a + votes_b,
+      my_vote,
+      like_count: likes.length,
+      liked_by_me: likes.some((l) => l.user_id === user.userId),
+      reactions: Object.entries(reactionCounts).map(([emoji, count]) => ({ emoji, count })),
+      my_reaction,
+      comment_count: (poll.poll_comments ?? []).length,
+    };
+  });
+
   return NextResponse.json({
-    event: { ...eventFields, event_guests: eventGuests, bets: filteredBets },
+    event: { ...eventFields, event_guests: eventGuests, bets: filteredBets, polls: transformedPolls },
     userId: user.userId,
   });
 }
