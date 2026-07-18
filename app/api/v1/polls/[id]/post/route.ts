@@ -19,7 +19,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { data: poll } = await supabase.from("polls").select("id").eq("id", id).single();
   if (!poll) return NextResponse.json({ error: "poll not found" }, { status: 404 });
 
-  const { data: post, error } = await supabase
+  const { error } = await supabase
     .from("poll_posts")
     .insert({
       poll_id: id,
@@ -27,16 +27,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       caption: caption?.trim() || null,
       photo_url: photo_url || null,
       targeted_user_ids: targeted_user_ids ?? null,
-    })
-    .select("id")
-    .single();
+    });
 
   if (error) {
     if (error.code === "23505") return NextResponse.json({ error: "already shared" }, { status: 409 });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ id: post.id });
+  return NextResponse.json({ ok: true });
 }
 
 // DELETE /api/v1/polls/[id]/post — unshare
