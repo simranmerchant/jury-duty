@@ -28,10 +28,13 @@ export async function GET(req: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   const shaped = (polls ?? []).map((poll) => {
-    const votes = (poll.poll_votes ?? []) as Array<{ user_id: string; side: string }>;
-    const votes_a = votes.filter((v) => v.side === "a").length;
-    const votes_b = votes.filter((v) => v.side === "b").length;
-    const myVote = votes.find((v) => v.user_id === user.userId)?.side ?? null;
+    const rawVotes = (poll.poll_votes ?? []) as Array<{ user_id: string; side: string }>;
+    // Deduplicate by user_id (last write wins) to guard against pre-constraint duplicates.
+    const voteByUser = new Map<string, string>();
+    for (const v of rawVotes) voteByUser.set(v.user_id, v.side);
+    const votes_a = [...voteByUser.values()].filter((s) => s === "a").length;
+    const votes_b = [...voteByUser.values()].filter((s) => s === "b").length;
+    const myVote = (voteByUser.get(user.userId) ?? null) as "a" | "b" | null;
 
     const likes = (poll.poll_likes ?? []) as Array<{ user_id: string }>;
     const rawReactions = (poll.poll_reactions ?? []) as Array<{ user_id: string; emoji: string }>;

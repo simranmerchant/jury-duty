@@ -43,12 +43,14 @@ export async function POST(
 
   const { data: allVotes } = await supabase
     .from("poll_votes")
-    .select("side")
+    .select("user_id, side")
     .eq("poll_id", id);
 
-  const votes = allVotes ?? [];
-  const votes_a = votes.filter((v) => v.side === "a").length;
-  const votes_b = votes.filter((v) => v.side === "b").length;
+  // Deduplicate by user_id to guard against any pre-constraint duplicate rows.
+  const voteByUser = new Map<string, string>();
+  for (const v of allVotes ?? []) voteByUser.set(v.user_id, v.side);
+  const votes_a = [...voteByUser.values()].filter((s) => s === "a").length;
+  const votes_b = [...voteByUser.values()].filter((s) => s === "b").length;
 
   return NextResponse.json({ side, votes_a, votes_b, total_votes: votes_a + votes_b });
 }
