@@ -36,7 +36,21 @@ type FeedPost = {
   post_comments: { id: string }[];
   bets: EmbeddedBet | null;
 };
-type FeedItem = FeedBet | FeedPost;
+type FeedPollPost = {
+  type: "poll_post";
+  poll_id: string;
+  user_id: string;
+  caption: string | null;
+  photo_url: string | null;
+  created_at: string;
+  balances: { display_name: string | null; avatar_url: string | null; username: string | null } | null;
+  polls: {
+    id: string; question: string; option_a: string; option_b: string;
+    votes_a: number; votes_b: number; total_votes: number;
+    reactions: { emoji: string; count: number }[];
+  } | null;
+};
+type FeedItem = FeedBet | FeedPost | FeedPollPost;
 
 function timeAgo(dateString: string): string {
   const seconds = Math.floor((Date.now() - new Date(dateString).getTime()) / 1000);
@@ -76,6 +90,11 @@ export default function FeedPage() {
   const [postDeadline, setPostDeadline] = useState("");
   const [posting, setPosting] = useState(false);
   const [postError, setPostError] = useState<string | null>(null);
+  const [postMode, setPostMode] = useState<"followers" | "specific">("followers");
+  const [postTargetUsers, setPostTargetUsers] = useState<{ user_id: string; display_name: string | null; username: string | null }[]>([]);
+  const [postUserSearchQ, setPostUserSearchQ] = useState("");
+  const [postUserSearchResults, setPostUserSearchResults] = useState<{ user_id: string; display_name: string | null; username: string | null }[]>([]);
+  const postUserSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = useCallback(async (cursor?: string) => {
     const token = await getAccessToken();
@@ -107,7 +126,7 @@ export default function FeedPage() {
     setTimeout(() => {
       setSeenBetIds((prev) => {
         const next = new Set(prev);
-        incoming.forEach((b) => next.add(b.id));
+        incoming.forEach((b) => next.add(b.type === "poll_post" ? b.poll_id : b.id));
         try { sessionStorage.setItem("seenFeedBetIds", JSON.stringify([...next])); } catch {}
         return next;
       });
@@ -172,9 +191,21 @@ export default function FeedPage() {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (res.ok) {
-      setItems((prev) => prev.filter((item) => item.id !== betId));
+      setItems((prev) => prev.filter((item) => (item.type === "poll_post" ? item.poll_id : item.id) !== betId));
     }
     setDeletingId(null);
+  }
+
+  function searchPostUsers(q: string) {
+    setPostUserSearchQ(q);
+    if (postUserSearchTimer.current) clearTimeout(postUserSearchTimer.current);
+    if (!q.trim()) { setPostUserSearchResults([]); return; }
+    postUserSearchTimer.current = setTimeout(async () => {
+      const token = await getAccessToken();
+      const res = await fetch(`/api/v1/users/search?q=${encodeURIComponent(q.trim())}`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      setPostUserSearchResults(data?.users ?? []);
+    }, 300);
   }
 
   async function postBet() {
@@ -190,12 +221,14 @@ export default function FeedPage() {
         question: postQuestion.trim(),
         options: filled.map((o) => ({ label: o.trim() })),
         deadline: new Date(postDeadline).toISOString(),
+        targeted_user_ids: postMode === "specific" && postTargetUsers.length > 0 ? postTargetUsers.map((u) => u.user_id) : undefined,
       }),
     });
     setPosting(false);
     if (res.ok) {
       setShowPost(false);
       setPostQuestion(""); setPostOptions(["", ""]); setPostDeadline(""); setPostError(null);
+      setPostMode("followers"); setPostTargetUsers([]); setPostUserSearchQ(""); setPostUserSearchResults([]);
       setLoading(true);
       try { await load(); } finally { setLoading(false); }
     } else {
@@ -212,7 +245,8 @@ export default function FeedPage() {
     );
   }
 
-  const canPost = postQuestion.trim() && postOptions.filter((o) => o.trim()).length >= 2 && postDeadline;
+  const canPost = postQuestion.trim() && postOptions.filter((o) => o.trim()).length >= 2 && postDeadline &&
+    (postMode === "followers" || postTargetUsers.length > 0);
 
   return (
     <div className="min-h-screen" style={{ background: "var(--bg)", color: "var(--text)" }}>
@@ -230,10 +264,17 @@ export default function FeedPage() {
               {myPoints.toLocaleString()} pts
             </span>
           )}
+          <button onClick={() => setShowPost(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-bold"
+            style={{ background: "var(--accent)", color: "#fff" }}>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            predict
+          </button>
         </div>
       </div>
 
-      <p className="text-[10px] font-semibold px-5 pb-3" style={{ color: "var(--dimmer)", letterSpacing: "0.14em", textTransform: "uppercase" }}>feed</p>
 
       {/* Feed list */}
       <div className="px-4 pb-36 flex flex-col gap-3">
@@ -265,8 +306,60 @@ export default function FeedPage() {
                 currentUserId={privyUser?.id}
                 followedIds={followedIds}
                 getAccessToken={getAccessToken}
-                onDelete={() => setItems((prev) => prev.filter((i) => i.id !== item.id))}
+                onDelete={() => setItems((prev) => prev.filter((i) => (i.type === "poll_post" ? i.poll_id : i.id) !== item.id))}
               />
+            );
+          }
+
+          if (item.type === "poll_post") {
+            const pp = item as FeedPollPost;
+            const poll = pp.polls;
+            const poster = pp.balances;
+            const posterName = poster?.display_name ?? poster?.username ?? "someone";
+            const total = poll ? poll.votes_a + poll.votes_b : 0;
+            const pctA = total > 0 && poll ? Math.round((poll.votes_a / total) * 100) : null;
+            const pctB = pctA !== null ? 100 - pctA : null;
+            return (
+              <div key={`poll-post-${pp.poll_id}`} className="rounded-[16px] p-4 flex flex-col gap-3"
+                style={{ background: "var(--card)", border: "1px solid var(--purple-border, rgba(124,58,237,0.3))" }}>
+                <div className="flex items-center gap-2.5">
+                  <div className="rounded-full flex items-center justify-center overflow-hidden flex-shrink-0"
+                    style={{ width: 32, height: 32, background: "var(--purple-dim, rgba(124,58,237,0.12))", border: "1px solid var(--purple-border, rgba(124,58,237,0.3))" }}>
+                    {poster?.avatar_url
+                      ? <img src={poster.avatar_url} alt="" className="w-full h-full object-cover" />
+                      : <span className="text-[12px] font-black" style={{ color: "var(--purple, #7c3aed)" }}>{(posterName)[0]?.toUpperCase()}</span>}
+                  </div>
+                  <div>
+                    <button onClick={() => poster?.username && router.push(`/u/${poster.username}`)} className="font-bold text-[14px]" style={{ color: "var(--text)" }}>{posterName}</button>
+                    <p className="text-[11px]" style={{ color: "var(--dimmer)" }}>{timeAgo(pp.created_at)}</p>
+                  </div>
+                  <span className="ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                    style={{ background: "var(--purple-dim, rgba(124,58,237,0.12))", color: "var(--purple, #7c3aed)", border: "1px solid var(--purple-border, rgba(124,58,237,0.3))" }}>
+                    poll
+                  </span>
+                </div>
+                {pp.caption && <p className="text-[14px]" style={{ color: "var(--text)" }}>{pp.caption}</p>}
+                {pp.photo_url && <img src={pp.photo_url} alt="" className="w-full rounded-[12px] object-cover" style={{ maxHeight: 300 }} />}
+                {poll && (
+                  <div className="flex flex-col gap-2">
+                    <p className="font-semibold text-[14px]">{poll.question}</p>
+                    <div className="flex flex-col gap-1">
+                      {(["a", "b"] as const).map((side) => {
+                        const label = side === "a" ? poll.option_a : poll.option_b;
+                        const pct = side === "a" ? pctA : pctB;
+                        return (
+                          <div key={side} className="relative flex items-center rounded-[8px] overflow-hidden" style={{ height: 30, border: "1px solid var(--border)" }}>
+                            <div style={{ position: "absolute", top: 0, left: 0, bottom: 0, width: `${pct ?? 50}%`, background: "rgba(124,58,237,0.15)" }} />
+                            <span className="relative pl-3 flex-1 text-[12px] font-medium truncate" style={{ color: "var(--text)" }}>{label}</span>
+                            <span className="relative pr-3 text-[11px] font-semibold" style={{ color: "var(--muted)" }}>{pct !== null ? `${pct}%` : "—"}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <p className="text-[11px]" style={{ color: "var(--dimmer)" }}>{total} vote{total !== 1 ? "s" : ""}</p>
+                  </div>
+                )}
+              </div>
             );
           }
 
@@ -290,10 +383,10 @@ export default function FeedPage() {
                   style={{ opacity: creator?.username ? 1 : 0.7 }}
                 >
                   <div className="rounded-full flex items-center justify-center overflow-hidden flex-shrink-0"
-                    style={{ width: 32, height: 32, background: "var(--accent-dim)", border: "1px solid var(--accent-border)" }}>
+                    style={{ width: 38, height: 38, background: "var(--accent-dim)", border: "1px solid var(--accent-border)" }}>
                     {creator?.avatar_url
                       ? <img src={creator.avatar_url} alt="" className="w-full h-full object-cover" />
-                      : <span className="text-[12px] font-black" style={{ color: "var(--accent)", fontFamily: "var(--font-nunito)" }}>{creatorName[0]?.toUpperCase() ?? "?"}</span>
+                      : <span className="text-[14px] font-black" style={{ color: "var(--accent)", fontFamily: "var(--font-nunito)" }}>{creatorName[0]?.toUpperCase() ?? "?"}</span>
                     }
                   </div>
                   <div className="text-left">
@@ -327,7 +420,7 @@ export default function FeedPage() {
                             className="w-full px-4 py-3 text-left text-[13px] font-semibold"
                             style={{ color: "var(--accent)" }}
                           >
-                            {deletingId === bet.id ? "deleting…" : "delete bet"}
+                            {deletingId === bet.id ? "deleting…" : "delete prediction"}
                           </button>
                         </div>
                       )}
@@ -337,7 +430,7 @@ export default function FeedPage() {
               </div>
 
               {/* Question */}
-              <p className="text-[15px] font-bold leading-snug" style={{ color: "var(--text)" }}>{bet.question}</p>
+              <p className="text-[19px] font-black leading-tight" style={{ color: "var(--text)", letterSpacing: "-0.015em", fontFamily: "var(--font-nunito)" }}>{bet.question}</p>
 
               {/* Options */}
               <div className="flex flex-col gap-2">
@@ -350,21 +443,19 @@ export default function FeedPage() {
 
                   if (hasVoted || !isOpen) {
                     return (
-                      <div key={opt.id} className="rounded-[10px] p-2.5 flex flex-col gap-1.5"
+                      <div key={opt.id} className="relative rounded-[11px] overflow-hidden flex items-center"
                         style={{
+                          height: 40,
                           background: isWinner ? "var(--win-dim)" : isMine ? "var(--accent-dim)" : "rgba(255,255,255,0.03)",
                           border: `1px solid ${isWinner ? "var(--win-border)" : isMine ? "var(--accent-border)" : "rgba(255,255,255,0.06)"}`,
                         }}>
-                        <div className="flex items-center justify-between">
-                          <span className="text-[13px] font-semibold" style={{ color: isMine || isWinner ? (isMine ? "var(--accent)" : "var(--win)") : "var(--text)" }}>{opt.label}</span>
-                          <span className="text-[13px] font-bold" style={{ color: isMine ? "var(--accent)" : "var(--muted)" }}>{pct}%</span>
-                        </div>
-                        <div className="rounded-full overflow-hidden" style={{ height: 3, background: "rgba(255,255,255,0.06)" }}>
-                          <div className="h-full rounded-full" style={{
-                            width: `${pct}%`,
-                            background: isWinner ? "var(--win-border)" : isMine ? "var(--accent-border)" : "rgba(255,255,255,0.18)",
-                          }} />
-                        </div>
+                        <div className="absolute inset-y-0 left-0" style={{
+                          width: `${pct}%`,
+                          background: isWinner ? "var(--win)" : isMine ? "var(--accent)" : "rgba(255,255,255,0.12)",
+                          opacity: 0.28,
+                        }} />
+                        <span className="relative pl-3 flex-1 text-[13px] font-semibold truncate" style={{ color: isMine ? "var(--accent)" : isWinner ? "var(--win)" : "var(--text)" }}>{opt.label}</span>
+                        <span className="relative pr-3 text-[14px] font-black" style={{ color: isMine ? "var(--accent)" : isWinner ? "var(--win)" : "var(--muted)" }}>{pct}%</span>
                       </div>
                     );
                   }
@@ -373,12 +464,18 @@ export default function FeedPage() {
                     <button key={opt.id}
                       onClick={() => vote(bet.id, opt.id)}
                       disabled={!!isVoting}
-                      className="rounded-[10px] py-2.5 px-3 text-[14px] font-semibold text-center transition-opacity"
+                      className="rounded-[11px] text-left transition-opacity"
                       style={{
+                        height: 40,
+                        paddingLeft: 14,
                         background: "rgba(255,255,255,0.04)",
-                        border: "1px solid rgba(255,255,255,0.07)",
+                        border: "1px solid rgba(255,255,255,0.08)",
                         color: "var(--text)",
+                        fontSize: 14,
+                        fontWeight: 600,
                         opacity: isVoting ? 0.5 : 1,
+                        display: "block",
+                        width: "100%",
                       }}>
                       {isVoting ? "…" : opt.label}
                     </button>
@@ -387,10 +484,10 @@ export default function FeedPage() {
               </div>
 
               {/* Footer */}
-              <div className="flex items-center justify-between pt-1" style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}>
-                <span className="text-[11px]" style={{ color: "var(--dimmer)" }}>
+              <div className="flex items-center justify-between" style={{ borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: 8, marginTop: 2 }}>
+                <span className="text-[12px]" style={{ color: "var(--muted)" }}>
+                  {totalStaked > 0 && <><span className="font-black text-[13px]" style={{ color: "var(--text)" }}>{totalStaked.toLocaleString()}</span>{" pts · "}</>}
                   {bet.bet_entries.length} {bet.bet_entries.length === 1 ? "vote" : "votes"}
-                  {totalStaked > 0 ? ` · ${totalStaked.toLocaleString()} pts` : ""}
                 </span>
                 <span className="text-[11px]" style={{ color: "var(--dimmer)" }}>
                   {isOpen ? "closes " : "closed "}
@@ -422,10 +519,57 @@ export default function FeedPage() {
             style={{ background: "var(--card)", border: "1px solid var(--border-soft)", maxHeight: "90vh", overflowY: "auto" }}>
             <div className="flex items-center justify-between">
               <h2 className="font-black text-[18px]" style={{ fontFamily: "var(--font-nunito)", color: "var(--text)" }}>new prediction</h2>
-              <button onClick={() => { setShowPost(false); setPostError(null); }} style={{ color: "var(--muted)" }}>
+              <button onClick={() => { setShowPost(false); setPostError(null); setPostMode("followers"); setPostTargetUsers([]); setPostUserSearchQ(""); setPostUserSearchResults([]); }} style={{ color: "var(--muted)" }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
               </button>
             </div>
+
+            {/* Audience toggle */}
+            <div className="flex rounded-[12px] overflow-hidden" style={{ border: "1px solid var(--border-soft)" }}>
+              {(["followers", "specific"] as const).map((mode) => (
+                <button key={mode} onClick={() => setPostMode(mode)} className="flex-1 py-2.5 text-[13px] font-bold transition-colors"
+                  style={{ background: postMode === mode ? "var(--accent-dim)" : "transparent", color: postMode === mode ? "var(--accent)" : "var(--muted)" }}>
+                  {mode === "followers" ? "all followers" : "specific people"}
+                </button>
+              ))}
+            </div>
+            {postMode === "specific" && (
+              <div className="flex flex-col gap-2">
+                {postTargetUsers.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {postTargetUsers.map((u) => (
+                      <button key={u.user_id} onClick={() => setPostTargetUsers((prev) => prev.filter((t) => t.user_id !== u.user_id))}
+                        className="flex items-center gap-1 px-3 py-1 rounded-full text-[12px] font-bold"
+                        style={{ background: "var(--accent-dim)", border: "1px solid var(--accent-border)", color: "var(--accent)" }}>
+                        {u.display_name ?? u.username ?? "user"} ✕
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <input
+                  className="w-full rounded-[12px] px-4 py-3 text-[14px] outline-none"
+                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-soft)", color: "var(--text)" }}
+                  placeholder="search by name or @username…"
+                  value={postUserSearchQ}
+                  onChange={(e) => searchPostUsers(e.target.value)}
+                  autoComplete="off"
+                />
+                {postUserSearchResults.filter((u) => !postTargetUsers.some((t) => t.user_id === u.user_id)).slice(0, 6).map((u) => (
+                  <button key={u.user_id} onClick={() => { setPostTargetUsers((prev) => [...prev, u]); setPostUserSearchQ(""); setPostUserSearchResults([]); }}
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-[10px] text-left"
+                    style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-soft)" }}>
+                    <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black flex-shrink-0"
+                      style={{ background: "var(--accent-dim)", color: "var(--accent)" }}>
+                      {(u.display_name?.[0] ?? "?").toUpperCase()}
+                    </div>
+                    <div>
+                      <p className="text-[13px] font-semibold" style={{ color: "var(--text)" }}>{u.display_name ?? u.username}</p>
+                      {u.username && <p className="text-[11px]" style={{ color: "var(--dimmer)" }}>@{u.username}</p>}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
 
             <div className="flex flex-col gap-1.5">
               <label className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: "var(--dimmer)" }}>question</label>
@@ -484,7 +628,7 @@ export default function FeedPage() {
               disabled={!canPost || posting}
               className="w-full py-4 rounded-[14px] text-[15px] font-black"
               style={{ background: "var(--accent)", color: "#fff", opacity: (!canPost || posting) ? 0.4 : 1, fontFamily: "var(--font-nunito)" }}>
-              {posting ? "posting…" : "post prediction"}
+              {posting ? "posting…" : postMode === "specific" ? `post to ${postTargetUsers.length} ${postTargetUsers.length === 1 ? "person" : "people"}` : "post prediction"}
             </button>
           </div>
         </div>
@@ -687,7 +831,7 @@ function PostCard({
                 <span className="text-[11px] font-semibold" style={{ color: "var(--muted)" }}>{bet.events.name}</span>
               </a>
             )}
-            <p className="text-[14px] font-bold leading-snug" style={{ color: "var(--text)" }}>{bet.question}</p>
+            <p className="text-[15px] font-bold leading-snug" style={{ color: "var(--text)" }}>{bet.question}</p>
             <div className="flex flex-col gap-1.5">
               {bet.bet_options.map((opt) => {
                 const voters = bet.bet_entries.filter((e) => e.option_id === opt.id);
@@ -703,8 +847,8 @@ function PostCard({
                       <span className="text-[13px] font-semibold" style={{ color: isWinner ? "var(--win)" : isLoss ? "var(--loss)" : isMe ? "var(--accent)" : "var(--text)" }}>{opt.label}</span>
                       <span className="text-[13px] font-bold" style={{ color: "var(--muted)" }}>{pct}%</span>
                     </div>
-                    <div className="rounded-full overflow-hidden" style={{ height: 3, background: "rgba(255,255,255,0.06)" }}>
-                      <div className="h-full rounded-full" style={{ width: `${pct}%`, background: isWinner ? "var(--win-border)" : isLoss ? "var(--loss-border)" : isMe ? "var(--accent)" : "rgba(255,255,255,0.18)" }} />
+                    <div className="rounded-full overflow-hidden" style={{ height: 5, background: "rgba(255,255,255,0.06)" }}>
+                      <div className="h-full rounded-full" style={{ width: `${pct}%`, background: isWinner ? "var(--win-border)" : isLoss ? "var(--loss-border)" : isMe ? "var(--accent)" : "rgba(255,255,255,0.22)" }} />
                     </div>
                     {voters.length > 0 && (
                       <div className="flex items-center gap-1.5 mt-0.5">

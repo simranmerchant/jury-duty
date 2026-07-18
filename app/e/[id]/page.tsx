@@ -40,6 +40,24 @@ type Bet = {
   posts?: BetPost[];
 };
 type Guest = { user_id: string; balances?: { display_name: string | null; avatar_url: string | null; username?: string | null } };
+type Poll = {
+  id: string;
+  question: string;
+  option_a: string;
+  option_b: string;
+  creator_id: string;
+  created_at: string;
+  closes_at: string | null;
+  votes_a: number;
+  votes_b: number;
+  total_votes: number;
+  my_vote: "a" | "b" | null;
+  like_count: number;
+  liked_by_me: boolean;
+  reactions: { emoji: string; count: number }[];
+  my_reaction: string | null;
+  comment_count: number;
+};
 type Event = {
   id: string;
   name: string;
@@ -50,6 +68,7 @@ type Event = {
   cover_url: string | null;
   event_guests: Guest[];
   bets: Bet[];
+  polls: Poll[];
 };
 
 export default function EventPage() {
@@ -77,6 +96,14 @@ export default function EventPage() {
   const [editEndsAt, setEditEndsAt] = useState("");
   const [savingEvent, setSavingEvent] = useState(false);
 
+  // Poll create
+  const [showPollCreate, setShowPollCreate] = useState(false);
+  const [pollQ, setPollQ] = useState("");
+  const [pollOptA, setPollOptA] = useState("");
+  const [pollOptB, setPollOptB] = useState("");
+  const [pollCreating, setPollCreating] = useState(false);
+  const [pollCreateErr, setPollCreateErr] = useState<string | null>(null);
+
   async function saveEvent() {
     if (savingEvent) return;
     setSavingEvent(true);
@@ -89,6 +116,30 @@ export default function EventPage() {
     setSavingEvent(false);
     setShowEditEvent(false);
     fetchEvent();
+  }
+
+  async function createEventPoll() {
+    if (pollCreating) return;
+    if (!pollQ.trim()) { setPollCreateErr("question required"); return; }
+    if (!pollOptA.trim()) { setPollCreateErr("option A required"); return; }
+    if (!pollOptB.trim()) { setPollCreateErr("option B required"); return; }
+    setPollCreating(true);
+    setPollCreateErr(null);
+    const token = await getAccessToken();
+    const res = await fetch(`/api/v1/events/${eventId}/polls`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ question: pollQ, option_a: pollOptA, option_b: pollOptB }),
+    });
+    setPollCreating(false);
+    if (res.ok) {
+      setShowPollCreate(false);
+      setPollQ(""); setPollOptA(""); setPollOptB("");
+      fetchEvent();
+    } else {
+      const d = await res.json().catch(() => ({}));
+      setPollCreateErr(d.error ?? "something went wrong");
+    }
   }
 
   // Add people to event
@@ -436,6 +487,61 @@ export default function EventPage() {
         </div>
       )}
 
+      {/* Poll create modal */}
+      {showPollCreate && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,0.6)" }}
+          onClick={(e) => { if (e.target === e.currentTarget) { setShowPollCreate(false); setPollCreateErr(null); } }}>
+          <div className="w-full max-w-lg rounded-t-3xl p-6 flex flex-col gap-4" style={{ background: "var(--card)", border: "1px solid var(--border-soft)" }}>
+            <p className="font-extrabold text-[16px]" style={{ fontFamily: "var(--font-nunito)" }}>new poll</p>
+            <div className="flex flex-col gap-1">
+              <label className="text-[12px] font-semibold" style={{ color: "var(--muted)" }}>question</label>
+              <input
+                className="rounded-2xl px-4 py-3 text-[15px] outline-none"
+                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--purple-border, #6d28d9)", color: "var(--text)" }}
+                value={pollQ}
+                onChange={(e) => setPollQ(e.target.value)}
+                maxLength={200}
+                autoFocus
+                placeholder="what do you want to ask?"
+              />
+            </div>
+            <div className="flex gap-3">
+              <div className="flex-1 flex flex-col gap-1">
+                <label className="text-[12px] font-semibold" style={{ color: "var(--muted)" }}>option A</label>
+                <input
+                  className="rounded-2xl px-4 py-3 text-[14px] outline-none"
+                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-soft)", color: "var(--text)" }}
+                  value={pollOptA}
+                  onChange={(e) => setPollOptA(e.target.value)}
+                  maxLength={80}
+                  placeholder="first option"
+                />
+              </div>
+              <div className="flex-1 flex flex-col gap-1">
+                <label className="text-[12px] font-semibold" style={{ color: "var(--muted)" }}>option B</label>
+                <input
+                  className="rounded-2xl px-4 py-3 text-[14px] outline-none"
+                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-soft)", color: "var(--text)" }}
+                  value={pollOptB}
+                  onChange={(e) => setPollOptB(e.target.value)}
+                  maxLength={80}
+                  placeholder="second option"
+                />
+              </div>
+            </div>
+            {pollCreateErr && <p className="text-[12px]" style={{ color: "var(--accent)" }}>{pollCreateErr}</p>}
+            <div className="flex gap-2">
+              <button onClick={() => { setShowPollCreate(false); setPollCreateErr(null); }} className="flex-1 py-2.5 rounded-2xl font-bold text-[14px]" style={{ background: "rgba(255,255,255,0.05)", color: "var(--muted)" }}>cancel</button>
+              <button onClick={createEventPoll} disabled={!pollQ.trim() || !pollOptA.trim() || !pollOptB.trim() || pollCreating}
+                className="flex-1 py-2.5 rounded-2xl font-bold text-[14px] text-white disabled:opacity-40"
+                style={{ background: "var(--purple, #7c3aed)", fontFamily: "var(--font-nunito)" }}>
+                {pollCreating ? "creating..." : "create poll"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Cover photo */}
       <div className="relative w-full overflow-hidden" style={{ height: 240 }}>
         {event.cover_url ? (
@@ -610,6 +716,35 @@ export default function EventPage() {
             ))}
           </>
         )}
+
+        {/* Polls section */}
+        {(event.polls?.length > 0 || !isClosed) && (
+          <>
+            <div className="flex items-center justify-between px-2 pt-4">
+              <p className="text-[12px] font-semibold" style={{ color: "var(--dimmer)" }}>polls</p>
+              {!isClosed && (
+                <button
+                  onClick={() => setShowPollCreate(true)}
+                  className="text-[12px] font-bold px-3 py-1.5 rounded-full"
+                  style={{ background: "var(--purple-dim, rgba(124,58,237,0.12))", color: "var(--purple, #7c3aed)", border: "1px solid var(--purple-border, rgba(124,58,237,0.3))" }}
+                >
+                  + add poll
+                </button>
+              )}
+            </div>
+            {(event.polls ?? []).length === 0 && (
+              <p className="text-center py-4 text-[13px]" style={{ color: "var(--dimmer)" }}>no polls yet</p>
+            )}
+            {(event.polls ?? []).map((poll) => (
+              <EventPollCard
+                key={poll.id}
+                poll={poll}
+                userId={userId!}
+                getAccessToken={getAccessToken}
+              />
+            ))}
+          </>
+        )}
       </div>
 
       {!isClosed && (
@@ -701,6 +836,23 @@ function BetCard({
   const sharePhotoInputRef = useRef<HTMLInputElement>(null);
   const [captionMentionSearch, setCaptionMentionSearch] = useState<string | null>(null);
   const captionTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const [shareMode, setShareMode] = useState<"followers" | "specific">("followers");
+  const [targetUsers, setTargetUsers] = useState<{ user_id: string; display_name: string | null; username: string | null; avatar_url: string | null }[]>([]);
+  const [userSearchQ, setUserSearchQ] = useState("");
+  const [userSearchResults, setUserSearchResults] = useState<{ user_id: string; display_name: string | null; username: string | null; avatar_url: string | null }[]>([]);
+  const userSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  async function searchShareUsers(q: string) {
+    setUserSearchQ(q);
+    if (userSearchTimer.current) clearTimeout(userSearchTimer.current);
+    if (!q.trim()) { setUserSearchResults([]); return; }
+    userSearchTimer.current = setTimeout(async () => {
+      const token = await getAccessToken();
+      const res = await fetch(`/api/v1/users/search?q=${encodeURIComponent(q.trim())}`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json().catch(() => ({}));
+      setUserSearchResults(data.users ?? []);
+    }, 300);
+  }
 
   async function fetchComments() {
     setCommentsLoading(true);
@@ -1009,7 +1161,12 @@ function BetCard({
     const res = await fetch("/api/v1/posts", {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ bet_id: bet.id, caption: shareCaption.trim() || undefined, photo_url: photoUrl }),
+      body: JSON.stringify({
+        bet_id: bet.id,
+        caption: shareCaption.trim() || undefined,
+        photo_url: photoUrl,
+        targeted_user_ids: shareMode === "specific" && targetUsers.length > 0 ? targetUsers.map((u) => u.user_id) : undefined,
+      }),
     });
     setSharingToFeed(false);
     if (res.ok) {
@@ -1018,6 +1175,10 @@ function BetCard({
       setShareCaption("");
       setSharePhoto(null);
       setSharePhotoPreview(null);
+      setShareMode("followers");
+      setTargetUsers([]);
+      setUserSearchQ("");
+      setUserSearchResults([]);
       onUpdate();
     }
   }
@@ -1997,11 +2158,63 @@ function BetCard({
           style={{ background: "var(--card)", border: "1px solid var(--border-soft)" }}>
           <div className="flex items-center justify-between">
             <h2 className="font-black text-[18px]" style={{ fontFamily: "var(--font-nunito)", color: "var(--text)" }}>share to feed</h2>
-            <button onClick={() => { setShowShareFeed(false); setShareCaption(""); setSharePhoto(null); setSharePhotoPreview(null); setCaptionMentionSearch(null); }} style={{ color: "var(--muted)" }}>
+            <button onClick={() => { setShowShareFeed(false); setShareCaption(""); setSharePhoto(null); setSharePhotoPreview(null); setCaptionMentionSearch(null); setShareMode("followers"); setTargetUsers([]); setUserSearchQ(""); setUserSearchResults([]); }} style={{ color: "var(--muted)" }}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
             </button>
           </div>
-          <p className="text-[13px]" style={{ color: "var(--muted)" }}>your followers will see this in their feed</p>
+          {/* Audience toggle */}
+          <div className="flex rounded-2xl overflow-hidden" style={{ border: "1px solid var(--border-soft)" }}>
+            {(["followers", "specific"] as const).map((mode) => (
+              <button key={mode} onClick={() => setShareMode(mode)}
+                className="flex-1 py-2.5 text-[13px] font-bold"
+                style={{ background: shareMode === mode ? "var(--accent-dim)" : "transparent", color: shareMode === mode ? "var(--accent)" : "var(--muted)" }}>
+                {mode === "followers" ? "all followers" : "specific people"}
+              </button>
+            ))}
+          </div>
+          {shareMode === "specific" && (
+            <div className="flex flex-col gap-2">
+              {targetUsers.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {targetUsers.map((u) => (
+                    <button key={u.user_id} onClick={() => setTargetUsers((prev) => prev.filter((t) => t.user_id !== u.user_id))}
+                      className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[12px] font-bold"
+                      style={{ background: "var(--accent-dim)", color: "var(--accent)", border: "1px solid var(--accent-border)" }}>
+                      {u.display_name ?? u.username ?? "user"} ✕
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="relative">
+                <input
+                  className="w-full rounded-2xl px-4 py-3 text-[14px] outline-none"
+                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-soft)", color: "var(--text)" }}
+                  placeholder="search by name or @username..."
+                  value={userSearchQ}
+                  onChange={(e) => searchShareUsers(e.target.value)}
+                />
+                {userSearchResults.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 mt-1 rounded-[12px] overflow-hidden z-10 flex flex-col"
+                    style={{ background: "var(--card)", border: "1px solid var(--border-soft)", maxHeight: 200, overflowY: "auto" }}>
+                    {userSearchResults.filter((u) => !targetUsers.some((t) => t.user_id === u.user_id)).slice(0, 8).map((u) => (
+                      <button key={u.user_id} type="button"
+                        className="flex items-center gap-2.5 px-3 py-2.5 text-left"
+                        style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}
+                        onMouseDown={(e) => { e.preventDefault(); setTargetUsers((prev) => [...prev, u]); setUserSearchQ(""); setUserSearchResults([]); }}>
+                        <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black overflow-hidden flex-shrink-0" style={{ background: "var(--accent-dim)", color: "var(--accent)" }}>
+                          {u.avatar_url ? <img src={u.avatar_url} className="w-7 h-7 object-cover" alt="" /> : (u.display_name?.[0] ?? "?").toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="text-[13px] font-semibold" style={{ color: "var(--text)" }}>{u.display_name ?? u.username}</p>
+                          {u.username && <p className="text-[11px]" style={{ color: "var(--dimmer)" }}>@{u.username}</p>}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
           <div className="flex flex-col gap-1.5">
             <label className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: "var(--dimmer)" }}>caption (optional)</label>
             <div className="relative">
@@ -2092,14 +2305,367 @@ function BetCard({
           </div>
           <button
             onClick={shareToFeed}
-            disabled={sharingToFeed}
+            disabled={sharingToFeed || (shareMode === "specific" && targetUsers.length === 0)}
             className="w-full py-4 rounded-[14px] text-[15px] font-black"
-            style={{ background: "var(--accent)", color: "#fff", opacity: sharingToFeed ? 0.5 : 1, fontFamily: "var(--font-nunito)" }}>
-            {sharingToFeed ? "sharing…" : "share to feed"}
+            style={{ background: "var(--accent)", color: "#fff", opacity: sharingToFeed || (shareMode === "specific" && targetUsers.length === 0) ? 0.5 : 1, fontFamily: "var(--font-nunito)" }}>
+            {sharingToFeed ? "sharing…" : shareMode === "specific" ? `share to ${targetUsers.length} ${targetUsers.length === 1 ? "person" : "people"}` : "share to feed"}
           </button>
         </div>
       </div>
     )}
+    </>
+  );
+}
+
+const POLL_EMOJIS = ["🔥", "👀", "💀", "😂", "🤝", "🫡", "🙏"];
+
+function EventPollCard({ poll: initialPoll, userId, getAccessToken }: {
+  poll: Poll;
+  userId: string;
+  getAccessToken: () => Promise<string | null>;
+}) {
+  const [votesA, setVotesA] = useState(initialPoll.votes_a);
+  const [votesB, setVotesB] = useState(initialPoll.votes_b);
+  const [myVote, setMyVote] = useState<"a" | "b" | null>(initialPoll.my_vote);
+  const [reactions, setReactions] = useState(initialPoll.reactions);
+  const [myReaction, setMyReaction] = useState(initialPoll.my_reaction);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [commentCount, setCommentCount] = useState(initialPoll.comment_count);
+  const [showComments, setShowComments] = useState(false);
+  const [comments, setComments] = useState<Array<{ id: string; body: string | null; gif_url: string | null; created_at: string; user: { display_name: string; username: string; avatar_url: string | null } | null }>>([]);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [commentInput, setCommentInput] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [showShare, setShowShare] = useState(false);
+  const [shareCaption, setShareCaption] = useState("");
+  const [sharing, setSharing] = useState(false);
+  const [shared, setShared] = useState(false);
+  const sharePhotoInputRef = useRef<HTMLInputElement>(null);
+  const [sharePhoto, setSharePhoto] = useState<File | null>(null);
+  const [sharePhotoPreview, setSharePhotoPreview] = useState<string | null>(null);
+  const [shareMode, setShareMode] = useState<"followers" | "specific">("followers");
+  const [targetUsers, setTargetUsers] = useState<{ user_id: string; display_name: string | null; username: string | null; avatar_url: string | null }[]>([]);
+  const [userSearchQ, setUserSearchQ] = useState("");
+  const [userSearchResults, setUserSearchResults] = useState<{ user_id: string; display_name: string | null; username: string | null; avatar_url: string | null }[]>([]);
+  const userSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  async function searchUsers(q: string) {
+    setUserSearchQ(q);
+    if (userSearchTimer.current) clearTimeout(userSearchTimer.current);
+    if (!q.trim()) { setUserSearchResults([]); return; }
+    userSearchTimer.current = setTimeout(async () => {
+      const token = await getAccessToken();
+      const res = await fetch(`/api/v1/users/search?q=${encodeURIComponent(q.trim())}`, { headers: { Authorization: `Bearer ${token ?? ""}` } });
+      const data = await res.json().catch(() => ({}));
+      setUserSearchResults(data.users ?? []);
+    }, 300);
+  }
+
+  const total = votesA + votesB;
+  const pctA = total > 0 ? Math.round((votesA / total) * 100) : null;
+  const pctB = pctA !== null ? 100 - pctA : null;
+  const grouped: Record<string, number> = {};
+  for (const r of reactions) grouped[r.emoji] = r.count;
+
+  async function castVote(side: "a" | "b") {
+    if (myVote) return;
+    const token = await getAccessToken();
+    const res = await fetch(`/api/v1/polls/${initialPoll.id}/vote`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token ?? ""}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ side }),
+    });
+    const data = await res.json().catch(() => null);
+    if (data) { setVotesA(data.votes_a); setVotesB(data.votes_b); setMyVote(data.side); }
+  }
+
+  async function toggleReaction(emoji: string) {
+    setShowEmojiPicker(false);
+    const token = await getAccessToken();
+    const res = await fetch(`/api/v1/polls/${initialPoll.id}/react`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token ?? ""}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ emoji }),
+    });
+    const data = await res.json().catch(() => null);
+    if (data) { setMyReaction(data.my_reaction); setReactions(data.reactions); }
+  }
+
+  async function fetchComments() {
+    setCommentsLoading(true);
+    const token = await getAccessToken();
+    const res = await fetch(`/api/v1/polls/${initialPoll.id}/comments`, { headers: { Authorization: `Bearer ${token ?? ""}` } });
+    const data = await res.json().catch(() => ({}));
+    setComments(data.comments ?? []);
+    setCommentsLoading(false);
+  }
+
+  async function submitComment() {
+    if (submitting || !commentInput.trim()) return;
+    setSubmitting(true);
+    const body = commentInput.trim();
+    setCommentInput("");
+    const token = await getAccessToken();
+    const res = await fetch(`/api/v1/polls/${initialPoll.id}/comments`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token ?? ""}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ text: body }),
+    });
+    const data = await res.json().catch(() => null);
+    setSubmitting(false);
+    if (data?.comment) { setComments((prev) => [...prev, data.comment]); setCommentCount((n) => n + 1); }
+  }
+
+  async function sharePoll() {
+    if (sharing) return;
+    setSharing(true);
+    const token = await getAccessToken();
+    let photoUrl: string | null = null;
+    if (sharePhoto) {
+      const formData = new FormData();
+      formData.append("file", sharePhoto, "photo.jpg");
+      const uploadRes = await fetch("/api/v1/posts/upload", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token ?? ""}` },
+        body: formData,
+      });
+      if (uploadRes.ok) { const d = await uploadRes.json(); photoUrl = d.photo_url; }
+    }
+    const res = await fetch(`/api/v1/polls/${initialPoll.id}/post`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token ?? ""}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        caption: shareCaption.trim() || undefined,
+        photo_url: photoUrl,
+        targeted_user_ids: shareMode === "specific" && targetUsers.length > 0 ? targetUsers.map((u) => u.user_id) : undefined,
+      }),
+    });
+    setSharing(false);
+    if (res.ok) {
+      setShared(true); setShowShare(false); setShareCaption(""); setSharePhoto(null); setSharePhotoPreview(null);
+      setShareMode("followers"); setTargetUsers([]); setUserSearchQ(""); setUserSearchResults([]);
+    }
+  }
+
+  return (
+    <>
+      <div className="flex flex-col gap-3 rounded-[16px] p-4" style={{ background: "var(--card)", border: "1px solid var(--purple-border, rgba(124,58,237,0.3))" }}>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full"
+            style={{ background: "var(--purple-dim, rgba(124,58,237,0.12))", color: "var(--purple, #7c3aed)", border: "1px solid var(--purple-border, rgba(124,58,237,0.3))" }}>
+            poll
+          </span>
+          {initialPoll.closes_at && (
+            <span className="text-[11px]" style={{ color: "var(--muted)" }}>
+              closes {new Date(initialPoll.closes_at).toLocaleDateString()}
+            </span>
+          )}
+        </div>
+        <p className="font-semibold text-[15px] leading-snug">{initialPoll.question}</p>
+        <div className="flex flex-col gap-1.5">
+          {(["a", "b"] as const).map((side) => {
+            const label = side === "a" ? initialPoll.option_a : initialPoll.option_b;
+            const pct = side === "a" ? pctA : pctB;
+            const isMyVote = myVote === side;
+            return (
+              <button key={side} onClick={() => castVote(side)} disabled={!!myVote}
+                className="relative flex items-center rounded-[10px] overflow-hidden text-left"
+                style={{ height: 34, border: `1px solid ${isMyVote ? "var(--purple-border, rgba(124,58,237,0.5))" : "var(--border)"}`, cursor: myVote ? "default" : "pointer" }}>
+                <div style={{ position: "absolute", top: 0, left: 0, bottom: 0, width: `${pct ?? 50}%`, background: `${isMyVote ? "var(--purple, #7c3aed)" : "var(--dimmer)"}28` }} />
+                <span className="relative pl-3 flex-1 text-[12px] font-medium truncate" style={{ color: isMyVote ? "var(--purple, #7c3aed)" : "var(--text)" }}>{label}</span>
+                <span className="relative pr-3 text-[12px] font-semibold" style={{ color: isMyVote ? "var(--purple, #7c3aed)" : "var(--muted)" }}>{pct !== null ? `${pct}%` : myVote ? "0%" : "—"}</span>
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-[12px]" style={{ color: "var(--muted)" }}>
+          {total} vote{total !== 1 ? "s" : ""}
+          {myVote ? ` · you voted ${myVote === "a" ? initialPoll.option_a : initialPoll.option_b}` : " · tap to vote"}
+        </p>
+        <div className="relative flex items-center gap-1.5 flex-wrap pt-2 border-t" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
+          {Object.entries(grouped).map(([emoji, count]) => {
+            const isMe = myReaction === emoji;
+            return (
+              <button key={emoji} onClick={() => toggleReaction(emoji)} className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[13px]"
+                style={{ background: isMe ? "var(--purple-dim, rgba(124,58,237,0.12))" : "rgba(255,255,255,0.05)", border: `1px solid ${isMe ? "var(--purple-border, rgba(124,58,237,0.3))" : "rgba(255,255,255,0.1)"}`, color: isMe ? "var(--purple, #7c3aed)" : "var(--muted)" }}>
+                <span>{emoji}</span><span className="font-bold text-[11px]">{count}</span>
+              </button>
+            );
+          })}
+          <div className="relative">
+            <button onClick={() => setShowEmojiPicker((v) => !v)} className="px-2.5 py-1 rounded-full text-[13px] font-bold"
+              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: "var(--muted)" }}>＋</button>
+            {showEmojiPicker && (
+              <div className="absolute bottom-full left-0 mb-2 flex gap-1 p-2 rounded-[12px] z-10"
+                style={{ background: "var(--card)", border: "1px solid var(--border)", boxShadow: "0 8px 32px rgba(0,0,0,0.5)" }}>
+                {POLL_EMOJIS.map((e) => (
+                  <button key={e} onClick={() => toggleReaction(e)} className="text-[18px] w-8 h-8 flex items-center justify-center rounded-[8px]"
+                    style={{ background: "rgba(255,255,255,0.05)" }}>{e}</button>
+                ))}
+              </div>
+            )}
+          </div>
+          <button onClick={() => { if (!showComments) fetchComments(); setShowComments((v) => !v); }}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-bold"
+            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: "var(--muted)" }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            </svg>
+            {commentCount > 0 ? `comments ${commentCount}` : "comment"}
+          </button>
+          <button onClick={() => setShowShare(true)}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-bold ml-auto"
+            style={{ background: shared ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: shared ? "var(--win)" : "var(--muted)" }}>
+            {shared ? "shared ✓" : "share"}
+          </button>
+        </div>
+        {showComments && (
+          <div className="flex flex-col gap-3 pt-2 border-t" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
+            {commentsLoading ? (
+              <p className="text-[12px] text-center py-2" style={{ color: "var(--muted)" }}>loading...</p>
+            ) : comments.length === 0 ? (
+              <p className="text-[12px] text-center py-2" style={{ color: "var(--dimmer)" }}>no comments yet — be first</p>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {comments.map((c) => (
+                  <div key={c.id} className="flex gap-2.5">
+                    <div className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-[10px] font-bold"
+                      style={{ background: "var(--purple-dim, rgba(124,58,237,0.12))", color: "var(--purple, #7c3aed)", border: "1px solid var(--purple-border, rgba(124,58,237,0.3))" }}>
+                      {(c.user?.display_name ?? "?")[0].toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-[12px] font-bold">{c.user?.display_name ?? "someone"}</span>
+                        <span className="text-[10px]" style={{ color: "var(--dimmer)" }}>{new Date(c.created_at).toLocaleDateString()}</span>
+                      </div>
+                      {c.body && <p className="text-[13px] mt-0.5 leading-snug">{c.body}</p>}
+                      {c.gif_url && <img src={c.gif_url} alt="" className="mt-1 rounded-[8px]" style={{ maxWidth: 160, height: 100, objectFit: "cover" }} />}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <input
+                className="flex-1 rounded-[10px] px-3 py-2 text-[13px] outline-none"
+                style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)", color: "var(--text)" }}
+                placeholder="add a comment..."
+                value={commentInput}
+                onChange={(e) => setCommentInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitComment(); } }}
+              />
+              <button onClick={submitComment} disabled={!commentInput.trim() || submitting}
+                className="px-3 py-2 rounded-[10px] text-[13px] font-bold text-white disabled:opacity-40"
+                style={{ background: "var(--purple, #7c3aed)" }}>
+                {submitting ? "..." : "post"}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Share modal */}
+      {showShare && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,0.6)" }}
+          onClick={(e) => { if (e.target === e.currentTarget) { setShowShare(false); setShareCaption(""); setSharePhoto(null); setSharePhotoPreview(null); } }}>
+          <div className="w-full max-w-lg rounded-t-3xl p-6 flex flex-col gap-4" style={{ background: "var(--card)", border: "1px solid var(--border-soft)" }}>
+            <div className="flex items-center justify-between">
+              <p className="font-extrabold text-[16px]" style={{ fontFamily: "var(--font-nunito)" }}>share poll to feed</p>
+              <button onClick={() => { setShowShare(false); setShareCaption(""); setSharePhoto(null); setSharePhotoPreview(null); setShareMode("followers"); setTargetUsers([]); setUserSearchQ(""); setUserSearchResults([]); }} style={{ color: "var(--muted)" }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
+              </button>
+            </div>
+            {/* Audience toggle */}
+            <div className="flex rounded-2xl overflow-hidden" style={{ border: "1px solid var(--border-soft)" }}>
+              {(["followers", "specific"] as const).map((mode) => (
+                <button key={mode} onClick={() => setShareMode(mode)}
+                  className="flex-1 py-2.5 text-[13px] font-bold"
+                  style={{ background: shareMode === mode ? "var(--accent-dim)" : "transparent", color: shareMode === mode ? "var(--accent)" : "var(--muted)" }}>
+                  {mode === "followers" ? "all followers" : "specific people"}
+                </button>
+              ))}
+            </div>
+            {shareMode === "specific" && (
+              <div className="flex flex-col gap-2">
+                {targetUsers.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {targetUsers.map((u) => (
+                      <button key={u.user_id} onClick={() => setTargetUsers((prev) => prev.filter((t) => t.user_id !== u.user_id))}
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[12px] font-bold"
+                        style={{ background: "var(--accent-dim)", color: "var(--accent)", border: "1px solid var(--accent-border)" }}>
+                        {u.display_name ?? u.username ?? "user"} ✕
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <div className="relative">
+                  <input
+                    className="w-full rounded-2xl px-4 py-3 text-[14px] outline-none"
+                    style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-soft)", color: "var(--text)" }}
+                    placeholder="search by name or @username..."
+                    value={userSearchQ}
+                    onChange={(e) => searchUsers(e.target.value)}
+                  />
+                  {userSearchResults.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 mt-1 rounded-[12px] overflow-hidden z-10 flex flex-col"
+                      style={{ background: "var(--card)", border: "1px solid var(--border-soft)", maxHeight: 200, overflowY: "auto" }}>
+                      {userSearchResults.filter((u) => !targetUsers.some((t) => t.user_id === u.user_id)).slice(0, 8).map((u) => (
+                        <button key={u.user_id} type="button"
+                          className="flex items-center gap-2.5 px-3 py-2.5 text-left"
+                          style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}
+                          onMouseDown={(e) => { e.preventDefault(); setTargetUsers((prev) => [...prev, u]); setUserSearchQ(""); setUserSearchResults([]); }}>
+                          <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black overflow-hidden flex-shrink-0" style={{ background: "var(--accent-dim)", color: "var(--accent)" }}>
+                            {u.avatar_url ? <img src={u.avatar_url} className="w-7 h-7 object-cover" alt="" /> : (u.display_name?.[0] ?? "?").toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="text-[13px] font-semibold" style={{ color: "var(--text)" }}>{u.display_name ?? u.username}</p>
+                            {u.username && <p className="text-[11px]" style={{ color: "var(--dimmer)" }}>@{u.username}</p>}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: "var(--dimmer)" }}>caption (optional)</label>
+              <textarea
+                className="w-full rounded-[12px] px-4 py-3 text-[14px] resize-none outline-none"
+                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-soft)", color: "var(--text)", minHeight: 80 }}
+                placeholder="say something about this poll..."
+                value={shareCaption}
+                onChange={(e) => setShareCaption(e.target.value.slice(0, 280))}
+                maxLength={280}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: "var(--dimmer)" }}>photo (optional)</label>
+              {sharePhotoPreview ? (
+                <div className="relative">
+                  <img src={sharePhotoPreview} alt="" className="w-full rounded-[12px] object-cover" style={{ maxHeight: 200 }} />
+                  <button onClick={() => { setSharePhoto(null); setSharePhotoPreview(null); }}
+                    className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center text-[13px] font-bold"
+                    style={{ background: "rgba(0,0,0,0.65)", color: "#fff" }}>✕</button>
+                </div>
+              ) : (
+                <button onClick={() => sharePhotoInputRef.current?.click()}
+                  className="w-full py-3 rounded-[12px] text-[13px] font-semibold"
+                  style={{ border: "1px dashed var(--border-soft)", color: "var(--muted)", background: "rgba(255,255,255,0.02)" }}>
+                  + add photo
+                </button>
+              )}
+              <input ref={sharePhotoInputRef} type="file" accept="image/*" className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; setSharePhoto(f); setSharePhotoPreview(URL.createObjectURL(f)); e.target.value = ""; }} />
+            </div>
+            <button onClick={sharePoll} disabled={sharing || (shareMode === "specific" && targetUsers.length === 0)}
+              className="w-full py-4 rounded-[14px] text-[15px] font-black"
+              style={{ background: "var(--purple, #7c3aed)", color: "#fff", opacity: sharing || (shareMode === "specific" && targetUsers.length === 0) ? 0.5 : 1, fontFamily: "var(--font-nunito)" }}>
+              {sharing ? "sharing…" : shareMode === "specific" ? `share to ${targetUsers.length} ${targetUsers.length === 1 ? "person" : "people"}` : "share to feed"}
+            </button>
+          </div>
+        </div>
+      )}
     </>
   );
 }
