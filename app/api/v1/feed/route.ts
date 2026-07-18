@@ -11,7 +11,9 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const cursor = searchParams.get("cursor");
-  const supportsPollPost = req.headers.get("x-feed-capabilities")?.includes("poll-post") ?? false;
+  const capabilities = req.headers.get("x-feed-capabilities") ?? "";
+  const supportsPollPost = capabilities.includes("poll-post");
+  const supportsExploreBetPost = capabilities.includes("explore-bet-post");
 
   const { data: followRows } = await supabase
     .from("follows")
@@ -81,12 +83,30 @@ export async function GET(req: NextRequest) {
     .order("created_at", { ascending: false })
     .limit(25);
 
+  const exploreBetPostQuery = supabase
+    .from("explore_bet_posts")
+    .select(`
+      id, explore_bet_id, user_id, caption, photo_url, created_at,
+      balances:user_id(display_name, avatar_url, username),
+      explore_bets:explore_bet_id(
+        id, question, option_a, option_b, status, winning_side, closes_at,
+        explore_bet_entries(user_id, side, points_wagered),
+        explore_bet_likes(user_id),
+        explore_bet_reactions(user_id, emoji),
+        explore_bet_comments(id)
+      )
+    `)
+    .in("user_id", feedUserIds)
+    .order("created_at", { ascending: false })
+    .limit(25);
+
   const applyCursor = (q: any) => cursor ? q.lt("created_at", cursor) : q;
 
-  const [{ data: bets }, { data: posts }, { data: pollPosts }] = await Promise.all([
+  const [{ data: bets }, { data: posts }, { data: pollPosts }, { data: exploreBetPosts }] = await Promise.all([
     applyCursor(betQuery),
     applyCursor(postQuery),
     supportsPollPost ? applyCursor(pollPostQuery) : Promise.resolve({ data: [] }),
+    supportsExploreBetPost ? applyCursor(exploreBetPostQuery) : Promise.resolve({ data: [] }),
   ]);
 
   // Suppress bare BetItem when a visible post already exists for that bet
@@ -143,7 +163,39 @@ export async function GET(req: NextRequest) {
     return { type: "poll_post" as const, ...pp };
   });
 
-  const merged = [...betItems, ...postItems, ...pollPostItems]
+  const exploreBetPostItems = (exploreBetPosts ?? []).map((ebp: any) => {
+    const bet = ebp.explore_bets as any;
+    if (bet) {
+      const entries = (bet.explore_bet_entries ?? []) as Array<{ user_id: string; side: string; points_wagered: number }>;
+      const totalA = entries.filter((e) => e.side === "a").reduce((s, e) => s + e.points_wagered, 0);
+      const totalB = entries.filter((e) => e.side === "b").reduce((s, e) => s + e.points_wagered, 0);
+      const myEntry = entries.find((e) => e.user_id === user.userId) ?? null;
+      const likes = (bet.explore_bet_likes ?? []) as Array<{ user_id: string }>;
+      const rawReactions = (bet.explore_bet_reactions ?? []) as Array<{ user_id: string; emoji: string }>;
+      const reactionCounts: Record<string, number> = {};
+      for (const r of rawReactions) reactionCounts[r.emoji] = (reactionCounts[r.emoji] ?? 0) + 1;
+      const my_reaction = rawReactions.find((r: any) => r.user_id === user.userId)?.emoji ?? null;
+      ebp.explore_bets = {
+        ...bet,
+        explore_bet_entries: undefined,
+        explore_bet_likes: undefined,
+        explore_bet_reactions: undefined,
+        explore_bet_comments: undefined,
+        total_pts_a: totalA,
+        total_pts_b: totalB,
+        total_entries: entries.length,
+        my_entry: myEntry ? { side: myEntry.side as "a" | "b", points_wagered: myEntry.points_wagered } : null,
+        like_count: likes.length,
+        liked_by_me: likes.some((l) => l.user_id === user.userId),
+        reactions: Object.entries(reactionCounts).map(([emoji, count]) => ({ emoji, count })),
+        my_reaction,
+        comment_count: (bet.explore_bet_comments ?? []).length,
+      };
+    }
+    return { type: "explore_bet_post" as const, ...ebp };
+  });
+
+  const merged = [...betItems, ...postItems, ...pollPostItems, ...exploreBetPostItems]
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     .slice(0, 20);
 
