@@ -83,17 +83,16 @@ export async function GET(req: NextRequest) {
     .order("created_at", { ascending: false })
     .limit(25);
 
+  // Simple join — no nested children inside explore_bets to avoid PostgREST
+  // circular-reference issues (explore_bet_posts is itself a child of explore_bets).
+  // Reactions/comments load on-demand in the mobile card.
   const exploreBetPostQuery = supabase
     .from("explore_bet_posts")
     .select(`
       id, explore_bet_id, user_id, caption, photo_url, created_at,
       balances:user_id(display_name, avatar_url, username),
       explore_bets:explore_bet_id(
-        id, question, option_a, option_b, status, winning_side, closes_at,
-        explore_bet_entries(user_id, side, points_wagered),
-        explore_bet_likes(user_id),
-        explore_bet_reactions(user_id, emoji),
-        explore_bet_comments(id)
+        id, question, option_a, option_b, status, winning_side, closes_at
       )
     `)
     .in("user_id", feedUserIds)
@@ -172,30 +171,18 @@ export async function GET(req: NextRequest) {
   const exploreBetPostItems = (exploreBetPosts ?? []).map((ebp: any) => {
     const bet = ebp.explore_bets as any;
     if (bet) {
-      const entries = (bet.explore_bet_entries ?? []) as Array<{ user_id: string; side: string; points_wagered: number }>;
-      const totalA = entries.filter((e) => e.side === "a").reduce((s, e) => s + e.points_wagered, 0);
-      const totalB = entries.filter((e) => e.side === "b").reduce((s, e) => s + e.points_wagered, 0);
-      const myEntry = entries.find((e) => e.user_id === user.userId) ?? null;
-      const likes = (bet.explore_bet_likes ?? []) as Array<{ user_id: string }>;
-      const rawReactions = (bet.explore_bet_reactions ?? []) as Array<{ user_id: string; emoji: string }>;
-      const reactionCounts: Record<string, number> = {};
-      for (const r of rawReactions) reactionCounts[r.emoji] = (reactionCounts[r.emoji] ?? 0) + 1;
-      const my_reaction = rawReactions.find((r: any) => r.user_id === user.userId)?.emoji ?? null;
+      // Aggregate fields not available from the simple query — load on-demand in the card
       ebp.explore_bets = {
         ...bet,
-        explore_bet_entries: undefined,
-        explore_bet_likes: undefined,
-        explore_bet_reactions: undefined,
-        explore_bet_comments: undefined,
-        total_pts_a: totalA,
-        total_pts_b: totalB,
-        total_entries: entries.length,
-        my_entry: myEntry ? { side: myEntry.side as "a" | "b", points_wagered: myEntry.points_wagered } : null,
-        like_count: likes.length,
-        liked_by_me: likes.some((l) => l.user_id === user.userId),
-        reactions: Object.entries(reactionCounts).map(([emoji, count]) => ({ emoji, count })),
-        my_reaction,
-        comment_count: (bet.explore_bet_comments ?? []).length,
+        total_pts_a: 0,
+        total_pts_b: 0,
+        total_entries: 0,
+        my_entry: null,
+        like_count: 0,
+        liked_by_me: false,
+        reactions: [],
+        my_reaction: null,
+        comment_count: 0,
       };
     }
     return { type: "explore_bet_post" as const, ...ebp };
