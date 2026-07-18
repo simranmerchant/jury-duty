@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/privy";
 import { supabase } from "@/lib/supabase";
-import { sendPushToUsers } from "@/lib/push";
-import { sendWebPushToUsers } from "@/lib/webpush";
 
 async function assertMember(eventId: string, userId: string): Promise<boolean> {
   const { data: event } = await supabase
@@ -81,25 +79,6 @@ export async function POST(
     .upsert(rows, { onConflict: "event_id,user_id", ignoreDuplicates: true });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
-  // Notify newly invited users
-  const [{ data: eventData }, { data: inviterData }] = await Promise.all([
-    supabase.from("events").select("name").eq("id", id).single(),
-    supabase.from("balances").select("display_name").eq("user_id", user.userId).single(),
-  ]);
-  const eventName = eventData?.name ?? "a group";
-  const inviterName = inviterData?.display_name ?? "someone";
-  const title = `${inviterName} invited you to ${eventName} 🎉`;
-  const body = "tap to join and make predictions";
-  await Promise.all([
-    supabase.from("notifications").insert(
-      (userIds as string[]).map((uid) => ({
-        user_id: uid, type: "event_invite", title, body, data: { event_id: id },
-      }))
-    ),
-    sendPushToUsers(userIds as string[], { title, body, data: { event_id: id } }),
-    sendWebPushToUsers(userIds as string[], { title, body, data: { event_id: id } }),
-  ]);
 
   return NextResponse.json({ ok: true });
 }
