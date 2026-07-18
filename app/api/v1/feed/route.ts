@@ -10,7 +10,8 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const { searchParams } = new URL(req.url);
-  const cursor = searchParams.get("cursor"); // created_at ISO string for pagination
+  const cursor = searchParams.get("cursor");
+  const supportsPollPost = req.headers.get("x-feed-capabilities")?.includes("poll-post") ?? false;
 
   const { data: followRows } = await supabase
     .from("follows")
@@ -85,7 +86,7 @@ export async function GET(req: NextRequest) {
   const [{ data: bets }, { data: posts }, { data: pollPosts }] = await Promise.all([
     applyCursor(betQuery),
     applyCursor(postQuery),
-    applyCursor(pollPostQuery),
+    supportsPollPost ? applyCursor(pollPostQuery) : Promise.resolve({ data: [] }),
   ]);
 
   // Suppress bare BetItem when a visible post already exists for that bet
