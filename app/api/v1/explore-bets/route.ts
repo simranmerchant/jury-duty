@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
         creator:creator_id(display_name, username, avatar_url),
         explore_bet_entries(user_id, side, points_wagered, bettor:user_id(display_name, username, avatar_url)),
         explore_bet_posts(
-          id, caption, created_at,
+          id, caption, photo_url, created_at,
           user:user_id(user_id, display_name, username, avatar_url, is_private)
         ),
         explore_bet_likes(user_id),
@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
 
     // Only show posts from public accounts on the card
     const allPosts = (bet.explore_bet_posts ?? []) as unknown as Array<{
-      id: string; caption: string | null; created_at: string;
+      id: string; caption: string | null; photo_url: string | null; created_at: string;
       user: { user_id: string; display_name: string; username: string; avatar_url: string | null; is_private: boolean } | null;
     }>;
     const publicPosts = allPosts
@@ -83,10 +83,11 @@ export async function GET(req: NextRequest) {
         .map((e) => ({ user_id: e.user_id, side: e.side as "a" | "b", bettor: e.bettor })),
       other_entry_count: entries.filter((e) => e.user_id !== user.userId && !followingIds.has(e.user_id)).length,
       is_mine: (bet as any).creator_id === user.userId,
-      my_post: myPost ? { id: myPost.id, caption: myPost.caption } : null,
+      my_post: myPost ? { id: myPost.id, caption: myPost.caption, photo_url: myPost.photo_url } : null,
       public_posts: publicPosts.map((p) => ({
         id: p.id,
         caption: p.caption,
+        photo_url: p.photo_url,
         created_at: p.created_at,
         user: p.user ? {
           user_id: p.user.user_id,
