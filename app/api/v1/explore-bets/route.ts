@@ -10,27 +10,36 @@ export async function GET(req: NextRequest) {
   const user = await requireUser(token).catch(() => null);
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  const { data: bets, error } = await supabase
-    .from("explore_bets")
-    .select(`
-      id, question, option_a, option_b, status, winning_side, closes_at, created_at, creator_id,
-      creator:creator_id(display_name, username, avatar_url),
-      explore_bet_entries(user_id, side, points_wagered),
-      explore_bet_posts(
-        id, caption, created_at,
-        user:user_id(user_id, display_name, username, avatar_url, is_private)
-      ),
-      explore_bet_likes(user_id),
-      explore_bet_reactions(user_id, emoji),
-      explore_bet_comments(id)
-    `)
-    .order("created_at", { ascending: false })
-    .limit(50);
+  const [{ data: bets, error }, { data: followRows }] = await Promise.all([
+    supabase
+      .from("explore_bets")
+      .select(`
+        id, question, option_a, option_b, status, winning_side, closes_at, created_at, creator_id,
+        creator:creator_id(display_name, username, avatar_url),
+        explore_bet_entries(user_id, side, points_wagered, bettor:user_id(display_name, username, avatar_url)),
+        explore_bet_posts(
+          id, caption, created_at,
+          user:user_id(user_id, display_name, username, avatar_url, is_private)
+        ),
+        explore_bet_likes(user_id),
+        explore_bet_reactions(user_id, emoji),
+        explore_bet_comments(id)
+      `)
+      .order("created_at", { ascending: false })
+      .limit(50),
+    supabase
+      .from("follows")
+      .select("following_id")
+      .eq("follower_id", user.userId)
+      .eq("status", "accepted"),
+  ]);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+  const followingIds = new Set((followRows ?? []).map((f: any) => f.following_id));
+
   const shaped = (bets ?? []).map((bet) => {
-    const entries = (bet.explore_bet_entries ?? []) as Array<{ user_id: string; side: string; points_wagered: number }>;
+    const entries = (bet.explore_bet_entries ?? []) as Array<{ user_id: string; side: string; points_wagered: number; bettor: { display_name: string; username: string; avatar_url: string | null } | null }>;
     const totalA = entries.filter((e) => e.side === "a").reduce((s, e) => s + e.points_wagered, 0);
     const totalB = entries.filter((e) => e.side === "b").reduce((s, e) => s + e.points_wagered, 0);
     const myEntry = entries.find((e) => e.user_id === user.userId) ?? null;
@@ -68,7 +77,11 @@ export async function GET(req: NextRequest) {
       reactions: Object.entries(reactionCounts).map(([emoji, count]) => ({ emoji, count })),
       my_reaction: rawReactions.find((r) => r.user_id === user.userId)?.emoji ?? null,
       comment_count: commentCount,
-      my_entry: myEntry ? { side: myEntry.side, points_wagered: myEntry.points_wagered } : null,
+      my_entry: myEntry ? { side: myEntry.side as "a" | "b", points_wagered: myEntry.points_wagered } : null,
+      followed_entries: entries
+        .filter((e) => e.user_id !== user.userId && followingIds.has(e.user_id))
+        .map((e) => ({ user_id: e.user_id, side: e.side as "a" | "b", bettor: e.bettor })),
+      other_entry_count: entries.filter((e) => e.user_id !== user.userId && !followingIds.has(e.user_id)).length,
       is_mine: (bet as any).creator_id === user.userId,
       my_post: myPost ? { id: myPost.id, caption: myPost.caption } : null,
       public_posts: publicPosts.map((p) => ({
