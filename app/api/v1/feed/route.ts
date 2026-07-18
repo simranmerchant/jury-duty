@@ -102,12 +102,18 @@ export async function GET(req: NextRequest) {
 
   const applyCursor = (q: any) => cursor ? q.lt("created_at", cursor) : q;
 
-  const [{ data: bets }, { data: posts }, { data: pollPosts }, { data: exploreBetPosts }] = await Promise.all([
+  const [
+    { data: bets },
+    { data: posts },
+    { data: pollPosts },
+    { data: exploreBetPosts, error: ebpError },
+  ] = await Promise.all([
     applyCursor(betQuery),
     applyCursor(postQuery),
     supportsPollPost ? applyCursor(pollPostQuery) : Promise.resolve({ data: [] }),
-    supportsExploreBetPost ? applyCursor(exploreBetPostQuery) : Promise.resolve({ data: [] }),
+    supportsExploreBetPost ? applyCursor(exploreBetPostQuery) : Promise.resolve({ data: [], error: null }),
   ]);
+  if (ebpError) console.error("[feed] explore_bet_posts error:", ebpError.message);
 
   // Suppress bare BetItem when a visible post already exists for that bet
   const sharedBetIds = new Set(
