@@ -10,31 +10,46 @@ export async function GET(req: NextRequest) {
   const user = await requireUser(token).catch(() => null);
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  const { data: polls, error } = await supabase
-    .from("polls")
-    .select(`
-      id, question, option_a, option_b, creator_id, created_at, closes_at,
-      creator:creator_id(display_name, username, avatar_url),
-      poll_votes(user_id, side),
-      poll_likes(user_id),
-      poll_reactions(user_id, emoji),
-      poll_comments(id),
-      poll_posts(user_id, caption, photo_url, created_at, user:user_id(display_name, username, avatar_url))
-    `)
-    .is("event_id", null)
-    .order("created_at", { ascending: false })
-    .limit(50);
+  const [{ data: polls, error }, { data: followRows }] = await Promise.all([
+    supabase
+      .from("polls")
+      .select(`
+        id, question, option_a, option_b, creator_id, created_at, closes_at,
+        creator:creator_id(display_name, username, avatar_url),
+        poll_votes(user_id, side, voter:user_id(display_name, username, avatar_url)),
+        poll_likes(user_id),
+        poll_reactions(user_id, emoji),
+        poll_comments(id),
+        poll_posts(user_id, caption, photo_url, created_at, user:user_id(display_name, username, avatar_url))
+      `)
+      .is("event_id", null)
+      .order("created_at", { ascending: false })
+      .limit(50),
+    supabase
+      .from("follows")
+      .select("following_id")
+      .eq("follower_id", user.userId)
+      .eq("status", "accepted"),
+  ]);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+  const followingIds = new Set((followRows ?? []).map((f: any) => f.following_id));
+
   const shaped = (polls ?? []).map((poll) => {
-    const rawVotes = (poll.poll_votes ?? []) as Array<{ user_id: string; side: string }>;
+    const rawVotes = (poll.poll_votes ?? []) as Array<{ user_id: string; side: string; voter: { display_name: string; username: string; avatar_url: string | null } | null }>;
     // Deduplicate by user_id (last write wins) to guard against pre-constraint duplicates.
-    const voteByUser = new Map<string, string>();
-    for (const v of rawVotes) voteByUser.set(v.user_id, v.side);
-    const votes_a = [...voteByUser.values()].filter((s) => s === "a").length;
-    const votes_b = [...voteByUser.values()].filter((s) => s === "b").length;
-    const myVote = (voteByUser.get(user.userId) ?? null) as "a" | "b" | null;
+    const voteByUser = new Map<string, typeof rawVotes[number]>();
+    for (const v of rawVotes) voteByUser.set(v.user_id, v);
+    const votes_a = [...voteByUser.values()].filter((v) => v.side === "a").length;
+    const votes_b = [...voteByUser.values()].filter((v) => v.side === "b").length;
+    const myVote = (voteByUser.get(user.userId)?.side ?? null) as "a" | "b" | null;
+
+    const allVoters = [...voteByUser.values()].filter((v) => v.user_id !== user.userId);
+    const followed_votes = allVoters
+      .filter((v) => followingIds.has(v.user_id))
+      .map((v) => ({ user_id: v.user_id, side: v.side as "a" | "b", voter: v.voter }));
+    const other_vote_count = allVoters.filter((v) => !followingIds.has(v.user_id)).length;
 
     const likes = (poll.poll_likes ?? []) as Array<{ user_id: string }>;
     const rawReactions = (poll.poll_reactions ?? []) as Array<{ user_id: string; emoji: string }>;
@@ -71,6 +86,8 @@ export async function GET(req: NextRequest) {
       is_mine: poll.creator_id === user.userId,
       my_post: myPost ? { caption: myPost.caption, photo_url: myPost.photo_url } : null,
       public_posts: publicPosts,
+      followed_votes,
+      other_vote_count,
     };
   });
 
