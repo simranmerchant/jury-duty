@@ -21,6 +21,15 @@ function CalendarIcon({ color }: { color: string }) {
   );
 }
 
+function GlobeIcon({ color }: { color: string }) {
+  return (
+    <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+    </svg>
+  );
+}
+
 function SearchIcon({ color }: { color: string }) {
   return (
     <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -91,6 +100,7 @@ export default function BottomNav() {
   const tabs = [
     { href: "/feed", icon: (c: string) => <HomeIcon color={c} /> },
     { href: "/events", icon: (c: string) => <CalendarIcon color={c} /> },
+    { href: "/explore", icon: (c: string) => <GlobeIcon color={c} /> },
     { href: "/people", icon: (c: string) => <SearchIcon color={c} /> },
     { href: "/notifications", icon: (c: string) => <BellIcon color={c} unread={unread} /> },
     { href: "/profile", icon: (c: string) => <UserIcon color={c} /> },

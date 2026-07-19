@@ -36,7 +36,44 @@ type FeedPost = {
   post_comments: { id: string }[];
   bets: EmbeddedBet | null;
 };
-type FeedItem = FeedBet | FeedPost;
+type FeedPollPost = {
+  type: "poll_post";
+  id: string;
+  poll_id: string;
+  user_id: string;
+  caption: string | null;
+  photo_url: string | null;
+  created_at: string;
+  balances: { display_name: string | null; avatar_url: string | null; username: string | null } | null;
+  polls: {
+    id: string; question: string; option_a: string; option_b: string;
+    votes_a: number; votes_b: number; total_votes: number;
+    my_vote: string | null; closes_at: string | null;
+    reactions: { emoji: string; count: number }[];
+    my_reaction: string | null;
+    comment_count: number;
+  } | null;
+};
+type FeedExploreBetPost = {
+  type: "explore_bet_post";
+  id: string;
+  explore_bet_id: string;
+  user_id: string;
+  caption: string | null;
+  photo_url: string | null;
+  created_at: string;
+  balances: { display_name: string | null; avatar_url: string | null; username: string | null } | null;
+  explore_bets: {
+    id: string; question: string; option_a: string; option_b: string;
+    status: "open" | "resolved"; winning_side: "a" | "b" | null; closes_at: string | null;
+    total_pts_a: number; total_pts_b: number; total_entries: number;
+    my_entry: { side: "a" | "b"; points_wagered: number } | null;
+    reactions: { emoji: string; count: number }[];
+    my_reaction: string | null;
+    comment_count: number;
+  } | null;
+};
+type FeedItem = FeedBet | FeedPost | FeedPollPost | FeedExploreBetPost;
 
 function timeAgo(dateString: string): string {
   const seconds = Math.floor((Date.now() - new Date(dateString).getTime()) / 1000);
@@ -81,10 +118,11 @@ export default function FeedPage() {
     const token = await getAccessToken();
     if (!token) return;
     const url = cursor ? `/api/v1/feed?cursor=${encodeURIComponent(cursor)}` : "/api/v1/feed";
+    const feedHeaders = { Authorization: `Bearer ${token}`, "X-Feed-Capabilities": "poll-post,explore-bet-post" };
     const requests = cursor
-      ? [fetch(url, { headers: { Authorization: `Bearer ${token}` } })]
+      ? [fetch(url, { headers: feedHeaders })]
       : [
-          fetch(url, { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(url, { headers: feedHeaders }),
           fetch("/api/v1/me", { headers: { Authorization: `Bearer ${token}` } }),
         ];
     const [feedRes, meRes] = await Promise.all(requests);
@@ -266,6 +304,30 @@ export default function FeedPage() {
                 followedIds={followedIds}
                 getAccessToken={getAccessToken}
                 onDelete={() => setItems((prev) => prev.filter((i) => i.id !== item.id))}
+              />
+            );
+          }
+
+          if (item.type === "poll_post") {
+            return (
+              <PollPostCard
+                key={`poll-post-${item.poll_id}`}
+                item={item}
+                currentUserId={privyUser?.id}
+                getAccessToken={getAccessToken}
+                onDelete={() => setItems((prev) => prev.filter((i) => i.type !== "poll_post" || i.poll_id !== item.poll_id))}
+              />
+            );
+          }
+
+          if (item.type === "explore_bet_post") {
+            return (
+              <ExploreBetPostCard
+                key={`ebp-${item.explore_bet_id}`}
+                item={item}
+                currentUserId={privyUser?.id}
+                getAccessToken={getAccessToken}
+                onDelete={() => setItems((prev) => prev.filter((i) => i.type !== "explore_bet_post" || i.explore_bet_id !== item.explore_bet_id))}
               />
             );
           }
@@ -968,6 +1030,563 @@ function PostCard({
                 );
               })}
             </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PollPostCard({
+  item,
+  currentUserId,
+  getAccessToken,
+  onDelete,
+}: {
+  item: FeedPollPost;
+  currentUserId?: string;
+  getAccessToken: () => Promise<string | null>;
+  onDelete: () => void;
+}) {
+  const router = useRouter();
+  const poll = item.polls;
+  const sharer = item.balances;
+  const sharerName = sharer?.display_name ?? sharer?.username ?? "someone";
+  const isOwn = item.user_id === currentUserId;
+
+  const [myVote, setMyVote] = useState(poll?.my_vote ?? null);
+  const [votesA, setVotesA] = useState(poll?.votes_a ?? 0);
+  const [votesB, setVotesB] = useState(poll?.votes_b ?? 0);
+  const [voting, setVoting] = useState(false);
+  const [myReaction, setMyReaction] = useState(poll?.my_reaction ?? null);
+  const [reactions, setReactions] = useState<{ emoji: string; count: number }[]>(poll?.reactions ?? []);
+  const [showComments, setShowComments] = useState(false);
+  const [comments, setComments] = useState<PostComment[]>([]);
+  const [commentCount, setCommentCount] = useState(poll?.comment_count ?? 0);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [commentInput, setCommentInput] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showMenu) return;
+    function close(e: MouseEvent) { if (menuRef.current && !menuRef.current.contains(e.target as Node)) setShowMenu(false); }
+    document.addEventListener("click", close);
+    return () => document.removeEventListener("click", close);
+  }, [showMenu]);
+
+  if (!poll) return null;
+
+  const totalVotes = votesA + votesB;
+  const pctA = totalVotes > 0 ? Math.round((votesA / totalVotes) * 100) : 50;
+  const pctB = totalVotes > 0 ? Math.round((votesB / totalVotes) * 100) : 50;
+  const isClosed = poll.closes_at ? new Date(poll.closes_at) < new Date() : false;
+
+  async function castVote(side: "a" | "b") {
+    if (voting || myVote || isClosed) return;
+    setVoting(true);
+    setMyVote(side);
+    if (side === "a") setVotesA((v) => v + 1); else setVotesB((v) => v + 1);
+    const token = await getAccessToken();
+    await fetch(`/api/v1/polls/${poll!.id}/vote`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ side }),
+    });
+    setVoting(false);
+  }
+
+  async function toggleReaction(emoji: string) {
+    const token = await getAccessToken();
+    const wasActive = myReaction === emoji;
+    setMyReaction(wasActive ? null : emoji);
+    setReactions((prev) => {
+      const map: Record<string, number> = {};
+      for (const r of prev) map[r.emoji] = r.count;
+      if (wasActive) { map[emoji] = Math.max(0, (map[emoji] ?? 1) - 1); }
+      else {
+        if (myReaction) map[myReaction] = Math.max(0, (map[myReaction] ?? 1) - 1);
+        map[emoji] = (map[emoji] ?? 0) + 1;
+      }
+      return Object.entries(map).filter(([, c]) => c > 0).map(([e, c]) => ({ emoji: e, count: c }));
+    });
+    await fetch(`/api/v1/polls/${poll!.id}/react`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ emoji }),
+    });
+  }
+
+  async function fetchComments() {
+    setCommentsLoading(true);
+    const token = await getAccessToken();
+    const res = await fetch(`/api/v1/polls/${poll!.id}/comments`, { headers: { Authorization: `Bearer ${token}` } });
+    const data = await res.json().catch(() => ({}));
+    setComments(data.comments ?? []);
+    setCommentCount(data.comments?.length ?? commentCount);
+    setCommentsLoading(false);
+  }
+
+  async function submitComment(e: React.FormEvent) {
+    e.preventDefault();
+    if (!commentInput.trim() || submitting) return;
+    setSubmitting(true);
+    const token = await getAccessToken();
+    const res = await fetch(`/api/v1/polls/${poll!.id}/comments`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ body: commentInput.trim() }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) {
+      setComments((prev) => [...prev, data.comment]);
+      setCommentCount((c) => c + 1);
+      setCommentInput("");
+    }
+    setSubmitting(false);
+  }
+
+  async function deletePost() {
+    setDeleting(true);
+    const token = await getAccessToken();
+    await fetch(`/api/v1/polls/${poll!.id}/post`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+    onDelete();
+  }
+
+  const EMOJIS = ["🔥", "😂", "😮", "❤️", "👏"];
+  const reactionMap: Record<string, number> = {};
+  for (const r of reactions) reactionMap[r.emoji] = r.count;
+
+  return (
+    <div className="rounded-[16px] p-4 flex flex-col gap-3" style={{ background: "var(--card)", border: "1px solid var(--border-soft)" }}>
+      {/* Sharer row */}
+      <div className="flex items-center justify-between">
+        <button className="flex items-center gap-2.5" onClick={() => sharer?.username && router.push(`/u/${sharer.username}`)}>
+          <div className="rounded-full flex items-center justify-center overflow-hidden flex-shrink-0"
+            style={{ width: 32, height: 32, background: "var(--accent-dim)", border: "1px solid var(--accent-border)" }}>
+            {sharer?.avatar_url
+              ? <img src={sharer.avatar_url} alt="" className="w-full h-full object-cover" />
+              : <span className="text-[12px] font-black" style={{ color: "var(--accent)" }}>{sharerName[0]?.toUpperCase() ?? "?"}</span>
+            }
+          </div>
+          <div className="text-left">
+            <p className="text-[13px] font-bold leading-none" style={{ color: "var(--text)" }}>
+              {sharerName} <span className="font-normal" style={{ color: "var(--muted)" }}>posted a poll</span>
+            </p>
+            <p className="text-[11px] mt-0.5" style={{ color: "var(--muted)" }}>{timeAgo(item.created_at)}</p>
+          </div>
+        </button>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-[6px]" style={{ background: "rgba(147,51,234,0.15)", color: "#a855f7", border: "1px solid rgba(147,51,234,0.3)" }}>poll</span>
+          {isOwn && (
+            <div className="relative" ref={menuRef}>
+              <button onClick={() => setShowMenu((s) => !s)} className="w-7 h-7 flex items-center justify-center rounded-full text-[15px] font-bold" style={{ color: "var(--muted)" }}>···</button>
+              {showMenu && (
+                <div className="absolute right-0 top-8 z-10 rounded-[12px] overflow-hidden shadow-lg" style={{ background: "var(--card)", border: "1px solid var(--border-soft)", minWidth: 130 }}>
+                  <button onClick={deletePost} disabled={deleting} className="w-full px-4 py-3 text-left text-[13px] font-semibold" style={{ color: "var(--accent)" }}>
+                    {deleting ? "deleting…" : "delete post"}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {item.photo_url && <img src={item.photo_url} alt="" className="w-full rounded-[12px] object-cover" style={{ maxHeight: 300 }} />}
+
+      {item.caption && (
+        <p className="text-[14px] leading-snug" style={{ color: "var(--text)" }}>
+          {item.caption.split(/(@\w+)/g).map((part, i) =>
+            /^@\w+$/.test(part)
+              ? <a key={i} href={`/u/${part.slice(1)}`} style={{ color: "var(--accent)", fontWeight: 600, textDecoration: "none" }}>{part}</a>
+              : part
+          )}
+        </p>
+      )}
+
+      {/* Embedded poll */}
+      <div className="rounded-[12px] p-3 flex flex-col gap-3" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+        <p className="text-[14px] font-bold leading-snug" style={{ color: "var(--text)" }}>{poll.question}</p>
+        {(["a", "b"] as const).map((side) => {
+          const label = side === "a" ? poll.option_a : poll.option_b;
+          const votes = side === "a" ? votesA : votesB;
+          const pct = side === "a" ? pctA : pctB;
+          const isMyVote = myVote === side;
+          const hasVoted = !!myVote || isClosed;
+          if (!hasVoted) {
+            return (
+              <button key={side} onClick={() => castVote(side)} disabled={voting}
+                className="w-full py-3 px-4 rounded-[10px] text-[14px] font-bold text-left"
+                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: "var(--text)" }}>
+                {label}
+              </button>
+            );
+          }
+          return (
+            <div key={side} className="rounded-[10px] p-2.5 flex flex-col gap-1.5"
+              style={{ background: isMyVote ? "rgba(147,51,234,0.1)" : "rgba(255,255,255,0.03)", border: `1px solid ${isMyVote ? "rgba(147,51,234,0.3)" : "rgba(255,255,255,0.06)"}` }}>
+              <div className="flex items-center justify-between">
+                <span className="text-[13px] font-semibold" style={{ color: isMyVote ? "#a855f7" : "var(--text)" }}>{label}</span>
+                <span className="text-[13px] font-bold" style={{ color: "var(--muted)" }}>{pct}%</span>
+              </div>
+              <div className="rounded-full overflow-hidden" style={{ height: 3, background: "rgba(255,255,255,0.06)" }}>
+                <div className="h-full rounded-full" style={{ width: `${pct}%`, background: isMyVote ? "#a855f7" : "rgba(255,255,255,0.18)" }} />
+              </div>
+              <p className="text-[11px]" style={{ color: "var(--dimmer)" }}>{votes} {votes === 1 ? "vote" : "votes"}</p>
+            </div>
+          );
+        })}
+        <p className="text-[11px]" style={{ color: "var(--dimmer)" }}>
+          {totalVotes} total · {isClosed ? "closed" : poll.closes_at ? `closes ${timeAgo(poll.closes_at)}` : "open"}
+        </p>
+      </div>
+
+      {/* Reactions + comment */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        {EMOJIS.map((emoji) => {
+          const count = reactionMap[emoji] ?? 0;
+          const isActive = myReaction === emoji;
+          return (
+            <button key={emoji} onClick={() => toggleReaction(emoji)}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[12px] font-semibold"
+              style={{ background: isActive ? "var(--accent-dim)" : "rgba(255,255,255,0.04)", border: `1px solid ${isActive ? "var(--accent-border)" : "rgba(255,255,255,0.06)"}`, color: isActive ? "var(--accent)" : "var(--muted)" }}>
+              {emoji}{count > 0 && <span className="ml-0.5">{count}</span>}
+            </button>
+          );
+        })}
+        <button
+          onClick={() => { if (!showComments) fetchComments(); setShowComments(true); }}
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-semibold"
+          style={{ color: "var(--muted)", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          </svg>
+          {commentCount > 0 ? commentCount : "comment"}
+        </button>
+      </div>
+
+      {showComments && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,0.6)" }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowComments(false); }}>
+          <div className="w-full max-w-lg rounded-t-3xl flex flex-col" style={{ background: "var(--card)", border: "1px solid var(--border-soft)", maxHeight: "75vh" }}>
+            <div className="px-6 pt-5 pb-3 flex items-center justify-between flex-shrink-0" style={{ borderBottom: "1px solid var(--border-soft)" }}>
+              <p className="font-extrabold text-[16px]" style={{ fontFamily: "var(--font-nunito)" }}>comments</p>
+              <button onClick={() => setShowComments(false)} className="text-[14px] font-bold" style={{ color: "var(--dimmer)" }}>done</button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-3">
+              {commentsLoading
+                ? <p className="text-[13px] text-center py-6" style={{ color: "var(--dimmer)" }}>loading...</p>
+                : comments.length === 0
+                  ? <p className="text-[13px] text-center py-6" style={{ color: "var(--dimmer)" }}>no comments yet — be first</p>
+                  : comments.map((c) => {
+                    const name = c.balances?.display_name ?? c.balances?.username ?? "someone";
+                    return (
+                      <div key={c.id} className="flex gap-2.5">
+                        <div className="rounded-full flex items-center justify-center flex-shrink-0" style={{ width: 28, height: 28, background: "var(--accent-dim)" }}>
+                          {c.balances?.avatar_url
+                            ? <img src={c.balances.avatar_url} alt="" className="w-full h-full rounded-full object-cover" />
+                            : <span className="text-[10px] font-black" style={{ color: "var(--accent)" }}>{name[0]?.toUpperCase()}</span>
+                          }
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-[12px] font-bold" style={{ color: "var(--text)" }}>{name}</p>
+                          {c.body && <p className="text-[13px] mt-0.5" style={{ color: "var(--text)" }}>{c.body}</p>}
+                        </div>
+                        {c.user_id === currentUserId && (
+                          <button onClick={async () => {
+                            const token = await getAccessToken();
+                            await fetch(`/api/v1/polls/${poll!.id}/comments?commentId=${c.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+                            setComments((prev) => prev.filter((x) => x.id !== c.id));
+                            setCommentCount((n) => n - 1);
+                          }} className="text-[11px] self-start mt-1" style={{ color: "var(--dimmer)" }}>✕</button>
+                        )}
+                      </div>
+                    );
+                  })
+              }
+            </div>
+            <form onSubmit={submitComment} className="flex gap-2 px-6 py-3 items-center flex-shrink-0" style={{ borderTop: "1px solid var(--border-soft)" }}>
+              <input
+                value={commentInput}
+                onChange={(e) => setCommentInput(e.target.value)}
+                placeholder="add a comment..."
+                maxLength={500}
+                className="flex-1 text-[14px] px-4 py-3 rounded-2xl outline-none"
+                style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--border-soft)", color: "var(--text)" }}
+              />
+              <button type="submit" disabled={!commentInput.trim() || submitting} className="px-4 py-3 rounded-2xl text-[14px] font-bold text-white disabled:opacity-40" style={{ background: "var(--accent)" }}>
+                post
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ExploreBetPostCard({
+  item,
+  currentUserId,
+  getAccessToken,
+  onDelete,
+}: {
+  item: FeedExploreBetPost;
+  currentUserId?: string;
+  getAccessToken: () => Promise<string | null>;
+  onDelete: () => void;
+}) {
+  const router = useRouter();
+  const bet = item.explore_bets;
+  const sharer = item.balances;
+  const sharerName = sharer?.display_name ?? sharer?.username ?? "someone";
+  const isOwn = item.user_id === currentUserId;
+
+  const [myReaction, setMyReaction] = useState(bet?.my_reaction ?? null);
+  const [reactions, setReactions] = useState<{ emoji: string; count: number }[]>(bet?.reactions ?? []);
+  const [showComments, setShowComments] = useState(false);
+  const [comments, setComments] = useState<PostComment[]>([]);
+  const [commentCount, setCommentCount] = useState(bet?.comment_count ?? 0);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [commentInput, setCommentInput] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showMenu) return;
+    function close(e: MouseEvent) { if (menuRef.current && !menuRef.current.contains(e.target as Node)) setShowMenu(false); }
+    document.addEventListener("click", close);
+    return () => document.removeEventListener("click", close);
+  }, [showMenu]);
+
+  if (!bet) return null;
+
+  const totalPts = (bet.total_pts_a ?? 0) + (bet.total_pts_b ?? 0);
+  const pctA = totalPts > 0 ? Math.round(((bet.total_pts_a ?? 0) / totalPts) * 100) : 50;
+  const pctB = totalPts > 0 ? Math.round(((bet.total_pts_b ?? 0) / totalPts) * 100) : 50;
+  const isResolved = bet.status === "resolved";
+
+  async function toggleReaction(emoji: string) {
+    const token = await getAccessToken();
+    const wasActive = myReaction === emoji;
+    setMyReaction(wasActive ? null : emoji);
+    setReactions((prev) => {
+      const map: Record<string, number> = {};
+      for (const r of prev) map[r.emoji] = r.count;
+      if (wasActive) { map[emoji] = Math.max(0, (map[emoji] ?? 1) - 1); }
+      else {
+        if (myReaction) map[myReaction] = Math.max(0, (map[myReaction] ?? 1) - 1);
+        map[emoji] = (map[emoji] ?? 0) + 1;
+      }
+      return Object.entries(map).filter(([, c]) => c > 0).map(([e, c]) => ({ emoji: e, count: c }));
+    });
+    await fetch(`/api/v1/explore-bets/${bet!.id}/react`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ emoji }),
+    });
+  }
+
+  async function fetchComments() {
+    setCommentsLoading(true);
+    const token = await getAccessToken();
+    const res = await fetch(`/api/v1/explore-bets/${bet!.id}/comments`, { headers: { Authorization: `Bearer ${token}` } });
+    const data = await res.json().catch(() => ({}));
+    setComments(data.comments ?? []);
+    setCommentCount(data.comments?.length ?? commentCount);
+    setCommentsLoading(false);
+  }
+
+  async function submitComment(e: React.FormEvent) {
+    e.preventDefault();
+    if (!commentInput.trim() || submitting) return;
+    setSubmitting(true);
+    const token = await getAccessToken();
+    const res = await fetch(`/api/v1/explore-bets/${bet!.id}/comments`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ body: commentInput.trim() }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) {
+      setComments((prev) => [...prev, data.comment]);
+      setCommentCount((c) => c + 1);
+      setCommentInput("");
+    }
+    setSubmitting(false);
+  }
+
+  async function deletePost() {
+    setDeleting(true);
+    const token = await getAccessToken();
+    await fetch(`/api/v1/explore-bets/${bet!.id}/post`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+    onDelete();
+  }
+
+  const EMOJIS = ["🔥", "😂", "😮", "❤️", "👏"];
+  const reactionMap: Record<string, number> = {};
+  for (const r of reactions) reactionMap[r.emoji] = r.count;
+
+  return (
+    <div className="rounded-[16px] p-4 flex flex-col gap-3" style={{ background: "var(--card)", border: "1px solid var(--border-soft)" }}>
+      {/* Sharer row */}
+      <div className="flex items-center justify-between">
+        <button className="flex items-center gap-2.5" onClick={() => sharer?.username && router.push(`/u/${sharer.username}`)}>
+          <div className="rounded-full flex items-center justify-center overflow-hidden flex-shrink-0"
+            style={{ width: 32, height: 32, background: "var(--accent-dim)", border: "1px solid var(--accent-border)" }}>
+            {sharer?.avatar_url
+              ? <img src={sharer.avatar_url} alt="" className="w-full h-full object-cover" />
+              : <span className="text-[12px] font-black" style={{ color: "var(--accent)" }}>{sharerName[0]?.toUpperCase() ?? "?"}</span>
+            }
+          </div>
+          <div className="text-left">
+            <p className="text-[13px] font-bold leading-none" style={{ color: "var(--text)" }}>
+              {sharerName} <span className="font-normal" style={{ color: "var(--muted)" }}>shared a prediction</span>
+            </p>
+            <p className="text-[11px] mt-0.5" style={{ color: "var(--muted)" }}>{timeAgo(item.created_at)}</p>
+          </div>
+        </button>
+        <div className="flex items-center gap-2">
+          {isResolved && <span className="text-[10px] font-bold px-2 py-0.5 rounded-[6px]" style={{ background: "var(--win-dim)", color: "var(--win)", border: "1px solid var(--win-border)" }}>resolved</span>}
+          {isOwn && (
+            <div className="relative" ref={menuRef}>
+              <button onClick={() => setShowMenu((s) => !s)} className="w-7 h-7 flex items-center justify-center rounded-full text-[15px] font-bold" style={{ color: "var(--muted)" }}>···</button>
+              {showMenu && (
+                <div className="absolute right-0 top-8 z-10 rounded-[12px] overflow-hidden shadow-lg" style={{ background: "var(--card)", border: "1px solid var(--border-soft)", minWidth: 130 }}>
+                  <button onClick={deletePost} disabled={deleting} className="w-full px-4 py-3 text-left text-[13px] font-semibold" style={{ color: "var(--accent)" }}>
+                    {deleting ? "deleting…" : "delete post"}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {item.photo_url && <img src={item.photo_url} alt="" className="w-full rounded-[12px] object-cover" style={{ maxHeight: 300 }} />}
+
+      {item.caption && (
+        <p className="text-[14px] leading-snug" style={{ color: "var(--text)" }}>
+          {item.caption.split(/(@\w+)/g).map((part, i) =>
+            /^@\w+$/.test(part)
+              ? <a key={i} href={`/u/${part.slice(1)}`} style={{ color: "var(--accent)", fontWeight: 600, textDecoration: "none" }}>{part}</a>
+              : part
+          )}
+        </p>
+      )}
+
+      {/* Embedded explore bet */}
+      <div className="rounded-[12px] p-3 flex flex-col gap-2" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+        <p className="text-[14px] font-bold leading-snug" style={{ color: "var(--text)" }}>{bet.question}</p>
+        {(["a", "b"] as const).map((side) => {
+          const label = side === "a" ? bet.option_a : bet.option_b;
+          const pts = side === "a" ? (bet.total_pts_a ?? 0) : (bet.total_pts_b ?? 0);
+          const pct = side === "a" ? pctA : pctB;
+          const isWinner = isResolved && bet.winning_side === side;
+          const isLoss = isResolved && bet.winning_side !== null && bet.winning_side !== side;
+          const isMine = bet.my_entry?.side === side;
+          return (
+            <div key={side} className="rounded-[10px] p-2.5 flex flex-col gap-1.5"
+              style={{ background: isWinner ? "var(--win-dim)" : isLoss ? "var(--loss-dim)" : "rgba(255,255,255,0.03)", border: `1px solid ${isWinner ? "var(--win-border)" : isLoss ? "var(--loss-border)" : "rgba(255,255,255,0.06)"}` }}>
+              <div className="flex items-center justify-between">
+                <span className="text-[13px] font-semibold" style={{ color: isWinner ? "var(--win)" : isLoss ? "var(--loss)" : isMine ? "var(--accent)" : "var(--text)" }}>{label}</span>
+                <span className="text-[13px] font-bold" style={{ color: "var(--muted)" }}>{pct}%</span>
+              </div>
+              <div className="rounded-full overflow-hidden" style={{ height: 3, background: "rgba(255,255,255,0.06)" }}>
+                <div className="h-full rounded-full" style={{ width: `${pct}%`, background: isWinner ? "var(--win-border)" : isLoss ? "var(--loss-border)" : isMine ? "var(--accent)" : "rgba(255,255,255,0.18)" }} />
+              </div>
+              {pts > 0 && <p className="text-[11px]" style={{ color: "var(--dimmer)" }}>{pts.toLocaleString()} pts</p>}
+            </div>
+          );
+        })}
+        {isResolved && bet.winning_side && (
+          <p className="text-[12px] font-bold" style={{ color: "var(--win)" }}>✓ {bet.winning_side === "a" ? bet.option_a : bet.option_b} won</p>
+        )}
+        <p className="text-[11px]" style={{ color: "var(--dimmer)" }}>{bet.total_entries ?? 0} entries · {totalPts.toLocaleString()} pts</p>
+      </div>
+
+      {/* Reactions + comment */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        {EMOJIS.map((emoji) => {
+          const count = reactionMap[emoji] ?? 0;
+          const isActive = myReaction === emoji;
+          return (
+            <button key={emoji} onClick={() => toggleReaction(emoji)}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[12px] font-semibold"
+              style={{ background: isActive ? "var(--accent-dim)" : "rgba(255,255,255,0.04)", border: `1px solid ${isActive ? "var(--accent-border)" : "rgba(255,255,255,0.06)"}`, color: isActive ? "var(--accent)" : "var(--muted)" }}>
+              {emoji}{count > 0 && <span className="ml-0.5">{count}</span>}
+            </button>
+          );
+        })}
+        <button
+          onClick={() => { if (!showComments) fetchComments(); setShowComments(true); }}
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-semibold"
+          style={{ color: "var(--muted)", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          </svg>
+          {commentCount > 0 ? commentCount : "comment"}
+        </button>
+      </div>
+
+      {showComments && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,0.6)" }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowComments(false); }}>
+          <div className="w-full max-w-lg rounded-t-3xl flex flex-col" style={{ background: "var(--card)", border: "1px solid var(--border-soft)", maxHeight: "75vh" }}>
+            <div className="px-6 pt-5 pb-3 flex items-center justify-between flex-shrink-0" style={{ borderBottom: "1px solid var(--border-soft)" }}>
+              <p className="font-extrabold text-[16px]" style={{ fontFamily: "var(--font-nunito)" }}>comments</p>
+              <button onClick={() => setShowComments(false)} className="text-[14px] font-bold" style={{ color: "var(--dimmer)" }}>done</button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-3">
+              {commentsLoading
+                ? <p className="text-[13px] text-center py-6" style={{ color: "var(--dimmer)" }}>loading...</p>
+                : comments.length === 0
+                  ? <p className="text-[13px] text-center py-6" style={{ color: "var(--dimmer)" }}>no comments yet — be first</p>
+                  : comments.map((c) => {
+                    const name = c.balances?.display_name ?? c.balances?.username ?? "someone";
+                    return (
+                      <div key={c.id} className="flex gap-2.5">
+                        <div className="rounded-full flex items-center justify-center flex-shrink-0" style={{ width: 28, height: 28, background: "var(--accent-dim)" }}>
+                          {c.balances?.avatar_url
+                            ? <img src={c.balances.avatar_url} alt="" className="w-full h-full rounded-full object-cover" />
+                            : <span className="text-[10px] font-black" style={{ color: "var(--accent)" }}>{name[0]?.toUpperCase()}</span>
+                          }
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-[12px] font-bold" style={{ color: "var(--text)" }}>{name}</p>
+                          {c.body && <p className="text-[13px] mt-0.5" style={{ color: "var(--text)" }}>{c.body}</p>}
+                        </div>
+                        {c.user_id === currentUserId && (
+                          <button onClick={async () => {
+                            const token = await getAccessToken();
+                            await fetch(`/api/v1/explore-bets/${bet!.id}/comments?commentId=${c.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+                            setComments((prev) => prev.filter((x) => x.id !== c.id));
+                            setCommentCount((n) => n - 1);
+                          }} className="text-[11px] self-start mt-1" style={{ color: "var(--dimmer)" }}>✕</button>
+                        )}
+                      </div>
+                    );
+                  })
+              }
+            </div>
+            <form onSubmit={submitComment} className="flex gap-2 px-6 py-3 items-center flex-shrink-0" style={{ borderTop: "1px solid var(--border-soft)" }}>
+              <input
+                value={commentInput}
+                onChange={(e) => setCommentInput(e.target.value)}
+                placeholder="add a comment..."
+                maxLength={500}
+                className="flex-1 text-[14px] px-4 py-3 rounded-2xl outline-none"
+                style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--border-soft)", color: "var(--text)" }}
+              />
+              <button type="submit" disabled={!commentInput.trim() || submitting} className="px-4 py-3 rounded-2xl text-[14px] font-bold text-white disabled:opacity-40" style={{ background: "var(--accent)" }}>
+                post
+              </button>
+            </form>
           </div>
         </div>
       )}

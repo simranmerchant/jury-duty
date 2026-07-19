@@ -15,6 +15,7 @@ Next.js web app + API backend for **Jury Duty** — a social prediction app wher
 - `people/page.tsx` — people discovery / search
 - `notifications/page.tsx` — notification inbox
 - `events/page.tsx` — home: list of events & groups
+- `explore/page.tsx` — explore predictions + polls: vote, react, comment, share to feed
 - `login/page.tsx`, `onboarding/page.tsx` — auth + first-run flow
 - `how-it-works/page.tsx` — explainer carousel
 - `join/[token]/page.tsx` — invite link landing
