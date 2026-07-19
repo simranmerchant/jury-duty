@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
   const followingIds = new Set((followRows ?? []).map((f: any) => f.following_id));
 
   const shaped = (polls ?? []).map((poll) => {
-    const rawVotes = (poll.poll_votes ?? []) as Array<{ user_id: string; side: string; voter: { display_name: string; username: string; avatar_url: string | null } | null }>;
+    const rawVotes = (poll.poll_votes ?? []) as unknown as Array<{ user_id: string; side: string; voter: { display_name: string; username: string; avatar_url: string | null } | null }>;
     // Deduplicate by user_id (last write wins) to guard against pre-constraint duplicates.
     const voteByUser = new Map<string, typeof rawVotes[number]>();
     for (const v of rawVotes) voteByUser.set(v.user_id, v);

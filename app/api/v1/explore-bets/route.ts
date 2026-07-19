@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
   const followingIds = new Set((followRows ?? []).map((f: any) => f.following_id));
 
   const shaped = (bets ?? []).map((bet) => {
-    const entries = (bet.explore_bet_entries ?? []) as Array<{ user_id: string; side: string; points_wagered: number; bettor: { display_name: string; username: string; avatar_url: string | null } | null }>;
+    const entries = (bet.explore_bet_entries ?? []) as unknown as Array<{ user_id: string; side: string; points_wagered: number; bettor: { display_name: string; username: string; avatar_url: string | null } | null }>;
     const totalA = entries.filter((e) => e.side === "a").reduce((s, e) => s + e.points_wagered, 0);
     const totalB = entries.filter((e) => e.side === "b").reduce((s, e) => s + e.points_wagered, 0);
     const myEntry = entries.find((e) => e.user_id === user.userId) ?? null;
