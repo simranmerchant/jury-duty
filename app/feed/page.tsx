@@ -830,7 +830,8 @@ function PostCard({
                     <span className="text-[11px] font-semibold" style={{ color: "var(--muted)" }}>{bet.events.name}</span>
                   </div>
                 )}
-                {item.photo_url && <img src={item.photo_url} alt="" className="w-full rounded-[12px] object-cover" style={{ maxHeight: 340 }} />}
+                <p className="text-[13px] font-bold leading-snug" style={{ color: "var(--text)" }}>{bet.question}</p>
+                {item.photo_url && <img src={item.photo_url} alt="" className="w-full rounded-[12px] object-cover" style={{ maxHeight: 300 }} />}
                 {item.caption && (
                   <p className="text-[14px] leading-snug" style={{ color: "var(--text)" }}>
                     {item.caption.split(/(@\w+)/g).map((part, i) =>
@@ -1259,6 +1260,7 @@ function PollPostCard({
               onScroll={(e) => setCarouselPage(Math.round(e.currentTarget.scrollLeft / e.currentTarget.clientWidth))}>
               <div style={{ minWidth: "100%", flexShrink: 0, scrollSnapAlign: "start" }}>{embeddedPoll}</div>
               <div style={{ minWidth: "100%", flexShrink: 0, scrollSnapAlign: "start", display: "flex", flexDirection: "column", gap: 10 }}>
+                <p className="text-[13px] font-bold leading-snug" style={{ color: "var(--text)" }}>{poll.question}</p>
                 {item.photo_url && <img src={item.photo_url} alt="" className="w-full rounded-[12px] object-cover" style={{ maxHeight: 300 }} />}
                 {item.caption && (
                   <p className="text-[14px] leading-snug" style={{ color: "var(--text)" }}>
@@ -1600,6 +1602,7 @@ function ExploreBetPostCard({
               onScroll={(e) => setCarouselPage(Math.round(e.currentTarget.scrollLeft / e.currentTarget.clientWidth))}>
               <div style={{ minWidth: "100%", flexShrink: 0, scrollSnapAlign: "start" }}>{embeddedBetCard}</div>
               <div style={{ minWidth: "100%", flexShrink: 0, scrollSnapAlign: "start", display: "flex", flexDirection: "column", gap: 10 }}>
+                <p className="text-[13px] font-bold leading-snug" style={{ color: "var(--text)" }}>{bet.question}</p>
                 {item.photo_url && <img src={item.photo_url} alt="" className="w-full rounded-[12px] object-cover" style={{ maxHeight: 300 }} />}
                 {item.caption && (
                   <p className="text-[14px] leading-snug" style={{ color: "var(--text)" }}>

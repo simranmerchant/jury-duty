@@ -234,6 +234,7 @@ export default function EventsPage() {
     setCreateQuestion(""); setCreateOptionA(""); setCreateOptionB(""); setCreateClosesAt("");
     setShowCreateExplore(false);
     setCreatingExplore(false);
+    setExploreSubTab("bets");
     setExploreLoaded(false);
     loadExplore();
   }
@@ -263,6 +264,7 @@ export default function EventsPage() {
     setCreateQuestion(""); setCreateOptionA(""); setCreateOptionB(""); setCreateClosesAt("");
     setShowCreateExplore(false);
     setCreatingExplore(false);
+    setExploreSubTab("polls");
     setExploreLoaded(false);
     loadExplore();
   }
@@ -547,7 +549,7 @@ export default function EventsPage() {
       {activeTab === "explore" && (
         <div className="fixed bottom-0 left-0 right-0 px-4 pb-[76px] pt-3" style={{ zIndex: 10, background: "linear-gradient(to top, var(--bg) 65%, transparent 100%)" }}>
           <button
-            onClick={() => setShowCreateExplore(true)}
+            onClick={() => { setCreateExploreType(exploreSubTab === "polls" ? "poll" : "prediction"); setShowCreateExplore(true); }}
             className="w-full py-3.5 rounded-[12px] font-black text-[15px] text-white"
             style={{ background: "var(--accent)", fontFamily: "var(--font-nunito)", letterSpacing: "-0.01em" }}
           >
@@ -1158,15 +1160,13 @@ function ExploreBetCard({
           {bet.public_posts.slice(0, 3).map((post) => {
             const pname = post.user?.display_name ?? post.user?.username ?? "someone";
             return (
-              <div key={post.id} className="rounded-[10px] p-2.5 flex items-start gap-2.5" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
-                <button onClick={() => post.user?.username && router.push(`/u/${post.user.username}`)}>
-                  <div className="rounded-full flex items-center justify-center overflow-hidden flex-shrink-0" style={{ width: 24, height: 24, background: "var(--accent-dim)", border: "1px solid var(--accent-border)" }}>
-                    {post.user?.avatar_url
-                      ? <img src={post.user.avatar_url} alt="" className="w-full h-full object-cover" />
-                      : <span className="text-[9px] font-black" style={{ color: "var(--accent)" }}>{pname[0]?.toUpperCase()}</span>
-                    }
-                  </div>
-                </button>
+              <button key={post.id} onClick={() => router.push(`/feed/explore-post/${post.id}`)} className="w-full text-left rounded-[10px] p-2.5 flex items-start gap-2.5" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                <div className="rounded-full flex items-center justify-center overflow-hidden flex-shrink-0" style={{ width: 24, height: 24, background: "var(--accent-dim)", border: "1px solid var(--accent-border)" }}>
+                  {post.user?.avatar_url
+                    ? <img src={post.user.avatar_url} alt="" className="w-full h-full object-cover" />
+                    : <span className="text-[9px] font-black" style={{ color: "var(--accent)" }}>{pname[0]?.toUpperCase()}</span>
+                  }
+                </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-[11px] font-bold" style={{ color: "var(--text)" }}>{pname}
                     {post.side && <span className="font-normal ml-1" style={{ color: "var(--dimmer)" }}>· {post.side === "a" ? bet.option_a : bet.option_b}</span>}
@@ -1174,7 +1174,7 @@ function ExploreBetCard({
                   {post.caption && <p className="text-[12px] mt-0.5 leading-snug" style={{ color: "var(--muted)" }}>{post.caption}</p>}
                   {post.photo_url && <img src={post.photo_url} alt="" className="w-full rounded-[8px] mt-1 object-cover" style={{ maxHeight: 160 }} />}
                 </div>
-              </div>
+              </button>
             );
           })}
         </div>
@@ -1183,7 +1183,7 @@ function ExploreBetCard({
       {showShare && (
         <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,0.6)" }}
           onClick={(e) => { if (e.target === e.currentTarget) { setShowShare(false); setSharePhoto(null); setSharePhotoPreview(null); } }}>
-          <div className="w-full max-w-lg rounded-t-3xl flex flex-col" style={{ background: "var(--card)", border: "1px solid var(--border-soft)", maxHeight: "70vh" }}>
+          <div className="w-full max-w-lg rounded-t-3xl flex flex-col" style={{ background: "var(--card)", border: "1px solid var(--border-soft)", maxHeight: "88vh" }}>
             <div className="px-6 pt-5 pb-3 flex items-center justify-between flex-shrink-0" style={{ borderBottom: "1px solid var(--border-soft)" }}>
               <p className="font-extrabold text-[16px]" style={{ fontFamily: "var(--font-nunito)" }}>share to feed</p>
               <button onClick={() => { setShowShare(false); setSharePhoto(null); setSharePhotoPreview(null); }} className="text-[14px] font-bold" style={{ color: "var(--dimmer)" }}>cancel</button>
@@ -1202,8 +1202,8 @@ function ExploreBetCard({
                 style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--border-soft)", color: "var(--text)" }}
               />
               {sharePhotoPreview ? (
-                <div className="relative rounded-[12px] overflow-hidden" style={{ maxHeight: 200 }}>
-                  <img src={sharePhotoPreview} alt="" className="w-full object-cover" style={{ maxHeight: 200 }} />
+                <div className="relative rounded-[12px] overflow-hidden" style={{ maxHeight: 140 }}>
+                  <img src={sharePhotoPreview} alt="" className="w-full object-cover" style={{ maxHeight: 140 }} />
                   <button onClick={() => { setSharePhoto(null); setSharePhotoPreview(null); }}
                     className="absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold"
                     style={{ background: "rgba(0,0,0,0.6)", color: "#fff" }}>✕</button>
@@ -1225,7 +1225,7 @@ function ExploreBetCard({
                 </label>
               )}
             </div>
-            <div className="px-6 pb-6 flex-shrink-0">
+            <div className="px-6 pb-6 pt-3 flex-shrink-0" style={{ borderTop: "1px solid var(--border-soft)" }}>
               <button onClick={shareToFeed} disabled={sharing}
                 className="w-full py-4 rounded-[14px] text-[15px] font-black disabled:opacity-40"
                 style={{ background: "var(--accent)", color: "#fff", fontFamily: "var(--font-nunito)" }}>
@@ -1602,7 +1602,7 @@ function PollCard({
       {showShare && (
         <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,0.6)" }}
           onClick={(e) => { if (e.target === e.currentTarget) { setShowShare(false); setSharePhoto(null); setSharePhotoPreview(null); } }}>
-          <div className="w-full max-w-lg rounded-t-3xl flex flex-col" style={{ background: "var(--card)", border: "1px solid var(--border-soft)", maxHeight: "70vh" }}>
+          <div className="w-full max-w-lg rounded-t-3xl flex flex-col" style={{ background: "var(--card)", border: "1px solid var(--border-soft)", maxHeight: "88vh" }}>
             <div className="px-6 pt-5 pb-3 flex items-center justify-between flex-shrink-0" style={{ borderBottom: "1px solid var(--border-soft)" }}>
               <p className="font-extrabold text-[16px]" style={{ fontFamily: "var(--font-nunito)" }}>share to feed</p>
               <button onClick={() => { setShowShare(false); setSharePhoto(null); setSharePhotoPreview(null); }} className="text-[14px] font-bold" style={{ color: "var(--dimmer)" }}>cancel</button>
@@ -1621,8 +1621,8 @@ function PollCard({
                 style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--border-soft)", color: "var(--text)" }}
               />
               {sharePhotoPreview ? (
-                <div className="relative rounded-[12px] overflow-hidden" style={{ maxHeight: 200 }}>
-                  <img src={sharePhotoPreview} alt="" className="w-full object-cover" style={{ maxHeight: 200 }} />
+                <div className="relative rounded-[12px] overflow-hidden" style={{ maxHeight: 140 }}>
+                  <img src={sharePhotoPreview} alt="" className="w-full object-cover" style={{ maxHeight: 140 }} />
                   <button onClick={() => { setSharePhoto(null); setSharePhotoPreview(null); }}
                     className="absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold"
                     style={{ background: "rgba(0,0,0,0.6)", color: "#fff" }}>✕</button>
@@ -1644,7 +1644,7 @@ function PollCard({
                 </label>
               )}
             </div>
-            <div className="px-6 pb-6 flex-shrink-0">
+            <div className="px-6 pb-6 pt-3 flex-shrink-0" style={{ borderTop: "1px solid var(--border-soft)" }}>
               <button onClick={shareToFeed} disabled={sharing}
                 className="w-full py-4 rounded-[14px] text-[15px] font-black disabled:opacity-40"
                 style={{ background: "#a855f7", color: "#fff", fontFamily: "var(--font-nunito)" }}>
