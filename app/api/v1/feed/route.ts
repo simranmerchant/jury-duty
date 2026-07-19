@@ -116,9 +116,36 @@ export async function GET(req: NextRequest) {
     const betIds = [...new Set(exploreBetPosts.map((p: any) => p.explore_bet_id as string))];
     const { data: exploreBetRows } = await supabase
       .from("explore_bets")
-      .select("id, question, option_a, option_b, status, winning_side, closes_at")
+      .select(`
+        id, question, option_a, option_b, status, winning_side, closes_at,
+        explore_bet_entries(user_id, side, points_wagered, bettor:user_id(display_name, username, avatar_url)),
+        explore_bet_reactions(user_id, emoji),
+        explore_bet_comments(id)
+      `)
       .in("id", betIds);
-    for (const b of exploreBetRows ?? []) exploreBetMap.set(b.id, b);
+    const followedSet = new Set(followedIds);
+    for (const b of exploreBetRows ?? []) {
+      const entries = (b.explore_bet_entries ?? []) as unknown as Array<{ user_id: string; side: string; points_wagered: number; bettor: { display_name: string; username: string; avatar_url: string | null } | null }>;
+      const totalA = entries.filter((e) => e.side === "a").reduce((s, e) => s + e.points_wagered, 0);
+      const totalB = entries.filter((e) => e.side === "b").reduce((s, e) => s + e.points_wagered, 0);
+      const myEntry = entries.find((e) => e.user_id === user.userId) ?? null;
+      const rawReactions = (b.explore_bet_reactions ?? []) as Array<{ user_id: string; emoji: string }>;
+      const reactionCounts: Record<string, number> = {};
+      for (const r of rawReactions) reactionCounts[r.emoji] = (reactionCounts[r.emoji] ?? 0) + 1;
+      exploreBetMap.set(b.id, {
+        id: b.id, question: b.question, option_a: b.option_a, option_b: b.option_b,
+        status: b.status, winning_side: b.winning_side, closes_at: b.closes_at,
+        total_pts_a: totalA, total_pts_b: totalB, total_entries: entries.length,
+        my_entry: myEntry ? { side: myEntry.side as "a" | "b", points_wagered: myEntry.points_wagered } : null,
+        reactions: Object.entries(reactionCounts).map(([emoji, count]) => ({ emoji, count })),
+        my_reaction: rawReactions.find((r) => r.user_id === user.userId)?.emoji ?? null,
+        comment_count: (b.explore_bet_comments ?? []).length,
+        followed_entries: entries
+          .filter((e) => e.user_id !== user.userId && followedSet.has(e.user_id))
+          .map((e) => ({ user_id: e.user_id, side: e.side as "a" | "b", bettor: e.bettor })),
+        other_entry_count: entries.filter((e) => e.user_id !== user.userId && !followedSet.has(e.user_id)).length,
+      });
+    }
   }
 
   // Suppress bare BetItem when a visible post already exists for that bet
@@ -176,19 +203,7 @@ export async function GET(req: NextRequest) {
   });
 
   const exploreBetPostItems = (exploreBetPosts ?? []).map((ebp: any) => {
-    const bet = exploreBetMap.get(ebp.explore_bet_id as string) ?? null;
-    const explore_bets = bet ? {
-      ...bet,
-      total_pts_a: 0,
-      total_pts_b: 0,
-      total_entries: 0,
-      my_entry: null,
-      like_count: 0,
-      liked_by_me: false,
-      reactions: [],
-      my_reaction: null,
-      comment_count: 0,
-    } : null;
+    const explore_bets = exploreBetMap.get(ebp.explore_bet_id as string) ?? null;
     return { type: "explore_bet_post" as const, ...ebp, explore_bets };
   });
 

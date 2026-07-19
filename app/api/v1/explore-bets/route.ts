@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
       user: { user_id: string; display_name: string; username: string; avatar_url: string | null; is_private: boolean } | null;
     }>;
     const publicPosts = allPosts
-      .filter((p) => p.user && !p.user.is_private)
+      .filter((p) => p.user && (!p.user.is_private || followingIds.has(p.user.user_id)))
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
       .slice(0, 5);
 

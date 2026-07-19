@@ -1047,23 +1047,30 @@ function ExploreBetCard({
         {myEntry && ` · you bet ${myEntry.points_wagered.toLocaleString()} pts on ${myEntry.side === "a" ? bet.option_a : bet.option_b}`}
       </p>
 
-      {bet.followed_entries.length > 0 && (
+      {(bet.followed_entries.length > 0 || bet.other_entry_count > 0) && (
         <div className="flex items-center gap-1.5">
           <div className="flex items-center">
-            {bet.followed_entries.slice(0, 5).map((e, i) => (
+            {bet.followed_entries.map((e, i) => (
               e.bettor?.avatar_url
-                ? <button key={e.user_id} onClick={() => e.bettor?.username && router.push(`/u/${e.bettor.username}`)} style={{ marginLeft: i === 0 ? 0 : -4, zIndex: 10 - i, borderRadius: "50%", padding: 0, lineHeight: 0, border: `1.5px solid ${e.side === "a" ? "var(--accent)" : "rgba(255,255,255,0.2)"}` }}>
-                    <img src={e.bettor.avatar_url} alt="" style={{ width: 18, height: 18, borderRadius: "50%", display: "block", objectFit: "cover" }} />
+                ? <button key={e.user_id} onClick={() => e.bettor?.username && router.push(`/u/${e.bettor.username}`)} style={{ marginLeft: i === 0 ? 0 : -4, zIndex: 20 - i, borderRadius: "50%", padding: 0, lineHeight: 0, border: `1.5px solid ${e.side === "a" ? "var(--accent)" : "rgba(255,255,255,0.2)"}`, cursor: "pointer" }}>
+                    <img src={e.bettor.avatar_url} alt="" style={{ width: 20, height: 20, borderRadius: "50%", display: "block", objectFit: "cover" }} />
                   </button>
-                : <div key={e.user_id} className="w-[18px] h-[18px] rounded-full flex items-center justify-center text-[7px] font-black" style={{ marginLeft: i === 0 ? 0 : -4, zIndex: 10 - i, border: `1.5px solid ${e.side === "a" ? "var(--accent)" : "rgba(255,255,255,0.2)"}`, background: "rgba(255,255,255,0.1)", color: "var(--muted)" }}>
+                : <button key={e.user_id} onClick={() => e.bettor?.username && router.push(`/u/${e.bettor.username}`)} className="w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-black" style={{ marginLeft: i === 0 ? 0 : -4, zIndex: 20 - i, border: `1.5px solid ${e.side === "a" ? "var(--accent)" : "rgba(255,255,255,0.2)"}`, background: "rgba(255,255,255,0.1)", color: "var(--muted)", cursor: e.bettor?.username ? "pointer" : "default" }}>
                     {(e.bettor?.display_name ?? "?")[0].toUpperCase()}
-                  </div>
+                  </button>
             ))}
+            {bet.other_entry_count > 0 && (
+              <div className="w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold" style={{ marginLeft: bet.followed_entries.length > 0 ? -4 : 0, zIndex: 0, background: "rgba(255,255,255,0.08)", border: "1.5px solid rgba(255,255,255,0.15)", color: "var(--muted)" }}>
+                +{bet.other_entry_count}
+              </div>
+            )}
           </div>
-          <p className="text-[11px]" style={{ color: "var(--dimmer)" }}>
-            {bet.followed_entries.slice(0, 2).map((e) => e.bettor?.display_name ?? e.bettor?.username ?? "someone").join(", ")}
-            {bet.followed_entries.length > 2 ? ` +${bet.followed_entries.length - 2} more` : ""} bet
-          </p>
+          {bet.followed_entries.length > 0 && (
+            <p className="text-[11px]" style={{ color: "var(--dimmer)" }}>
+              {bet.followed_entries.slice(0, 2).map((e) => e.bettor?.display_name ?? e.bettor?.username ?? "someone").join(", ")}
+              {bet.followed_entries.length > 2 ? ` +${bet.followed_entries.length - 2} more` : ""} bet
+            </p>
+          )}
         </div>
       )}
 
