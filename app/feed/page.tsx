@@ -832,6 +832,7 @@ function PostCard({
                     <span className="text-[11px] font-semibold" style={{ color: "var(--muted)" }}>{bet.events.name}</span>
                   </div>
                 )}
+                <p className="text-[14px] font-bold leading-snug" style={{ color: "var(--text)" }}>{bet.question}</p>
                 {item.photo_url && <img src={item.photo_url} alt="" className="w-full rounded-[12px] object-cover" style={{ maxHeight: 300 }} />}
                 {item.caption && (
                   <p className="text-[14px] leading-snug" style={{ color: "var(--text)" }}>
