@@ -738,6 +738,9 @@ function PostCard({
         </div>
       </div>
 
+      {/* Question */}
+      <p className="text-[15px] font-bold leading-snug" style={{ color: "var(--text)" }}>{bet.question}</p>
+
       {/* Carousel: page 1 = bet, page 2 = photo + caption */}
       {(() => {
         const hasMedia = !!item.photo_url;
@@ -751,7 +754,6 @@ function PostCard({
                 <span className="text-[11px] font-semibold" style={{ color: "var(--muted)" }}>{bet.events.name}</span>
               </a>
             )}
-            <p className="text-[14px] font-bold leading-snug" style={{ color: "var(--text)" }}>{bet.question}</p>
             <div className="flex flex-col gap-1.5">
               {bet.bet_options.map((opt) => {
                 const voters = bet.bet_entries.filter((e) => e.option_id === opt.id);
@@ -830,7 +832,6 @@ function PostCard({
                     <span className="text-[11px] font-semibold" style={{ color: "var(--muted)" }}>{bet.events.name}</span>
                   </div>
                 )}
-                <p className="text-[13px] font-bold leading-snug" style={{ color: "var(--text)" }}>{bet.question}</p>
                 {item.photo_url && <img src={item.photo_url} alt="" className="w-full rounded-[12px] object-cover" style={{ maxHeight: 300 }} />}
                 {item.caption && (
                   <p className="text-[14px] leading-snug" style={{ color: "var(--text)" }}>
@@ -1200,12 +1201,14 @@ function PollPostCard({
         </div>
       </div>
 
+      {/* Question */}
+      <p className="text-[15px] font-bold leading-snug" style={{ color: "var(--text)" }}>{poll.question}</p>
+
       {/* Carousel: page 1 = poll card, page 2 = photo + caption */}
       {(() => {
         const hasMedia = !!item.photo_url;
         const embeddedPoll = (
           <div className="rounded-[12px] p-3 flex flex-col gap-3" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
-            <p className="text-[14px] font-bold leading-snug" style={{ color: "var(--text)" }}>{poll.question}</p>
             {(["a", "b"] as const).map((side) => {
               const label = side === "a" ? poll.option_a : poll.option_b;
               const votes = side === "a" ? votesA : votesB;
@@ -1260,7 +1263,6 @@ function PollPostCard({
               onScroll={(e) => setCarouselPage(Math.round(e.currentTarget.scrollLeft / e.currentTarget.clientWidth))}>
               <div style={{ minWidth: "100%", flexShrink: 0, scrollSnapAlign: "start" }}>{embeddedPoll}</div>
               <div style={{ minWidth: "100%", flexShrink: 0, scrollSnapAlign: "start", display: "flex", flexDirection: "column", gap: 10 }}>
-                <p className="text-[13px] font-bold leading-snug" style={{ color: "var(--text)" }}>{poll.question}</p>
                 {item.photo_url && <img src={item.photo_url} alt="" className="w-full rounded-[12px] object-cover" style={{ maxHeight: 300 }} />}
                 {item.caption && (
                   <p className="text-[14px] leading-snug" style={{ color: "var(--text)" }}>
@@ -1529,12 +1531,14 @@ function ExploreBetPostCard({
         </div>
       </div>
 
+      {/* Question */}
+      <p className="text-[15px] font-bold leading-snug" style={{ color: "var(--text)" }}>{bet.question}</p>
+
       {/* Carousel: page 1 = bet card, page 2 = photo + caption */}
       {(() => {
         const hasMedia = !!item.photo_url;
         const embeddedBetCard = (
           <div className="rounded-[12px] p-3 flex flex-col gap-2" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
-            <p className="text-[14px] font-bold leading-snug" style={{ color: "var(--text)" }}>{bet.question}</p>
             {(["a", "b"] as const).map((side) => {
               const label = side === "a" ? bet.option_a : bet.option_b;
               const pts = side === "a" ? (bet.total_pts_a ?? 0) : (bet.total_pts_b ?? 0);
@@ -1602,7 +1606,6 @@ function ExploreBetPostCard({
               onScroll={(e) => setCarouselPage(Math.round(e.currentTarget.scrollLeft / e.currentTarget.clientWidth))}>
               <div style={{ minWidth: "100%", flexShrink: 0, scrollSnapAlign: "start" }}>{embeddedBetCard}</div>
               <div style={{ minWidth: "100%", flexShrink: 0, scrollSnapAlign: "start", display: "flex", flexDirection: "column", gap: 10 }}>
-                <p className="text-[13px] font-bold leading-snug" style={{ color: "var(--text)" }}>{bet.question}</p>
                 {item.photo_url && <img src={item.photo_url} alt="" className="w-full rounded-[12px] object-cover" style={{ maxHeight: 300 }} />}
                 {item.caption && (
                   <p className="text-[14px] leading-snug" style={{ color: "var(--text)" }}>
