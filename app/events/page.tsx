@@ -819,6 +819,8 @@ function ExploreBetCard({
   const [showBetInput, setShowBetInput] = useState<"a" | "b" | null>(null);
   const [showShare, setShowShare] = useState(false);
   const [shareCaption, setShareCaption] = useState("");
+  const [sharePhoto, setSharePhoto] = useState<File | null>(null);
+  const [sharePhotoPreview, setSharePhotoPreview] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState<PostComment[]>([]);
@@ -885,15 +887,22 @@ function ExploreBetCard({
   async function shareToFeed() {
     setSharing(true);
     const token = await getAccessToken();
+    let photoUrl: string | null = null;
+    if (sharePhoto) {
+      const fd = new FormData();
+      fd.append("file", sharePhoto);
+      const uploadRes = await fetch("/api/v1/posts/upload", { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd });
+      if (uploadRes.ok) { const d = await uploadRes.json(); photoUrl = d.photo_url ?? null; }
+    }
     const res = await fetch(`/api/v1/explore-bets/${bet.id}/post`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ caption: shareCaption.trim() || null }),
+      body: JSON.stringify({ caption: shareCaption.trim() || null, photo_url: photoUrl }),
     });
     if (res.ok) {
-      setBet((b) => ({ ...b, my_post: { id: "", caption: shareCaption.trim() || null, photo_url: null } }));
+      setBet((b) => ({ ...b, my_post: { id: "", caption: shareCaption.trim() || null, photo_url: photoUrl } }));
       setShowShare(false);
-      setShareCaption("");
+      setShareCaption(""); setSharePhoto(null); setSharePhotoPreview(null);
     }
     setSharing(false);
   }
@@ -1117,14 +1126,14 @@ function ExploreBetCard({
 
       {showShare && (
         <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,0.6)" }}
-          onClick={(e) => { if (e.target === e.currentTarget) setShowShare(false); }}>
-          <div className="w-full max-w-lg rounded-t-3xl flex flex-col" style={{ background: "var(--card)", border: "1px solid var(--border-soft)", maxHeight: "60vh" }}>
+          onClick={(e) => { if (e.target === e.currentTarget) { setShowShare(false); setSharePhoto(null); setSharePhotoPreview(null); } }}>
+          <div className="w-full max-w-lg rounded-t-3xl flex flex-col" style={{ background: "var(--card)", border: "1px solid var(--border-soft)", maxHeight: "70vh" }}>
             <div className="px-6 pt-5 pb-3 flex items-center justify-between flex-shrink-0" style={{ borderBottom: "1px solid var(--border-soft)" }}>
               <p className="font-extrabold text-[16px]" style={{ fontFamily: "var(--font-nunito)" }}>share to feed</p>
-              <button onClick={() => setShowShare(false)} className="text-[14px] font-bold" style={{ color: "var(--dimmer)" }}>cancel</button>
+              <button onClick={() => { setShowShare(false); setSharePhoto(null); setSharePhotoPreview(null); }} className="text-[14px] font-bold" style={{ color: "var(--dimmer)" }}>cancel</button>
             </div>
-            <div className="flex-1 overflow-y-auto px-6 py-4">
-              <p className="text-[13px] font-semibold mb-3" style={{ color: "var(--muted)" }}>
+            <div className="flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-3">
+              <p className="text-[13px] font-semibold" style={{ color: "var(--muted)" }}>
                 sharing: <span style={{ color: "var(--text)" }}>{bet.question}</span>
               </p>
               <textarea
@@ -1136,6 +1145,29 @@ function ExploreBetCard({
                 className="w-full text-[14px] px-4 py-3 rounded-2xl outline-none resize-none"
                 style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--border-soft)", color: "var(--text)" }}
               />
+              {sharePhotoPreview ? (
+                <div className="relative rounded-[12px] overflow-hidden" style={{ maxHeight: 200 }}>
+                  <img src={sharePhotoPreview} alt="" className="w-full object-cover" style={{ maxHeight: 200 }} />
+                  <button onClick={() => { setSharePhoto(null); setSharePhotoPreview(null); }}
+                    className="absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold"
+                    style={{ background: "rgba(0,0,0,0.6)", color: "#fff" }}>✕</button>
+                </div>
+              ) : (
+                <label className="flex items-center gap-2 px-4 py-2.5 rounded-2xl cursor-pointer text-[13px] font-semibold w-fit"
+                  style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--border-soft)", color: "var(--muted)" }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
+                    <path d="m21 15-5-5L5 21"/>
+                  </svg>
+                  add photo
+                  <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (!f) return;
+                    setSharePhoto(f);
+                    setSharePhotoPreview(URL.createObjectURL(f));
+                  }} />
+                </label>
+              )}
             </div>
             <div className="px-6 pb-6 flex-shrink-0">
               <button onClick={shareToFeed} disabled={sharing}
@@ -1224,6 +1256,8 @@ function PollCard({
   const [voting, setVoting] = useState(false);
   const [showShare, setShowShare] = useState(false);
   const [shareCaption, setShareCaption] = useState("");
+  const [sharePhoto, setSharePhoto] = useState<File | null>(null);
+  const [sharePhotoPreview, setSharePhotoPreview] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState<PostComment[]>([]);
@@ -1287,15 +1321,22 @@ function PollCard({
   async function shareToFeed() {
     setSharing(true);
     const token = await getAccessToken();
+    let photoUrl: string | null = null;
+    if (sharePhoto) {
+      const fd = new FormData();
+      fd.append("file", sharePhoto);
+      const uploadRes = await fetch("/api/v1/posts/upload", { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd });
+      if (uploadRes.ok) { const d = await uploadRes.json(); photoUrl = d.photo_url ?? null; }
+    }
     const res = await fetch(`/api/v1/polls/${poll.id}/post`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ caption: shareCaption.trim() || null }),
+      body: JSON.stringify({ caption: shareCaption.trim() || null, photo_url: photoUrl }),
     });
     if (res.ok) {
-      setPoll((p) => ({ ...p, my_post: { caption: shareCaption.trim() || null, photo_url: null } }));
+      setPoll((p) => ({ ...p, my_post: { caption: shareCaption.trim() || null, photo_url: photoUrl } }));
       setShowShare(false);
-      setShareCaption("");
+      setShareCaption(""); setSharePhoto(null); setSharePhotoPreview(null);
     }
     setSharing(false);
   }
@@ -1449,14 +1490,14 @@ function PollCard({
 
       {showShare && (
         <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,0.6)" }}
-          onClick={(e) => { if (e.target === e.currentTarget) setShowShare(false); }}>
-          <div className="w-full max-w-lg rounded-t-3xl flex flex-col" style={{ background: "var(--card)", border: "1px solid var(--border-soft)", maxHeight: "60vh" }}>
+          onClick={(e) => { if (e.target === e.currentTarget) { setShowShare(false); setSharePhoto(null); setSharePhotoPreview(null); } }}>
+          <div className="w-full max-w-lg rounded-t-3xl flex flex-col" style={{ background: "var(--card)", border: "1px solid var(--border-soft)", maxHeight: "70vh" }}>
             <div className="px-6 pt-5 pb-3 flex items-center justify-between flex-shrink-0" style={{ borderBottom: "1px solid var(--border-soft)" }}>
               <p className="font-extrabold text-[16px]" style={{ fontFamily: "var(--font-nunito)" }}>share to feed</p>
-              <button onClick={() => setShowShare(false)} className="text-[14px] font-bold" style={{ color: "var(--dimmer)" }}>cancel</button>
+              <button onClick={() => { setShowShare(false); setSharePhoto(null); setSharePhotoPreview(null); }} className="text-[14px] font-bold" style={{ color: "var(--dimmer)" }}>cancel</button>
             </div>
-            <div className="flex-1 overflow-y-auto px-6 py-4">
-              <p className="text-[13px] font-semibold mb-3" style={{ color: "var(--muted)" }}>
+            <div className="flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-3">
+              <p className="text-[13px] font-semibold" style={{ color: "var(--muted)" }}>
                 sharing: <span style={{ color: "var(--text)" }}>{poll.question}</span>
               </p>
               <textarea
@@ -1468,6 +1509,29 @@ function PollCard({
                 className="w-full text-[14px] px-4 py-3 rounded-2xl outline-none resize-none"
                 style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--border-soft)", color: "var(--text)" }}
               />
+              {sharePhotoPreview ? (
+                <div className="relative rounded-[12px] overflow-hidden" style={{ maxHeight: 200 }}>
+                  <img src={sharePhotoPreview} alt="" className="w-full object-cover" style={{ maxHeight: 200 }} />
+                  <button onClick={() => { setSharePhoto(null); setSharePhotoPreview(null); }}
+                    className="absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold"
+                    style={{ background: "rgba(0,0,0,0.6)", color: "#fff" }}>✕</button>
+                </div>
+              ) : (
+                <label className="flex items-center gap-2 px-4 py-2.5 rounded-2xl cursor-pointer text-[13px] font-semibold w-fit"
+                  style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--border-soft)", color: "var(--muted)" }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
+                    <path d="m21 15-5-5L5 21"/>
+                  </svg>
+                  add photo
+                  <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (!f) return;
+                    setSharePhoto(f);
+                    setSharePhotoPreview(URL.createObjectURL(f));
+                  }} />
+                </label>
+              )}
             </div>
             <div className="px-6 pb-6 flex-shrink-0">
               <button onClick={shareToFeed} disabled={sharing}
