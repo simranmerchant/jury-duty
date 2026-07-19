@@ -198,5 +198,5 @@ export async function GET(req: NextRequest) {
 
   const nextCursor = merged.length === 20 ? merged[merged.length - 1].created_at : null;
 
-  return NextResponse.json({ items: merged, nextCursor, followedIds, _debug: { supportsExploreBetPost, ebpCount: exploreBetPosts?.length ?? -1, ebpError: ebpError?.message ?? null } });
+  return NextResponse.json({ items: merged, nextCursor, followedIds });
 }
