@@ -83,17 +83,13 @@ export async function GET(req: NextRequest) {
     .order("created_at", { ascending: false })
     .limit(25);
 
-  // Simple join — no nested children inside explore_bets to avoid PostgREST
-  // circular-reference issues (explore_bet_posts is itself a child of explore_bets).
-  // Reactions/comments load on-demand in the mobile card.
+  // Two-step approach: fetch posts without join to avoid any PostgREST circular-ref issues,
+  // then look up bet details separately by IDs.
   const exploreBetPostQuery = supabase
     .from("explore_bet_posts")
     .select(`
       id, explore_bet_id, user_id, caption, photo_url, created_at,
-      balances:user_id(display_name, avatar_url, username),
-      explore_bets:explore_bet_id(
-        id, question, option_a, option_b, status, winning_side, closes_at
-      )
+      balances:user_id(display_name, avatar_url, username)
     `)
     .in("user_id", feedUserIds)
     .order("created_at", { ascending: false })
@@ -113,6 +109,17 @@ export async function GET(req: NextRequest) {
     supportsExploreBetPost ? applyCursor(exploreBetPostQuery) : Promise.resolve({ data: [], error: null }),
   ]);
   if (ebpError) console.error("[feed] explore_bet_posts error:", ebpError.message);
+
+  // Fetch the explore_bet details separately to avoid PostgREST join issues
+  const exploreBetMap = new Map<string, any>();
+  if (exploreBetPosts && exploreBetPosts.length > 0) {
+    const betIds = [...new Set(exploreBetPosts.map((p: any) => p.explore_bet_id as string))];
+    const { data: exploreBetRows } = await supabase
+      .from("explore_bets")
+      .select("id, question, option_a, option_b, status, winning_side, closes_at")
+      .in("id", betIds);
+    for (const b of exploreBetRows ?? []) exploreBetMap.set(b.id, b);
+  }
 
   // Suppress bare BetItem when a visible post already exists for that bet
   const sharedBetIds = new Set(
@@ -169,23 +176,20 @@ export async function GET(req: NextRequest) {
   });
 
   const exploreBetPostItems = (exploreBetPosts ?? []).map((ebp: any) => {
-    const bet = ebp.explore_bets as any;
-    if (bet) {
-      // Aggregate fields not available from the simple query — load on-demand in the card
-      ebp.explore_bets = {
-        ...bet,
-        total_pts_a: 0,
-        total_pts_b: 0,
-        total_entries: 0,
-        my_entry: null,
-        like_count: 0,
-        liked_by_me: false,
-        reactions: [],
-        my_reaction: null,
-        comment_count: 0,
-      };
-    }
-    return { type: "explore_bet_post" as const, ...ebp };
+    const bet = exploreBetMap.get(ebp.explore_bet_id as string) ?? null;
+    const explore_bets = bet ? {
+      ...bet,
+      total_pts_a: 0,
+      total_pts_b: 0,
+      total_entries: 0,
+      my_entry: null,
+      like_count: 0,
+      liked_by_me: false,
+      reactions: [],
+      my_reaction: null,
+      comment_count: 0,
+    } : null;
+    return { type: "explore_bet_post" as const, ...ebp, explore_bets };
   });
 
   const merged = [...betItems, ...postItems, ...pollPostItems, ...exploreBetPostItems]
