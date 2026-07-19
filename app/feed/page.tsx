@@ -1068,6 +1068,7 @@ function PollPostCard({
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [carouselPage, setCarouselPage] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -1195,54 +1196,85 @@ function PollPostCard({
         </div>
       </div>
 
-      {item.photo_url && <img src={item.photo_url} alt="" className="w-full rounded-[12px] object-cover" style={{ maxHeight: 300 }} />}
-
-      {item.caption && (
-        <p className="text-[14px] leading-snug" style={{ color: "var(--text)" }}>
-          {item.caption.split(/(@\w+)/g).map((part, i) =>
-            /^@\w+$/.test(part)
-              ? <a key={i} href={`/u/${part.slice(1)}`} style={{ color: "var(--accent)", fontWeight: 600, textDecoration: "none" }}>{part}</a>
-              : part
-          )}
-        </p>
-      )}
-
-      {/* Embedded poll */}
-      <div className="rounded-[12px] p-3 flex flex-col gap-3" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
-        <p className="text-[14px] font-bold leading-snug" style={{ color: "var(--text)" }}>{poll.question}</p>
-        {(["a", "b"] as const).map((side) => {
-          const label = side === "a" ? poll.option_a : poll.option_b;
-          const votes = side === "a" ? votesA : votesB;
-          const pct = side === "a" ? pctA : pctB;
-          const isMyVote = myVote === side;
-          const hasVoted = !!myVote || isClosed;
-          if (!hasVoted) {
-            return (
-              <button key={side} onClick={() => castVote(side)} disabled={voting}
-                className="w-full py-3 px-4 rounded-[10px] text-[14px] font-bold text-left"
-                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: "var(--text)" }}>
-                {label}
-              </button>
-            );
-          }
-          return (
-            <div key={side} className="rounded-[10px] p-2.5 flex flex-col gap-1.5"
-              style={{ background: isMyVote ? "rgba(147,51,234,0.1)" : "rgba(255,255,255,0.03)", border: `1px solid ${isMyVote ? "rgba(147,51,234,0.3)" : "rgba(255,255,255,0.06)"}` }}>
-              <div className="flex items-center justify-between">
-                <span className="text-[13px] font-semibold" style={{ color: isMyVote ? "#a855f7" : "var(--text)" }}>{label}</span>
-                <span className="text-[13px] font-bold" style={{ color: "var(--muted)" }}>{pct}%</span>
+      {/* Carousel: page 1 = poll card, page 2 = photo + caption */}
+      {(() => {
+        const hasMedia = !!item.photo_url;
+        const embeddedPoll = (
+          <div className="rounded-[12px] p-3 flex flex-col gap-3" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+            <p className="text-[14px] font-bold leading-snug" style={{ color: "var(--text)" }}>{poll.question}</p>
+            {(["a", "b"] as const).map((side) => {
+              const label = side === "a" ? poll.option_a : poll.option_b;
+              const votes = side === "a" ? votesA : votesB;
+              const pct = side === "a" ? pctA : pctB;
+              const isMyVote = myVote === side;
+              const hasVoted = !!myVote || isClosed;
+              if (!hasVoted) {
+                return (
+                  <button key={side} onClick={() => castVote(side)} disabled={voting}
+                    className="w-full py-3 px-4 rounded-[10px] text-[14px] font-bold text-left"
+                    style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: "var(--text)" }}>
+                    {label}
+                  </button>
+                );
+              }
+              return (
+                <div key={side} className="rounded-[10px] p-2.5 flex flex-col gap-1.5"
+                  style={{ background: isMyVote ? "rgba(147,51,234,0.1)" : "rgba(255,255,255,0.03)", border: `1px solid ${isMyVote ? "rgba(147,51,234,0.3)" : "rgba(255,255,255,0.06)"}` }}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[13px] font-semibold" style={{ color: isMyVote ? "#a855f7" : "var(--text)" }}>{label}</span>
+                    <span className="text-[13px] font-bold" style={{ color: "var(--muted)" }}>{pct}%</span>
+                  </div>
+                  <div className="rounded-full overflow-hidden" style={{ height: 3, background: "rgba(255,255,255,0.06)" }}>
+                    <div className="h-full rounded-full" style={{ width: `${pct}%`, background: isMyVote ? "#a855f7" : "rgba(255,255,255,0.18)" }} />
+                  </div>
+                  <p className="text-[11px]" style={{ color: "var(--dimmer)" }}>{votes} {votes === 1 ? "vote" : "votes"}</p>
+                </div>
+              );
+            })}
+            <p className="text-[11px]" style={{ color: "var(--dimmer)" }}>
+              {totalVotes} total · {isClosed ? "closed" : poll.closes_at ? `closes ${timeAgo(poll.closes_at)}` : "open"}
+            </p>
+          </div>
+        );
+        if (!hasMedia) return (
+          <>
+            {embeddedPoll}
+            {item.caption && (
+              <p className="text-[14px] leading-snug" style={{ color: "var(--text)" }}>
+                {item.caption.split(/(@\w+)/g).map((part, i) =>
+                  /^@\w+$/.test(part)
+                    ? <a key={i} href={`/u/${part.slice(1)}`} style={{ color: "var(--accent)", fontWeight: 600, textDecoration: "none" }}>{part}</a>
+                    : part
+                )}
+              </p>
+            )}
+          </>
+        );
+        return (
+          <div className="flex flex-col gap-2">
+            <div style={{ display: "flex", overflowX: "auto", width: "100%", scrollSnapType: "x mandatory", scrollbarWidth: "none" } as React.CSSProperties}
+              onScroll={(e) => setCarouselPage(Math.round(e.currentTarget.scrollLeft / e.currentTarget.clientWidth))}>
+              <div style={{ minWidth: "100%", flexShrink: 0, scrollSnapAlign: "start" }}>{embeddedPoll}</div>
+              <div style={{ minWidth: "100%", flexShrink: 0, scrollSnapAlign: "start", display: "flex", flexDirection: "column", gap: 10 }}>
+                {item.photo_url && <img src={item.photo_url} alt="" className="w-full rounded-[12px] object-cover" style={{ maxHeight: 300 }} />}
+                {item.caption && (
+                  <p className="text-[14px] leading-snug" style={{ color: "var(--text)" }}>
+                    {item.caption.split(/(@\w+)/g).map((part, i) =>
+                      /^@\w+$/.test(part)
+                        ? <a key={i} href={`/u/${part.slice(1)}`} style={{ color: "var(--accent)", fontWeight: 600, textDecoration: "none" }}>{part}</a>
+                        : part
+                    )}
+                  </p>
+                )}
               </div>
-              <div className="rounded-full overflow-hidden" style={{ height: 3, background: "rgba(255,255,255,0.06)" }}>
-                <div className="h-full rounded-full" style={{ width: `${pct}%`, background: isMyVote ? "#a855f7" : "rgba(255,255,255,0.18)" }} />
-              </div>
-              <p className="text-[11px]" style={{ color: "var(--dimmer)" }}>{votes} {votes === 1 ? "vote" : "votes"}</p>
             </div>
-          );
-        })}
-        <p className="text-[11px]" style={{ color: "var(--dimmer)" }}>
-          {totalVotes} total · {isClosed ? "closed" : poll.closes_at ? `closes ${timeAgo(poll.closes_at)}` : "open"}
-        </p>
-      </div>
+            <div className="flex justify-center gap-1.5">
+              <div style={{ width: 5, height: 5, borderRadius: "50%", background: carouselPage === 0 ? "#a855f7" : "rgba(255,255,255,0.2)", transition: "background 0.2s" }} />
+              <div style={{ width: 5, height: 5, borderRadius: "50%", background: carouselPage === 1 ? "#a855f7" : "rgba(255,255,255,0.2)", transition: "background 0.2s" }} />
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Reactions + comment */}
       <div className="flex items-center gap-1.5 flex-wrap">
@@ -1355,6 +1387,7 @@ function ExploreBetPostCard({
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [carouselPage, setCarouselPage] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -1468,47 +1501,78 @@ function ExploreBetPostCard({
         </div>
       </div>
 
-      {item.photo_url && <img src={item.photo_url} alt="" className="w-full rounded-[12px] object-cover" style={{ maxHeight: 300 }} />}
-
-      {item.caption && (
-        <p className="text-[14px] leading-snug" style={{ color: "var(--text)" }}>
-          {item.caption.split(/(@\w+)/g).map((part, i) =>
-            /^@\w+$/.test(part)
-              ? <a key={i} href={`/u/${part.slice(1)}`} style={{ color: "var(--accent)", fontWeight: 600, textDecoration: "none" }}>{part}</a>
-              : part
-          )}
-        </p>
-      )}
-
-      {/* Embedded explore bet */}
-      <div className="rounded-[12px] p-3 flex flex-col gap-2" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
-        <p className="text-[14px] font-bold leading-snug" style={{ color: "var(--text)" }}>{bet.question}</p>
-        {(["a", "b"] as const).map((side) => {
-          const label = side === "a" ? bet.option_a : bet.option_b;
-          const pts = side === "a" ? (bet.total_pts_a ?? 0) : (bet.total_pts_b ?? 0);
-          const pct = side === "a" ? pctA : pctB;
-          const isWinner = isResolved && bet.winning_side === side;
-          const isLoss = isResolved && bet.winning_side !== null && bet.winning_side !== side;
-          const isMine = bet.my_entry?.side === side;
-          return (
-            <div key={side} className="rounded-[10px] p-2.5 flex flex-col gap-1.5"
-              style={{ background: isWinner ? "var(--win-dim)" : isLoss ? "var(--loss-dim)" : "rgba(255,255,255,0.03)", border: `1px solid ${isWinner ? "var(--win-border)" : isLoss ? "var(--loss-border)" : "rgba(255,255,255,0.06)"}` }}>
-              <div className="flex items-center justify-between">
-                <span className="text-[13px] font-semibold" style={{ color: isWinner ? "var(--win)" : isLoss ? "var(--loss)" : isMine ? "var(--accent)" : "var(--text)" }}>{label}</span>
-                <span className="text-[13px] font-bold" style={{ color: "var(--muted)" }}>{pct}%</span>
+      {/* Carousel: page 1 = bet card, page 2 = photo + caption */}
+      {(() => {
+        const hasMedia = !!item.photo_url;
+        const embeddedBetCard = (
+          <div className="rounded-[12px] p-3 flex flex-col gap-2" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+            <p className="text-[14px] font-bold leading-snug" style={{ color: "var(--text)" }}>{bet.question}</p>
+            {(["a", "b"] as const).map((side) => {
+              const label = side === "a" ? bet.option_a : bet.option_b;
+              const pts = side === "a" ? (bet.total_pts_a ?? 0) : (bet.total_pts_b ?? 0);
+              const pct = side === "a" ? pctA : pctB;
+              const isWinner = isResolved && bet.winning_side === side;
+              const isLoss = isResolved && bet.winning_side !== null && bet.winning_side !== side;
+              const isMine = bet.my_entry?.side === side;
+              return (
+                <div key={side} className="rounded-[10px] p-2.5 flex flex-col gap-1.5"
+                  style={{ background: isWinner ? "var(--win-dim)" : isLoss ? "var(--loss-dim)" : "rgba(255,255,255,0.03)", border: `1px solid ${isWinner ? "var(--win-border)" : isLoss ? "var(--loss-border)" : "rgba(255,255,255,0.06)"}` }}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[13px] font-semibold" style={{ color: isWinner ? "var(--win)" : isLoss ? "var(--loss)" : isMine ? "var(--accent)" : "var(--text)" }}>{label}</span>
+                    <span className="text-[13px] font-bold" style={{ color: "var(--muted)" }}>{pct}%</span>
+                  </div>
+                  <div className="rounded-full overflow-hidden" style={{ height: 3, background: "rgba(255,255,255,0.06)" }}>
+                    <div className="h-full rounded-full" style={{ width: `${pct}%`, background: isWinner ? "var(--win-border)" : isLoss ? "var(--loss-border)" : isMine ? "var(--accent)" : "rgba(255,255,255,0.18)" }} />
+                  </div>
+                  {pts > 0 && <p className="text-[11px]" style={{ color: "var(--dimmer)" }}>{pts.toLocaleString()} pts</p>}
+                </div>
+              );
+            })}
+            {isResolved && bet.winning_side && (
+              <p className="text-[12px] font-bold" style={{ color: "var(--win)" }}>✓ {bet.winning_side === "a" ? bet.option_a : bet.option_b} won</p>
+            )}
+            <p className="text-[11px]" style={{ color: "var(--dimmer)" }}>{bet.total_entries ?? 0} entries · {totalPts.toLocaleString()} pts</p>
+          </div>
+        );
+        if (!hasMedia) return (
+          <>
+            {embeddedBetCard}
+            {item.caption && (
+              <p className="text-[14px] leading-snug" style={{ color: "var(--text)" }}>
+                {item.caption.split(/(@\w+)/g).map((part, i) =>
+                  /^@\w+$/.test(part)
+                    ? <a key={i} href={`/u/${part.slice(1)}`} style={{ color: "var(--accent)", fontWeight: 600, textDecoration: "none" }}>{part}</a>
+                    : part
+                )}
+              </p>
+            )}
+          </>
+        );
+        return (
+          <div className="flex flex-col gap-2">
+            <div style={{ display: "flex", overflowX: "auto", width: "100%", scrollSnapType: "x mandatory", scrollbarWidth: "none" } as React.CSSProperties}
+              onScroll={(e) => setCarouselPage(Math.round(e.currentTarget.scrollLeft / e.currentTarget.clientWidth))}>
+              <div style={{ minWidth: "100%", flexShrink: 0, scrollSnapAlign: "start" }}>{embeddedBetCard}</div>
+              <div style={{ minWidth: "100%", flexShrink: 0, scrollSnapAlign: "start", display: "flex", flexDirection: "column", gap: 10 }}>
+                {item.photo_url && <img src={item.photo_url} alt="" className="w-full rounded-[12px] object-cover" style={{ maxHeight: 300 }} />}
+                {item.caption && (
+                  <p className="text-[14px] leading-snug" style={{ color: "var(--text)" }}>
+                    {item.caption.split(/(@\w+)/g).map((part, i) =>
+                      /^@\w+$/.test(part)
+                        ? <a key={i} href={`/u/${part.slice(1)}`} style={{ color: "var(--accent)", fontWeight: 600, textDecoration: "none" }}>{part}</a>
+                        : part
+                    )}
+                  </p>
+                )}
               </div>
-              <div className="rounded-full overflow-hidden" style={{ height: 3, background: "rgba(255,255,255,0.06)" }}>
-                <div className="h-full rounded-full" style={{ width: `${pct}%`, background: isWinner ? "var(--win-border)" : isLoss ? "var(--loss-border)" : isMine ? "var(--accent)" : "rgba(255,255,255,0.18)" }} />
-              </div>
-              {pts > 0 && <p className="text-[11px]" style={{ color: "var(--dimmer)" }}>{pts.toLocaleString()} pts</p>}
             </div>
-          );
-        })}
-        {isResolved && bet.winning_side && (
-          <p className="text-[12px] font-bold" style={{ color: "var(--win)" }}>✓ {bet.winning_side === "a" ? bet.option_a : bet.option_b} won</p>
-        )}
-        <p className="text-[11px]" style={{ color: "var(--dimmer)" }}>{bet.total_entries ?? 0} entries · {totalPts.toLocaleString()} pts</p>
-      </div>
+            <div className="flex justify-center gap-1.5">
+              <div style={{ width: 5, height: 5, borderRadius: "50%", background: carouselPage === 0 ? "var(--accent)" : "rgba(255,255,255,0.2)", transition: "background 0.2s" }} />
+              <div style={{ width: 5, height: 5, borderRadius: "50%", background: carouselPage === 1 ? "var(--accent)" : "rgba(255,255,255,0.2)", transition: "background 0.2s" }} />
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Reactions + comment */}
       <div className="flex items-center gap-1.5 flex-wrap">
