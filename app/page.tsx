@@ -10,7 +10,7 @@ export default function Home() {
 
   useEffect(() => {
     if (!ready) return;
-    router.replace(authenticated ? "/feed" : "/login");
+    router.replace(authenticated ? "/events" : "/login");
   }, [ready, authenticated, router]);
 
   return null;
