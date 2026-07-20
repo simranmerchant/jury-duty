@@ -1067,12 +1067,6 @@ function ExploreBetCard({
               </div>
             )}
           </div>
-          {bet.followed_entries.length > 0 && (
-            <p className="text-[11px]" style={{ color: "var(--dimmer)" }}>
-              {bet.followed_entries.slice(0, 2).map((e) => e.bettor?.display_name ?? e.bettor?.username ?? "someone").join(", ")}
-              {bet.followed_entries.length > 2 ? ` +${bet.followed_entries.length - 2} more` : ""} bet
-            </p>
-          )}
         </div>
       )}
 
