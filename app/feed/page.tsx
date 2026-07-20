@@ -71,6 +71,8 @@ type FeedExploreBetPost = {
     reactions: { emoji: string; count: number }[];
     my_reaction: string | null;
     comment_count: number;
+    like_count: number;
+    liked_by_me: boolean;
     followed_entries: { user_id: string; side: "a" | "b"; bettor: { display_name: string; username: string; avatar_url: string | null } | null }[];
     other_entry_count: number;
   } | null;
@@ -1443,6 +1445,8 @@ function ExploreBetPostCard({
 
   const [myReaction, setMyReaction] = useState(bet?.my_reaction ?? null);
   const [reactions, setReactions] = useState<{ emoji: string; count: number }[]>(bet?.reactions ?? []);
+  const [liked, setLiked] = useState(bet?.liked_by_me ?? false);
+  const [likeCount, setLikeCount] = useState(bet?.like_count ?? 0);
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState<PostComment[]>([]);
   const [commentCount, setCommentCount] = useState(bet?.comment_count ?? 0);
@@ -1488,6 +1492,16 @@ function ExploreBetPostCard({
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       body: JSON.stringify({ emoji }),
+    });
+  }
+
+  async function toggleLike() {
+    const token = await getAccessToken();
+    setLiked((l) => !l);
+    setLikeCount((c) => liked ? c - 1 : c + 1);
+    await fetch(`/api/v1/explore-bets/${bet!.id}/like`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
     });
   }
 
@@ -1678,41 +1692,27 @@ function ExploreBetPostCard({
         );
       })()}
 
-      {/* Footer: entries + reactions + comment */}
+      {/* Footer: entries + like + comment */}
       <div className="flex items-center justify-between pt-2.5 mt-0.5" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
         <span className="text-[11px]" style={{ color: "var(--muted)" }}>
           {bet.total_entries ?? 0} {(bet.total_entries ?? 0) === 1 ? "entry" : "entries"}
           {((bet.total_pts_a ?? 0) + (bet.total_pts_b ?? 0)) > 0 ? ` · ${((bet.total_pts_a ?? 0) + (bet.total_pts_b ?? 0)).toLocaleString()} pts` : ""}
         </span>
         <div className="flex items-center gap-1.5">
-          {reactions.filter((r) => r.count > 0).map((r) => (
-            <button key={r.emoji} onClick={() => toggleReaction(r.emoji)}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[12px] font-semibold"
-              style={{ background: myReaction === r.emoji ? "var(--accent-dim)" : "rgba(255,255,255,0.04)", border: `1px solid ${myReaction === r.emoji ? "var(--accent-border)" : "rgba(255,255,255,0.06)"}`, color: myReaction === r.emoji ? "var(--accent)" : "var(--muted)" }}>
-              {r.emoji}<span className="ml-0.5">{r.count}</span>
-            </button>
-          ))}
-          <div className="relative">
-            <button onClick={() => setShowEmojiPicker((s) => !s)}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[12px] font-semibold"
-              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", color: "var(--muted)" }}>
-              ＋
-            </button>
-            {showEmojiPicker && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setShowEmojiPicker(false)} />
-                <div className="absolute right-0 bottom-9 z-50 flex gap-1.5 px-3 py-2 rounded-2xl shadow-lg" style={{ background: "var(--card)", border: "1px solid var(--border-soft)" }}>
-                  {EMOJIS.map((emoji) => (
-                    <button key={emoji} onClick={() => { toggleReaction(emoji); setShowEmojiPicker(false); }}
-                      className="text-[18px] leading-none px-1 py-0.5 rounded-lg"
-                      style={{ background: myReaction === emoji ? "var(--accent-dim)" : "transparent" }}>
-                      {emoji}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
+          <button
+            onClick={toggleLike}
+            className="flex items-center gap-1.5 text-[12px] font-bold px-2.5 py-1 rounded-full transition-colors"
+            style={{
+              color: liked ? "var(--accent)" : "var(--muted)",
+              background: liked ? "var(--accent-dim)" : "rgba(255,255,255,0.04)",
+              border: `1px solid ${liked ? "var(--accent-border)" : "rgba(255,255,255,0.06)"}`,
+            }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill={liked ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+            </svg>
+            {likeCount > 0 ? likeCount : "like"}
+          </button>
           <button
             onClick={() => { if (!showComments) fetchComments(); setShowComments(true); }}
             className="flex items-center gap-1.5 text-[12px] font-bold px-2.5 py-1 rounded-full"

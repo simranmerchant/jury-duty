@@ -120,7 +120,8 @@ export async function GET(req: NextRequest) {
         id, question, option_a, option_b, status, winning_side, closes_at,
         explore_bet_entries(user_id, side, points_wagered, bettor:user_id(display_name, username, avatar_url)),
         explore_bet_reactions(user_id, emoji),
-        explore_bet_comments(id)
+        explore_bet_comments(id),
+        explore_bet_likes(user_id)
       `)
       .in("id", betIds);
     const followedSet = new Set(followedIds);
@@ -132,6 +133,7 @@ export async function GET(req: NextRequest) {
       const rawReactions = (b.explore_bet_reactions ?? []) as Array<{ user_id: string; emoji: string }>;
       const reactionCounts: Record<string, number> = {};
       for (const r of rawReactions) reactionCounts[r.emoji] = (reactionCounts[r.emoji] ?? 0) + 1;
+      const likesArr = (b.explore_bet_likes ?? []) as Array<{ user_id: string }>;
       exploreBetMap.set(b.id, {
         id: b.id, question: b.question, option_a: b.option_a, option_b: b.option_b,
         status: b.status, winning_side: b.winning_side, closes_at: b.closes_at,
@@ -140,6 +142,8 @@ export async function GET(req: NextRequest) {
         reactions: Object.entries(reactionCounts).map(([emoji, count]) => ({ emoji, count })),
         my_reaction: rawReactions.find((r) => r.user_id === user.userId)?.emoji ?? null,
         comment_count: (b.explore_bet_comments ?? []).length,
+        like_count: likesArr.length,
+        liked_by_me: likesArr.some((l) => l.user_id === user.userId),
         followed_entries: entries
           .filter((e) => e.user_id !== user.userId && followedSet.has(e.user_id))
           .map((e) => ({ user_id: e.user_id, side: e.side as "a" | "b", bettor: e.bettor })),
