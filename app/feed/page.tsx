@@ -586,6 +586,7 @@ function PostCard({
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [voterSheet, setVoterSheet] = useState<{ label: string; voters: EmbeddedBet["bet_entries"] } | null>(null);
   const [carouselPage, setCarouselPage] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -727,10 +728,26 @@ function PostCard({
             <div className="relative" ref={menuRef}>
               <button onClick={() => setShowMenu((s) => !s)} className="w-7 h-7 flex items-center justify-center rounded-full text-[15px] font-bold" style={{ color: "var(--muted)" }}>···</button>
               {showMenu && (
-                <div className="absolute right-0 top-8 z-10 rounded-[12px] overflow-hidden shadow-lg" style={{ background: "var(--card)", border: "1px solid var(--border-soft)", minWidth: 130 }}>
-                  <button onClick={deletePost} disabled={deleting} className="w-full px-4 py-3 text-left text-[13px] font-semibold" style={{ color: "var(--accent)" }}>
-                    {deleting ? "deleting…" : "delete post"}
-                  </button>
+                <div className="absolute right-0 top-8 z-10 rounded-[12px] shadow-lg" style={{ background: "var(--card)", border: "1px solid var(--border-soft)", minWidth: 150 }}>
+                  {confirmDelete ? (
+                    <div className="px-4 py-2.5 flex flex-col gap-2">
+                      <p className="text-[12px] font-semibold" style={{ color: "var(--muted)" }}>delete this post?</p>
+                      <div className="flex gap-2">
+                        <button onClick={() => { setShowMenu(false); setConfirmDelete(false); deletePost(); }} disabled={deleting}
+                          className="flex-1 py-1.5 rounded-lg text-[12px] font-bold" style={{ background: "var(--loss)", color: "#fff" }}>
+                          delete
+                        </button>
+                        <button onClick={() => setConfirmDelete(false)}
+                          className="flex-1 py-1.5 rounded-lg text-[12px] font-bold" style={{ background: "rgba(255,255,255,0.08)", color: "var(--muted)" }}>
+                          cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button onClick={() => setConfirmDelete(true)} className="w-full px-4 py-3 text-left text-[13px] font-semibold" style={{ color: "var(--accent)" }}>
+                      delete post
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -1073,6 +1090,7 @@ function PollPostCard({
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [carouselPage, setCarouselPage] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -1191,10 +1209,26 @@ function PollPostCard({
             <div className="relative" ref={menuRef}>
               <button onClick={() => setShowMenu((s) => !s)} className="w-7 h-7 flex items-center justify-center rounded-full text-[15px] font-bold" style={{ color: "var(--muted)" }}>···</button>
               {showMenu && (
-                <div className="absolute right-0 top-8 z-10 rounded-[12px] overflow-hidden shadow-lg" style={{ background: "var(--card)", border: "1px solid var(--border-soft)", minWidth: 130 }}>
-                  <button onClick={deletePost} disabled={deleting} className="w-full px-4 py-3 text-left text-[13px] font-semibold" style={{ color: "var(--accent)" }}>
-                    {deleting ? "deleting…" : "delete post"}
-                  </button>
+                <div className="absolute right-0 top-8 z-10 rounded-[12px] shadow-lg" style={{ background: "var(--card)", border: "1px solid var(--border-soft)", minWidth: 150 }}>
+                  {confirmDelete ? (
+                    <div className="px-4 py-2.5 flex flex-col gap-2">
+                      <p className="text-[12px] font-semibold" style={{ color: "var(--muted)" }}>delete this post?</p>
+                      <div className="flex gap-2">
+                        <button onClick={() => { setShowMenu(false); setConfirmDelete(false); deletePost(); }} disabled={deleting}
+                          className="flex-1 py-1.5 rounded-lg text-[12px] font-bold" style={{ background: "var(--loss)", color: "#fff" }}>
+                          delete
+                        </button>
+                        <button onClick={() => setConfirmDelete(false)}
+                          className="flex-1 py-1.5 rounded-lg text-[12px] font-bold" style={{ background: "rgba(255,255,255,0.08)", color: "var(--muted)" }}>
+                          cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button onClick={() => setConfirmDelete(true)} className="w-full px-4 py-3 text-left text-[13px] font-semibold" style={{ color: "var(--accent)" }}>
+                      delete post
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -1417,6 +1451,7 @@ function ExploreBetPostCard({
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [carouselPage, setCarouselPage] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -1521,10 +1556,26 @@ function ExploreBetPostCard({
             <div className="relative" ref={menuRef}>
               <button onClick={() => setShowMenu((s) => !s)} className="w-7 h-7 flex items-center justify-center rounded-full text-[15px] font-bold" style={{ color: "var(--muted)" }}>···</button>
               {showMenu && (
-                <div className="absolute right-0 top-8 z-10 rounded-[12px] overflow-hidden shadow-lg" style={{ background: "var(--card)", border: "1px solid var(--border-soft)", minWidth: 130 }}>
-                  <button onClick={deletePost} disabled={deleting} className="w-full px-4 py-3 text-left text-[13px] font-semibold" style={{ color: "var(--accent)" }}>
-                    {deleting ? "deleting…" : "delete post"}
-                  </button>
+                <div className="absolute right-0 top-8 z-10 rounded-[12px] shadow-lg" style={{ background: "var(--card)", border: "1px solid var(--border-soft)", minWidth: 150 }}>
+                  {confirmDelete ? (
+                    <div className="px-4 py-2.5 flex flex-col gap-2">
+                      <p className="text-[12px] font-semibold" style={{ color: "var(--muted)" }}>delete this post?</p>
+                      <div className="flex gap-2">
+                        <button onClick={() => { setShowMenu(false); setConfirmDelete(false); deletePost(); }} disabled={deleting}
+                          className="flex-1 py-1.5 rounded-lg text-[12px] font-bold" style={{ background: "var(--loss)", color: "#fff" }}>
+                          delete
+                        </button>
+                        <button onClick={() => setConfirmDelete(false)}
+                          className="flex-1 py-1.5 rounded-lg text-[12px] font-bold" style={{ background: "rgba(255,255,255,0.08)", color: "var(--muted)" }}>
+                          cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button onClick={() => setConfirmDelete(true)} className="w-full px-4 py-3 text-left text-[13px] font-semibold" style={{ color: "var(--accent)" }}>
+                      delete post
+                    </button>
+                  )}
                 </div>
               )}
             </div>

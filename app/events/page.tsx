@@ -828,6 +828,7 @@ function ExploreBetCard({
   const [submitting, setSubmitting] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const isOpen = bet.status === "open" && (!bet.closes_at || new Date(bet.closes_at) > new Date());
   const myEntry = bet.my_entry;
@@ -1096,15 +1097,31 @@ function ExploreBetCard({
             </button>
             {showMenu && (
               <>
-                <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
-                <div className="absolute left-0 top-9 z-50 rounded-[12px] py-1 min-w-[130px]"
+                <div className="fixed inset-0 z-40" onClick={() => { setShowMenu(false); setConfirmDelete(false); }} />
+                <div className="absolute left-0 top-9 z-50 rounded-[12px] py-1 min-w-[150px]"
                   style={{ background: "var(--card)", border: "1px solid var(--border-soft)", boxShadow: "0 8px 24px rgba(0,0,0,0.4)" }}>
                   {bet.is_mine ? (
-                    <button onClick={() => { setShowMenu(false); deleteBet(); }}
-                      className="w-full text-left px-4 py-2.5 text-[13px] font-semibold"
-                      style={{ color: "var(--loss)" }}>
-                      delete
-                    </button>
+                    confirmDelete ? (
+                      <div className="px-4 py-2.5 flex flex-col gap-2">
+                        <p className="text-[12px] font-semibold" style={{ color: "var(--muted)" }}>delete this prediction?</p>
+                        <div className="flex gap-2">
+                          <button onClick={() => { setShowMenu(false); setConfirmDelete(false); deleteBet(); }}
+                            className="flex-1 py-1.5 rounded-lg text-[12px] font-bold" style={{ background: "var(--loss)", color: "#fff" }}>
+                            delete
+                          </button>
+                          <button onClick={() => setConfirmDelete(false)}
+                            className="flex-1 py-1.5 rounded-lg text-[12px] font-bold" style={{ background: "rgba(255,255,255,0.08)", color: "var(--muted)" }}>
+                            cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button onClick={() => setConfirmDelete(true)}
+                        className="w-full text-left px-4 py-2.5 text-[13px] font-semibold"
+                        style={{ color: "var(--loss)" }}>
+                        delete
+                      </button>
+                    )
                   ) : (
                     <p className="px-4 py-2.5 text-[12px]" style={{ color: "var(--dimmer)" }}>no options</p>
                   )}
@@ -1319,6 +1336,7 @@ function PollCard({
   const [submitting, setSubmitting] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const isClosed = poll.closes_at ? new Date(poll.closes_at) < new Date() : false;
   const hasVoted = !!poll.my_vote;
@@ -1540,15 +1558,31 @@ function PollCard({
             </button>
             {showMenu && (
               <>
-                <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
-                <div className="absolute left-0 top-9 z-50 rounded-[12px] py-1 min-w-[130px]"
+                <div className="fixed inset-0 z-40" onClick={() => { setShowMenu(false); setConfirmDelete(false); }} />
+                <div className="absolute left-0 top-9 z-50 rounded-[12px] py-1 min-w-[150px]"
                   style={{ background: "var(--card)", border: "1px solid var(--border-soft)", boxShadow: "0 8px 24px rgba(0,0,0,0.4)" }}>
                   {poll.is_mine ? (
-                    <button onClick={() => { setShowMenu(false); deletePoll(); }}
-                      className="w-full text-left px-4 py-2.5 text-[13px] font-semibold"
-                      style={{ color: "var(--loss)" }}>
-                      delete
-                    </button>
+                    confirmDelete ? (
+                      <div className="px-4 py-2.5 flex flex-col gap-2">
+                        <p className="text-[12px] font-semibold" style={{ color: "var(--muted)" }}>delete this poll?</p>
+                        <div className="flex gap-2">
+                          <button onClick={() => { setShowMenu(false); setConfirmDelete(false); deletePoll(); }}
+                            className="flex-1 py-1.5 rounded-lg text-[12px] font-bold" style={{ background: "var(--loss)", color: "#fff" }}>
+                            delete
+                          </button>
+                          <button onClick={() => setConfirmDelete(false)}
+                            className="flex-1 py-1.5 rounded-lg text-[12px] font-bold" style={{ background: "rgba(255,255,255,0.08)", color: "var(--muted)" }}>
+                            cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button onClick={() => setConfirmDelete(true)}
+                        className="w-full text-left px-4 py-2.5 text-[13px] font-semibold"
+                        style={{ color: "var(--loss)" }}>
+                        delete
+                      </button>
+                    )
                   ) : (
                     <p className="px-4 py-2.5 text-[12px]" style={{ color: "var(--dimmer)" }}>no options</p>
                   )}

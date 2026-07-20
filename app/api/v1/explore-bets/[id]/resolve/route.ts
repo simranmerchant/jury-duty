@@ -30,8 +30,9 @@ export async function POST(
     .eq("id", id)
     .single();
 
+  const ADMIN_ID = "did:privy:cmng3anf401zu0cibp1adsvn3";
   if (!bet) return NextResponse.json({ error: "not found" }, { status: 404 });
-  if (bet.creator_id !== user.userId) return NextResponse.json({ error: "only the creator can resolve" }, { status: 403 });
+  if (bet.creator_id !== user.userId && user.userId !== ADMIN_ID) return NextResponse.json({ error: "only the creator can resolve" }, { status: 403 });
   if (bet.status === "resolved") return NextResponse.json({ error: "already resolved" }, { status: 422 });
 
   const { data: entries } = await supabase
