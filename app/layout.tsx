@@ -3,6 +3,7 @@ import { Nunito, DM_Sans } from "next/font/google";
 import "./globals.css";
 import Providers from "./providers";
 import InstallPrompt from "./install-prompt";
+import UpdatePrompt from "./update-prompt";
 
 const nunito = Nunito({
   variable: "--font-nunito",
@@ -65,6 +66,7 @@ export default function RootLayout({
           />
           <Providers>{children}</Providers>
           <InstallPrompt />
+          <UpdatePrompt />
         </body>
     </html>
   );

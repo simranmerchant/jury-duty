@@ -32,7 +32,7 @@ function isSnoozed(): boolean {
 }
 
 export default function InstallPrompt() {
-  const { ready, authenticated } = usePrivy();
+  const { ready, authenticated, getAccessToken } = usePrivy();
   const pathname = usePathname();
   const [step, setStep] = useState<Step>("done");
   const [platform, setPlatform] = useState<Platform>(null);
@@ -43,18 +43,22 @@ export default function InstallPrompt() {
     if (pathname === "/onboarding") return;
 
     const plat = detectPlatform();
-    if (!plat) return; // desktop — never show
-
     const installed = isStandalone();
     const notifGranted = "Notification" in window && Notification.permission === "granted";
 
-    // Fully set up — nothing to do
-    if (installed && notifGranted) return;
+    // Already fully set up — nothing to do
+    if (notifGranted) return;
 
     // Snoozed — respect the cooldown
     if (isSnoozed()) return;
 
     setPlatform(plat);
+
+    if (!plat) {
+      // Desktop — skip install step, just prompt for notifications after 3s
+      const t = setTimeout(() => setStep("push"), 3000);
+      return () => clearTimeout(t);
+    }
 
     if (installed) {
       // Already on home screen, just need push permission
@@ -117,12 +121,14 @@ export default function InstallPrompt() {
           userVisibleOnly: true,
           applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
         });
-        await fetch("/api/v1/me/web-push-subscription", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(sub.toJSON()),
-        });
-        // Fully set up — clear snooze so we never show again
+        const token = await getAccessToken();
+        if (token) {
+          await fetch("/api/v1/me/web-push-subscription", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify(sub.toJSON()),
+          });
+        }
         localStorage.removeItem("install-snoozed-until");
         setStep("done");
         return;
