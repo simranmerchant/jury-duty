@@ -58,29 +58,26 @@ export async function POST(
     )
   );
 
-  // Push notifications
+  // In-app + push notifications
   const allUserIds = [...new Set(allEntries.map((e) => e.user_id))];
   if (allUserIds.length > 0) {
+    const notifData = { explore_bet_id: id };
     if (winning_side === null) {
-      await sendPushToUsers(allUserIds, {
-        title: "case dismissed",
-        body: `"${bet.question}" was called off — you've been refunded`,
-        data: { explore_bet_id: id },
-      });
+      const payload = { title: "case dismissed", body: `"${bet.question}" was called off — you've been refunded` };
+      await Promise.all([
+        supabase.from("notifications").insert(allUserIds.map((uid) => ({ user_id: uid, type: "explore_bet_resolved", ...payload, data: notifData }))),
+        sendPushToUsers(allUserIds, { ...payload, data: notifData }),
+      ]);
     } else {
       const winnerIds = allEntries.filter((e) => e.side === winning_side).map((e) => e.user_id);
       const loserIds = allUserIds.filter((uid) => !winnerIds.includes(uid));
+      const winPayload = { title: "jury's in — you won 🎉", body: `you called it on "${bet.question}"` };
+      const losePayload = { title: "jury's in — you lost 💀", body: `the jury has spoken on "${bet.question}"` };
       await Promise.all([
-        winnerIds.length > 0 && sendPushToUsers(winnerIds, {
-          title: "jury's in — you won 🎉",
-          body: `you called it on "${bet.question}"`,
-          data: { explore_bet_id: id },
-        }),
-        loserIds.length > 0 && sendPushToUsers(loserIds, {
-          title: "jury's in — you lost 💀",
-          body: `the jury has spoken on "${bet.question}"`,
-          data: { explore_bet_id: id },
-        }),
+        winnerIds.length > 0 && supabase.from("notifications").insert(winnerIds.map((uid) => ({ user_id: uid, type: "explore_bet_resolved", ...winPayload, data: notifData }))),
+        loserIds.length > 0 && supabase.from("notifications").insert(loserIds.map((uid) => ({ user_id: uid, type: "explore_bet_resolved", ...losePayload, data: notifData }))),
+        winnerIds.length > 0 && sendPushToUsers(winnerIds, { ...winPayload, data: notifData }),
+        loserIds.length > 0 && sendPushToUsers(loserIds, { ...losePayload, data: notifData }),
       ]);
     }
   }
