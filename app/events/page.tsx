@@ -820,6 +820,10 @@ function ExploreBetCard({
   const [sharePhoto, setSharePhoto] = useState<File | null>(null);
   const [sharePhotoPreview, setSharePhotoPreview] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
+  const [shareAudience, setShareAudience] = useState<"all" | "select">("all");
+  const [selectedFollowers, setSelectedFollowers] = useState<string[]>([]);
+  const [followers, setFollowers] = useState<{ user_id: string; display_name: string | null; username: string | null; avatar_url: string | null }[]>([]);
+  const [followersLoaded, setFollowersLoaded] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState<PostComment[]>([]);
   const [commentCount, setCommentCount] = useState(bet.comment_count);
@@ -885,6 +889,15 @@ function ExploreBetCard({
     });
   }
 
+  async function loadFollowers() {
+    if (followersLoaded) return;
+    const token = await getAccessToken();
+    const res = await fetch("/api/v1/me/followers", { headers: { Authorization: `Bearer ${token}` } });
+    const data = await res.json().catch(() => ({}));
+    setFollowers(data.followers ?? []);
+    setFollowersLoaded(true);
+  }
+
   async function shareToFeed() {
     setSharing(true);
     const token = await getAccessToken();
@@ -895,15 +908,17 @@ function ExploreBetCard({
       const uploadRes = await fetch("/api/v1/posts/upload", { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd });
       if (uploadRes.ok) { const d = await uploadRes.json(); photoUrl = d.photo_url ?? null; }
     }
+    const targeted = shareAudience === "select" && selectedFollowers.length > 0 ? selectedFollowers : undefined;
     const res = await fetch(`/api/v1/explore-bets/${bet.id}/post`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ caption: shareCaption.trim() || null, photo_url: photoUrl }),
+      body: JSON.stringify({ caption: shareCaption.trim() || null, photo_url: photoUrl, targeted_user_ids: targeted }),
     });
     if (res.ok) {
       setBet((b) => ({ ...b, my_post: { id: "", caption: shareCaption.trim() || null, photo_url: photoUrl } }));
       setShowShare(false);
       setShareCaption(""); setSharePhoto(null); setSharePhotoPreview(null);
+      setShareAudience("all"); setSelectedFollowers([]);
     }
     setSharing(false);
   }
@@ -1193,16 +1208,56 @@ function ExploreBetCard({
 
       {showShare && (
         <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,0.6)" }}
-          onClick={(e) => { if (e.target === e.currentTarget) { setShowShare(false); setSharePhoto(null); setSharePhotoPreview(null); } }}>
+          onClick={(e) => { if (e.target === e.currentTarget) { setShowShare(false); setSharePhoto(null); setSharePhotoPreview(null); setShareAudience("all"); setSelectedFollowers([]); } }}>
           <div className="w-full max-w-lg rounded-t-3xl flex flex-col" style={{ background: "var(--card)", border: "1px solid var(--border-soft)", maxHeight: "88vh" }}>
             <div className="px-6 pt-5 pb-3 flex items-center justify-between flex-shrink-0" style={{ borderBottom: "1px solid var(--border-soft)" }}>
               <p className="font-extrabold text-[16px]" style={{ fontFamily: "var(--font-nunito)" }}>share to feed</p>
-              <button onClick={() => { setShowShare(false); setSharePhoto(null); setSharePhotoPreview(null); }} className="text-[14px] font-bold" style={{ color: "var(--dimmer)" }}>cancel</button>
+              <button onClick={() => { setShowShare(false); setSharePhoto(null); setSharePhotoPreview(null); setShareAudience("all"); setSelectedFollowers([]); }} className="text-[14px] font-bold" style={{ color: "var(--dimmer)" }}>cancel</button>
             </div>
             <div className="flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-3">
               <p className="text-[13px] font-semibold" style={{ color: "var(--muted)" }}>
                 sharing: <span style={{ color: "var(--text)" }}>{bet.question}</span>
               </p>
+              {/* Audience */}
+              <div className="flex gap-2">
+                <button onClick={() => setShareAudience("all")} className="flex-1 py-2 rounded-[10px] text-[13px] font-bold"
+                  style={{ background: shareAudience === "all" ? "var(--accent-dim)" : "rgba(255,255,255,0.04)", border: `1px solid ${shareAudience === "all" ? "var(--accent-border)" : "rgba(255,255,255,0.06)"}`, color: shareAudience === "all" ? "var(--accent)" : "var(--muted)" }}>
+                  all followers
+                </button>
+                <button onClick={() => { setShareAudience("select"); loadFollowers(); }} className="flex-1 py-2 rounded-[10px] text-[13px] font-bold"
+                  style={{ background: shareAudience === "select" ? "var(--accent-dim)" : "rgba(255,255,255,0.04)", border: `1px solid ${shareAudience === "select" ? "var(--accent-border)" : "rgba(255,255,255,0.06)"}`, color: shareAudience === "select" ? "var(--accent)" : "var(--muted)" }}>
+                  select people
+                </button>
+              </div>
+              {shareAudience === "select" && (
+                <div className="flex flex-col gap-1" style={{ maxHeight: 160, overflowY: "auto" }}>
+                  {!followersLoaded ? (
+                    <p className="text-[12px] text-center py-3" style={{ color: "var(--dimmer)" }}>loading...</p>
+                  ) : followers.length === 0 ? (
+                    <p className="text-[12px] text-center py-3" style={{ color: "var(--dimmer)" }}>no followers yet</p>
+                  ) : followers.map((f) => {
+                    const name = f.display_name ?? f.username ?? "someone";
+                    const selected = selectedFollowers.includes(f.user_id);
+                    return (
+                      <button key={f.user_id} onClick={() => setSelectedFollowers((s) => selected ? s.filter((id) => id !== f.user_id) : [...s, f.user_id])}
+                        className="flex items-center gap-2.5 px-3 py-2 rounded-[10px] text-left"
+                        style={{ background: selected ? "var(--accent-dim)" : "rgba(255,255,255,0.02)", border: `1px solid ${selected ? "var(--accent-border)" : "rgba(255,255,255,0.05)"}` }}>
+                        <div className="w-7 h-7 rounded-full flex-shrink-0 overflow-hidden flex items-center justify-center text-[11px] font-black" style={{ background: "var(--accent-dim)", color: "var(--accent)" }}>
+                          {f.avatar_url ? <img src={f.avatar_url} alt="" className="w-full h-full object-cover" /> : name[0]?.toUpperCase()}
+                        </div>
+                        <span className="text-[13px] font-semibold flex-1" style={{ color: "var(--text)" }}>{name}</span>
+                        {f.username && <span className="text-[11px]" style={{ color: "var(--dimmer)" }}>@{f.username}</span>}
+                        <div className="w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: selected ? "var(--accent)" : "rgba(255,255,255,0.08)", border: `1px solid ${selected ? "var(--accent)" : "rgba(255,255,255,0.12)"}` }}>
+                          {selected && <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              {shareAudience === "select" && selectedFollowers.length > 0 && (
+                <p className="text-[11px]" style={{ color: "var(--dimmer)" }}>{selectedFollowers.length} {selectedFollowers.length === 1 ? "person" : "people"} selected</p>
+              )}
               <textarea
                 value={shareCaption}
                 onChange={(e) => setShareCaption(e.target.value)}
@@ -1328,6 +1383,10 @@ function PollCard({
   const [sharePhoto, setSharePhoto] = useState<File | null>(null);
   const [sharePhotoPreview, setSharePhotoPreview] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
+  const [shareAudience, setShareAudience] = useState<"all" | "select">("all");
+  const [selectedFollowers, setSelectedFollowers] = useState<string[]>([]);
+  const [followers, setFollowers] = useState<{ user_id: string; display_name: string | null; username: string | null; avatar_url: string | null }[]>([]);
+  const [followersLoaded, setFollowersLoaded] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState<PostComment[]>([]);
   const [commentCount, setCommentCount] = useState(poll.comment_count);
@@ -1390,6 +1449,15 @@ function PollCard({
     });
   }
 
+  async function loadFollowers() {
+    if (followersLoaded) return;
+    const token = await getAccessToken();
+    const res = await fetch("/api/v1/me/followers", { headers: { Authorization: `Bearer ${token}` } });
+    const data = await res.json().catch(() => ({}));
+    setFollowers(data.followers ?? []);
+    setFollowersLoaded(true);
+  }
+
   async function shareToFeed() {
     setSharing(true);
     const token = await getAccessToken();
@@ -1400,15 +1468,17 @@ function PollCard({
       const uploadRes = await fetch("/api/v1/posts/upload", { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd });
       if (uploadRes.ok) { const d = await uploadRes.json(); photoUrl = d.photo_url ?? null; }
     }
+    const targeted = shareAudience === "select" && selectedFollowers.length > 0 ? selectedFollowers : undefined;
     const res = await fetch(`/api/v1/polls/${poll.id}/post`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ caption: shareCaption.trim() || null, photo_url: photoUrl }),
+      body: JSON.stringify({ caption: shareCaption.trim() || null, photo_url: photoUrl, targeted_user_ids: targeted }),
     });
     if (res.ok) {
       setPoll((p) => ({ ...p, my_post: { caption: shareCaption.trim() || null, photo_url: photoUrl } }));
       setShowShare(false);
       setShareCaption(""); setSharePhoto(null); setSharePhotoPreview(null);
+      setShareAudience("all"); setSelectedFollowers([]);
     }
     setSharing(false);
   }
@@ -1629,16 +1699,56 @@ function PollCard({
 
       {showShare && (
         <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,0.6)" }}
-          onClick={(e) => { if (e.target === e.currentTarget) { setShowShare(false); setSharePhoto(null); setSharePhotoPreview(null); } }}>
+          onClick={(e) => { if (e.target === e.currentTarget) { setShowShare(false); setSharePhoto(null); setSharePhotoPreview(null); setShareAudience("all"); setSelectedFollowers([]); } }}>
           <div className="w-full max-w-lg rounded-t-3xl flex flex-col" style={{ background: "var(--card)", border: "1px solid var(--border-soft)", maxHeight: "88vh" }}>
             <div className="px-6 pt-5 pb-3 flex items-center justify-between flex-shrink-0" style={{ borderBottom: "1px solid var(--border-soft)" }}>
               <p className="font-extrabold text-[16px]" style={{ fontFamily: "var(--font-nunito)" }}>share to feed</p>
-              <button onClick={() => { setShowShare(false); setSharePhoto(null); setSharePhotoPreview(null); }} className="text-[14px] font-bold" style={{ color: "var(--dimmer)" }}>cancel</button>
+              <button onClick={() => { setShowShare(false); setSharePhoto(null); setSharePhotoPreview(null); setShareAudience("all"); setSelectedFollowers([]); }} className="text-[14px] font-bold" style={{ color: "var(--dimmer)" }}>cancel</button>
             </div>
             <div className="flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-3">
               <p className="text-[13px] font-semibold" style={{ color: "var(--muted)" }}>
                 sharing: <span style={{ color: "var(--text)" }}>{poll.question}</span>
               </p>
+              {/* Audience */}
+              <div className="flex gap-2">
+                <button onClick={() => setShareAudience("all")} className="flex-1 py-2 rounded-[10px] text-[13px] font-bold"
+                  style={{ background: shareAudience === "all" ? "var(--accent-dim)" : "rgba(255,255,255,0.04)", border: `1px solid ${shareAudience === "all" ? "var(--accent-border)" : "rgba(255,255,255,0.06)"}`, color: shareAudience === "all" ? "var(--accent)" : "var(--muted)" }}>
+                  all followers
+                </button>
+                <button onClick={() => { setShareAudience("select"); loadFollowers(); }} className="flex-1 py-2 rounded-[10px] text-[13px] font-bold"
+                  style={{ background: shareAudience === "select" ? "var(--accent-dim)" : "rgba(255,255,255,0.04)", border: `1px solid ${shareAudience === "select" ? "var(--accent-border)" : "rgba(255,255,255,0.06)"}`, color: shareAudience === "select" ? "var(--accent)" : "var(--muted)" }}>
+                  select people
+                </button>
+              </div>
+              {shareAudience === "select" && (
+                <div className="flex flex-col gap-1" style={{ maxHeight: 160, overflowY: "auto" }}>
+                  {!followersLoaded ? (
+                    <p className="text-[12px] text-center py-3" style={{ color: "var(--dimmer)" }}>loading...</p>
+                  ) : followers.length === 0 ? (
+                    <p className="text-[12px] text-center py-3" style={{ color: "var(--dimmer)" }}>no followers yet</p>
+                  ) : followers.map((f) => {
+                    const name = f.display_name ?? f.username ?? "someone";
+                    const selected = selectedFollowers.includes(f.user_id);
+                    return (
+                      <button key={f.user_id} onClick={() => setSelectedFollowers((s) => selected ? s.filter((id) => id !== f.user_id) : [...s, f.user_id])}
+                        className="flex items-center gap-2.5 px-3 py-2 rounded-[10px] text-left"
+                        style={{ background: selected ? "var(--accent-dim)" : "rgba(255,255,255,0.02)", border: `1px solid ${selected ? "var(--accent-border)" : "rgba(255,255,255,0.05)"}` }}>
+                        <div className="w-7 h-7 rounded-full flex-shrink-0 overflow-hidden flex items-center justify-center text-[11px] font-black" style={{ background: "var(--accent-dim)", color: "var(--accent)" }}>
+                          {f.avatar_url ? <img src={f.avatar_url} alt="" className="w-full h-full object-cover" /> : name[0]?.toUpperCase()}
+                        </div>
+                        <span className="text-[13px] font-semibold flex-1" style={{ color: "var(--text)" }}>{name}</span>
+                        {f.username && <span className="text-[11px]" style={{ color: "var(--dimmer)" }}>@{f.username}</span>}
+                        <div className="w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: selected ? "var(--accent)" : "rgba(255,255,255,0.08)", border: `1px solid ${selected ? "var(--accent)" : "rgba(255,255,255,0.12)"}` }}>
+                          {selected && <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              {shareAudience === "select" && selectedFollowers.length > 0 && (
+                <p className="text-[11px]" style={{ color: "var(--dimmer)" }}>{selectedFollowers.length} {selectedFollowers.length === 1 ? "person" : "people"} selected</p>
+              )}
               <textarea
                 value={shareCaption}
                 onChange={(e) => setShareCaption(e.target.value)}
