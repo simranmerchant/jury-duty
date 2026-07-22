@@ -30,8 +30,13 @@ type Event = {
 type PostComment = {
   id: string;
   body?: string | null;
+  gif_url?: string | null;
+  parent_id?: string | null;
   created_at: string;
   user_id: string;
+  is_mine?: boolean;
+  comment_likes?: { user_id: string }[];
+  user?: { display_name: string | null; avatar_url: string | null; username?: string | null } | null;
   balances?: { display_name: string | null; avatar_url: string | null; username?: string | null } | null;
 };
 
@@ -830,6 +835,8 @@ function ExploreBetCard({
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentInput, setCommentInput] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [replyingTo, setReplyingTo] = useState<{ id: string; name: string } | null>(null);
+  const [expandedThreads, setExpandedThreads] = useState<Set<string>>(new Set());
   const [showMenu, setShowMenu] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -939,6 +946,16 @@ function ExploreBetCard({
     setCommentsLoading(false);
   }
 
+  async function toggleCommentLike(commentId: string, authorId: string) {
+    const token = await getAccessToken();
+    setComments((prev) => prev.map((c) => {
+      if (c.id !== commentId) return c;
+      const liked = (c.comment_likes ?? []).some((l) => l.user_id === currentUserId);
+      return { ...c, comment_likes: liked ? (c.comment_likes ?? []).filter((l) => l.user_id !== currentUserId) : [...(c.comment_likes ?? []), { user_id: currentUserId! }] };
+    }));
+    await fetch(`/api/v1/explore-bets/${bet.id}/comments/${commentId}/likes`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+  }
+
   async function submitComment(e: React.FormEvent) {
     e.preventDefault();
     if (!commentInput.trim() || submitting) return;
@@ -947,13 +964,14 @@ function ExploreBetCard({
     const res = await fetch(`/api/v1/explore-bets/${bet.id}/comments`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ body: commentInput.trim() }),
+      body: JSON.stringify({ text: commentInput.trim(), parent_id: replyingTo?.id ?? null }),
     });
     const data = await res.json().catch(() => ({}));
     if (res.ok) {
       setComments((prev) => [...prev, data.comment]);
       setCommentCount((c) => c + 1);
       setCommentInput("");
+      setReplyingTo(null);
     }
     setSubmitting(false);
   }
@@ -1304,56 +1322,111 @@ function ExploreBetCard({
 
       {showComments && (
         <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,0.6)" }}
-          onClick={(e) => { if (e.target === e.currentTarget) setShowComments(false); }}>
+          onClick={(e) => { if (e.target === e.currentTarget) { setShowComments(false); setReplyingTo(null); } }}>
           <div className="w-full max-w-lg rounded-t-3xl flex flex-col" style={{ background: "var(--card)", border: "1px solid var(--border-soft)", maxHeight: "75vh" }}>
             <div className="px-6 pt-5 pb-3 flex items-center justify-between flex-shrink-0" style={{ borderBottom: "1px solid var(--border-soft)" }}>
               <p className="font-extrabold text-[16px]" style={{ fontFamily: "var(--font-nunito)" }}>comments</p>
-              <button onClick={() => setShowComments(false)} className="text-[14px] font-bold" style={{ color: "var(--dimmer)" }}>done</button>
+              <button onClick={() => { setShowComments(false); setReplyingTo(null); }} className="text-[14px] font-bold" style={{ color: "var(--dimmer)" }}>done</button>
             </div>
             <div className="flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-3">
               {commentsLoading
                 ? <p className="text-[13px] text-center py-6" style={{ color: "var(--dimmer)" }}>loading...</p>
-                : comments.length === 0
+                : comments.filter((c) => !c.parent_id).length === 0
                   ? <p className="text-[13px] text-center py-6" style={{ color: "var(--dimmer)" }}>no comments yet — be first</p>
-                  : comments.map((c) => {
-                    const cname = c.balances?.display_name ?? c.balances?.username ?? "someone";
+                  : comments.filter((c) => !c.parent_id).map((c) => {
+                    const cname = c.user?.display_name ?? c.user?.username ?? "someone";
+                    const liked = (c.comment_likes ?? []).some((l) => l.user_id === currentUserId);
+                    const likeCount = (c.comment_likes ?? []).length;
+                    const replies = comments.filter((r) => r.parent_id === c.id);
+                    const isExpanded = expandedThreads.has(c.id);
                     return (
-                      <div key={c.id} className="flex gap-2.5">
-                        <div className="rounded-full flex items-center justify-center flex-shrink-0" style={{ width: 28, height: 28, background: "var(--accent-dim)" }}>
-                          {c.balances?.avatar_url
-                            ? <img src={c.balances.avatar_url} alt="" className="w-full h-full rounded-full object-cover" />
-                            : <span className="text-[10px] font-black" style={{ color: "var(--accent)" }}>{cname[0]?.toUpperCase()}</span>
-                          }
+                      <div key={c.id}>
+                        <div className="flex gap-2.5">
+                          <div className="rounded-full flex items-center justify-center flex-shrink-0" style={{ width: 28, height: 28, background: "var(--accent-dim)" }}>
+                            {c.user?.avatar_url
+                              ? <img src={c.user.avatar_url} alt="" className="w-full h-full rounded-full object-cover" />
+                              : <span className="text-[10px] font-black" style={{ color: "var(--accent)" }}>{cname[0]?.toUpperCase()}</span>}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[12px] font-bold" style={{ color: "var(--text)" }}>{cname}</p>
+                            {c.body && <p className="text-[13px] mt-0.5" style={{ color: "var(--text)" }}>{c.body}</p>}
+                            <div className="flex items-center gap-3 mt-1.5">
+                              <button onClick={() => toggleCommentLike(c.id, c.user_id)} className="text-[11px] font-bold flex items-center gap-1" style={{ color: liked ? "var(--accent)" : "var(--dimmer)" }}>
+                                ♥ {likeCount > 0 ? likeCount : ""}
+                              </button>
+                              <button onClick={() => { setReplyingTo({ id: c.id, name: cname }); setCommentInput(`@${cname} `); }} className="text-[11px] font-bold" style={{ color: "var(--dimmer)" }}>reply</button>
+                              {replies.length > 0 && (
+                                <button onClick={() => setExpandedThreads((s) => { const n = new Set(s); n.has(c.id) ? n.delete(c.id) : n.add(c.id); return n; })} className="text-[11px] font-bold" style={{ color: "var(--dimmer)" }}>
+                                  {isExpanded ? "hide replies" : `${replies.length} repl${replies.length === 1 ? "y" : "ies"}`}
+                                </button>
+                              )}
+                              {c.user_id === currentUserId && (
+                                <button onClick={async () => {
+                                  const token = await getAccessToken();
+                                  await fetch(`/api/v1/explore-bets/${bet.id}/comments/${c.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+                                  setComments((prev) => prev.filter((x) => x.id !== c.id && x.parent_id !== c.id));
+                                  setCommentCount((n) => n - 1 - replies.length);
+                                }} className="text-[11px]" style={{ color: "var(--dimmer)" }}>delete</button>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex-1">
-                          <p className="text-[12px] font-bold" style={{ color: "var(--text)" }}>{cname}</p>
-                          {c.body && <p className="text-[13px] mt-0.5" style={{ color: "var(--text)" }}>{c.body}</p>}
-                        </div>
-                        {c.user_id === currentUserId && (
-                          <button onClick={async () => {
-                            const token = await getAccessToken();
-                            await fetch(`/api/v1/explore-bets/${bet.id}/comments?commentId=${c.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
-                            setComments((prev) => prev.filter((x) => x.id !== c.id));
-                            setCommentCount((n) => n - 1);
-                          }} className="text-[11px] self-start mt-1" style={{ color: "var(--dimmer)" }}>✕</button>
-                        )}
+                        {isExpanded && replies.map((r) => {
+                          const rname = r.user?.display_name ?? r.user?.username ?? "someone";
+                          const rliked = (r.comment_likes ?? []).some((l) => l.user_id === currentUserId);
+                          const rlikeCount = (r.comment_likes ?? []).length;
+                          return (
+                            <div key={r.id} className="flex gap-2 mt-2.5 ml-9">
+                              <div className="rounded-full flex items-center justify-center flex-shrink-0" style={{ width: 22, height: 22, background: "var(--accent-dim)" }}>
+                                {r.user?.avatar_url
+                                  ? <img src={r.user.avatar_url} alt="" className="w-full h-full rounded-full object-cover" />
+                                  : <span className="text-[9px] font-black" style={{ color: "var(--accent)" }}>{rname[0]?.toUpperCase()}</span>}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[11px] font-bold" style={{ color: "var(--text)" }}>{rname}</p>
+                                {r.body && <p className="text-[12px] mt-0.5" style={{ color: "var(--text)" }}>{r.body}</p>}
+                                <div className="flex items-center gap-3 mt-1">
+                                  <button onClick={() => toggleCommentLike(r.id, r.user_id)} className="text-[11px] font-bold flex items-center gap-1" style={{ color: rliked ? "var(--accent)" : "var(--dimmer)" }}>
+                                    ♥ {rlikeCount > 0 ? rlikeCount : ""}
+                                  </button>
+                                  {r.user_id === currentUserId && (
+                                    <button onClick={async () => {
+                                      const token = await getAccessToken();
+                                      await fetch(`/api/v1/explore-bets/${bet.id}/comments/${r.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+                                      setComments((prev) => prev.filter((x) => x.id !== r.id));
+                                      setCommentCount((n) => n - 1);
+                                    }} className="text-[11px]" style={{ color: "var(--dimmer)" }}>delete</button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     );
                   })
               }
             </div>
-            <form onSubmit={submitComment} className="flex gap-2 px-6 py-3 items-center flex-shrink-0" style={{ borderTop: "1px solid var(--border-soft)" }}>
-              <input
-                value={commentInput}
-                onChange={(e) => setCommentInput(e.target.value)}
-                placeholder="add a comment..."
-                maxLength={500}
-                className="flex-1 text-[14px] px-4 py-3 rounded-2xl outline-none"
-                style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--border-soft)", color: "var(--text)" }}
-              />
-              <button type="submit" disabled={!commentInput.trim() || submitting} className="px-4 py-3 rounded-2xl text-[14px] font-bold text-white disabled:opacity-40" style={{ background: "var(--accent)" }}>
-                post
-              </button>
+            <form onSubmit={submitComment} className="flex flex-col gap-2 px-6 py-3 flex-shrink-0" style={{ borderTop: "1px solid var(--border-soft)" }}>
+              {replyingTo && (
+                <div className="flex items-center gap-2 text-[12px]" style={{ color: "var(--dimmer)" }}>
+                  replying to <span className="font-bold" style={{ color: "var(--accent)" }}>@{replyingTo.name}</span>
+                  <button type="button" onClick={() => { setReplyingTo(null); setCommentInput(""); }} className="ml-auto text-[11px]">✕</button>
+                </div>
+              )}
+              <div className="flex gap-2 items-center">
+                <input
+                  value={commentInput}
+                  onChange={(e) => setCommentInput(e.target.value)}
+                  placeholder={replyingTo ? `reply to @${replyingTo.name}...` : "add a comment..."}
+                  maxLength={500}
+                  className="flex-1 text-[14px] px-4 py-3 rounded-2xl outline-none"
+                  style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--border-soft)", color: "var(--text)" }}
+                />
+                <button type="submit" disabled={!commentInput.trim() || submitting} className="px-4 py-3 rounded-2xl text-[14px] font-bold text-white disabled:opacity-40" style={{ background: "var(--accent)" }}>
+                  post
+                </button>
+              </div>
             </form>
           </div>
         </div>
@@ -1393,6 +1466,8 @@ function PollCard({
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentInput, setCommentInput] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [replyingTo, setReplyingTo] = useState<{ id: string; name: string } | null>(null);
+  const [expandedThreads, setExpandedThreads] = useState<Set<string>>(new Set());
   const [showMenu, setShowMenu] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -1499,6 +1574,16 @@ function PollCard({
     setCommentsLoading(false);
   }
 
+  async function toggleCommentLike(commentId: string, authorId: string) {
+    const token = await getAccessToken();
+    setComments((prev) => prev.map((c) => {
+      if (c.id !== commentId) return c;
+      const liked = (c.comment_likes ?? []).some((l) => l.user_id === currentUserId);
+      return { ...c, comment_likes: liked ? (c.comment_likes ?? []).filter((l) => l.user_id !== currentUserId) : [...(c.comment_likes ?? []), { user_id: currentUserId! }] };
+    }));
+    await fetch(`/api/v1/polls/${poll.id}/comments/${commentId}/likes`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+  }
+
   async function submitComment(e: React.FormEvent) {
     e.preventDefault();
     if (!commentInput.trim() || submitting) return;
@@ -1507,13 +1592,14 @@ function PollCard({
     const res = await fetch(`/api/v1/polls/${poll.id}/comments`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ body: commentInput.trim() }),
+      body: JSON.stringify({ text: commentInput.trim(), parent_id: replyingTo?.id ?? null }),
     });
     const data = await res.json().catch(() => ({}));
     if (res.ok) {
       setComments((prev) => [...prev, data.comment]);
       setCommentCount((c) => c + 1);
       setCommentInput("");
+      setReplyingTo(null);
     }
     setSubmitting(false);
   }
@@ -1795,56 +1881,111 @@ function PollCard({
 
       {showComments && (
         <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,0.6)" }}
-          onClick={(e) => { if (e.target === e.currentTarget) setShowComments(false); }}>
+          onClick={(e) => { if (e.target === e.currentTarget) { setShowComments(false); setReplyingTo(null); } }}>
           <div className="w-full max-w-lg rounded-t-3xl flex flex-col" style={{ background: "var(--card)", border: "1px solid var(--border-soft)", maxHeight: "75vh" }}>
             <div className="px-6 pt-5 pb-3 flex items-center justify-between flex-shrink-0" style={{ borderBottom: "1px solid var(--border-soft)" }}>
               <p className="font-extrabold text-[16px]" style={{ fontFamily: "var(--font-nunito)" }}>comments</p>
-              <button onClick={() => setShowComments(false)} className="text-[14px] font-bold" style={{ color: "var(--dimmer)" }}>done</button>
+              <button onClick={() => { setShowComments(false); setReplyingTo(null); }} className="text-[14px] font-bold" style={{ color: "var(--dimmer)" }}>done</button>
             </div>
             <div className="flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-3">
               {commentsLoading
                 ? <p className="text-[13px] text-center py-6" style={{ color: "var(--dimmer)" }}>loading...</p>
-                : comments.length === 0
+                : comments.filter((c) => !c.parent_id).length === 0
                   ? <p className="text-[13px] text-center py-6" style={{ color: "var(--dimmer)" }}>no comments yet — be first</p>
-                  : comments.map((c) => {
-                    const cname = c.balances?.display_name ?? c.balances?.username ?? "someone";
+                  : comments.filter((c) => !c.parent_id).map((c) => {
+                    const cname = c.user?.display_name ?? c.user?.username ?? "someone";
+                    const liked = (c.comment_likes ?? []).some((l) => l.user_id === currentUserId);
+                    const likeCount = (c.comment_likes ?? []).length;
+                    const replies = comments.filter((r) => r.parent_id === c.id);
+                    const isExpanded = expandedThreads.has(c.id);
                     return (
-                      <div key={c.id} className="flex gap-2.5">
-                        <div className="rounded-full flex items-center justify-center flex-shrink-0" style={{ width: 28, height: 28, background: "var(--accent-dim)" }}>
-                          {c.balances?.avatar_url
-                            ? <img src={c.balances.avatar_url} alt="" className="w-full h-full rounded-full object-cover" />
-                            : <span className="text-[10px] font-black" style={{ color: "var(--accent)" }}>{cname[0]?.toUpperCase()}</span>
-                          }
+                      <div key={c.id}>
+                        <div className="flex gap-2.5">
+                          <div className="rounded-full flex items-center justify-center flex-shrink-0" style={{ width: 28, height: 28, background: "var(--accent-dim)" }}>
+                            {c.user?.avatar_url
+                              ? <img src={c.user.avatar_url} alt="" className="w-full h-full rounded-full object-cover" />
+                              : <span className="text-[10px] font-black" style={{ color: "var(--accent)" }}>{cname[0]?.toUpperCase()}</span>}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[12px] font-bold" style={{ color: "var(--text)" }}>{cname}</p>
+                            {c.body && <p className="text-[13px] mt-0.5" style={{ color: "var(--text)" }}>{c.body}</p>}
+                            <div className="flex items-center gap-3 mt-1.5">
+                              <button onClick={() => toggleCommentLike(c.id, c.user_id)} className="text-[11px] font-bold flex items-center gap-1" style={{ color: liked ? "#a855f7" : "var(--dimmer)" }}>
+                                ♥ {likeCount > 0 ? likeCount : ""}
+                              </button>
+                              <button onClick={() => { setReplyingTo({ id: c.id, name: cname }); setCommentInput(`@${cname} `); }} className="text-[11px] font-bold" style={{ color: "var(--dimmer)" }}>reply</button>
+                              {replies.length > 0 && (
+                                <button onClick={() => setExpandedThreads((s) => { const n = new Set(s); n.has(c.id) ? n.delete(c.id) : n.add(c.id); return n; })} className="text-[11px] font-bold" style={{ color: "var(--dimmer)" }}>
+                                  {isExpanded ? "hide replies" : `${replies.length} repl${replies.length === 1 ? "y" : "ies"}`}
+                                </button>
+                              )}
+                              {c.user_id === currentUserId && (
+                                <button onClick={async () => {
+                                  const token = await getAccessToken();
+                                  await fetch(`/api/v1/polls/${poll.id}/comments/${c.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+                                  setComments((prev) => prev.filter((x) => x.id !== c.id && x.parent_id !== c.id));
+                                  setCommentCount((n) => n - 1 - replies.length);
+                                }} className="text-[11px]" style={{ color: "var(--dimmer)" }}>delete</button>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex-1">
-                          <p className="text-[12px] font-bold" style={{ color: "var(--text)" }}>{cname}</p>
-                          {c.body && <p className="text-[13px] mt-0.5" style={{ color: "var(--text)" }}>{c.body}</p>}
-                        </div>
-                        {c.user_id === currentUserId && (
-                          <button onClick={async () => {
-                            const token = await getAccessToken();
-                            await fetch(`/api/v1/polls/${poll.id}/comments?commentId=${c.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
-                            setComments((prev) => prev.filter((x) => x.id !== c.id));
-                            setCommentCount((n) => n - 1);
-                          }} className="text-[11px] self-start mt-1" style={{ color: "var(--dimmer)" }}>✕</button>
-                        )}
+                        {isExpanded && replies.map((r) => {
+                          const rname = r.user?.display_name ?? r.user?.username ?? "someone";
+                          const rliked = (r.comment_likes ?? []).some((l) => l.user_id === currentUserId);
+                          const rlikeCount = (r.comment_likes ?? []).length;
+                          return (
+                            <div key={r.id} className="flex gap-2 mt-2.5 ml-9">
+                              <div className="rounded-full flex items-center justify-center flex-shrink-0" style={{ width: 22, height: 22, background: "var(--accent-dim)" }}>
+                                {r.user?.avatar_url
+                                  ? <img src={r.user.avatar_url} alt="" className="w-full h-full rounded-full object-cover" />
+                                  : <span className="text-[9px] font-black" style={{ color: "var(--accent)" }}>{rname[0]?.toUpperCase()}</span>}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[11px] font-bold" style={{ color: "var(--text)" }}>{rname}</p>
+                                {r.body && <p className="text-[12px] mt-0.5" style={{ color: "var(--text)" }}>{r.body}</p>}
+                                <div className="flex items-center gap-3 mt-1">
+                                  <button onClick={() => toggleCommentLike(r.id, r.user_id)} className="text-[11px] font-bold flex items-center gap-1" style={{ color: rliked ? "#a855f7" : "var(--dimmer)" }}>
+                                    ♥ {rlikeCount > 0 ? rlikeCount : ""}
+                                  </button>
+                                  {r.user_id === currentUserId && (
+                                    <button onClick={async () => {
+                                      const token = await getAccessToken();
+                                      await fetch(`/api/v1/polls/${poll.id}/comments/${r.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+                                      setComments((prev) => prev.filter((x) => x.id !== r.id));
+                                      setCommentCount((n) => n - 1);
+                                    }} className="text-[11px]" style={{ color: "var(--dimmer)" }}>delete</button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     );
                   })
               }
             </div>
-            <form onSubmit={submitComment} className="flex gap-2 px-6 py-3 items-center flex-shrink-0" style={{ borderTop: "1px solid var(--border-soft)" }}>
-              <input
-                value={commentInput}
-                onChange={(e) => setCommentInput(e.target.value)}
-                placeholder="add a comment..."
-                maxLength={500}
-                className="flex-1 text-[14px] px-4 py-3 rounded-2xl outline-none"
-                style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--border-soft)", color: "var(--text)" }}
-              />
-              <button type="submit" disabled={!commentInput.trim() || submitting} className="px-4 py-3 rounded-2xl text-[14px] font-bold text-white disabled:opacity-40" style={{ background: "#a855f7" }}>
-                post
-              </button>
+            <form onSubmit={submitComment} className="flex flex-col gap-2 px-6 py-3 flex-shrink-0" style={{ borderTop: "1px solid var(--border-soft)" }}>
+              {replyingTo && (
+                <div className="flex items-center gap-2 text-[12px]" style={{ color: "var(--dimmer)" }}>
+                  replying to <span className="font-bold" style={{ color: "#a855f7" }}>@{replyingTo.name}</span>
+                  <button type="button" onClick={() => { setReplyingTo(null); setCommentInput(""); }} className="ml-auto text-[11px]">✕</button>
+                </div>
+              )}
+              <div className="flex gap-2 items-center">
+                <input
+                  value={commentInput}
+                  onChange={(e) => setCommentInput(e.target.value)}
+                  placeholder={replyingTo ? `reply to @${replyingTo.name}...` : "add a comment..."}
+                  maxLength={500}
+                  className="flex-1 text-[14px] px-4 py-3 rounded-2xl outline-none"
+                  style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--border-soft)", color: "var(--text)" }}
+                />
+                <button type="submit" disabled={!commentInput.trim() || submitting} className="px-4 py-3 rounded-2xl text-[14px] font-bold text-white disabled:opacity-40" style={{ background: "#a855f7" }}>
+                  post
+                </button>
+              </div>
             </form>
           </div>
         </div>
