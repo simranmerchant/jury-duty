@@ -53,21 +53,22 @@ export async function POST(
 
   if (newUserIds.length > 0) {
     const inviterName = inviterData?.display_name ?? "someone";
+    const notifBody = `${inviterName} added you to "${bet.question}"`;
 
     const notifications = newUserIds.map((uid) => ({
       user_id: uid,
       type: "bet_invited",
-      title: "you've been added to a private bet 👀",
-      body: `${inviterName} added you. tap to view.`,
+      title: "you've been added to a prediction 👀",
+      body: notifBody,
       data: { bet_id: id, event_id: bet.event_id },
     }));
 
     await Promise.all([
       supabase.from("notifications").insert(notifications),
       sendPushToUsers(newUserIds, {
-        title: "you've been added to a private bet 👀",
-        body: "tap to view",
-        data: { event_id: bet.event_id },
+        title: "you've been added to a prediction 👀",
+        body: notifBody,
+        data: { bet_id: id, event_id: bet.event_id },
       }),
     ]);
   }
