@@ -206,18 +206,10 @@ export async function GET(req: NextRequest) {
     return { type: "poll_post" as const, ...pp };
   });
 
-  // Deduplicate by explore_bet_id — keep only the most recent post per bet
-  const seenExploreBetIds = new Set<string>();
-  const exploreBetPostItems = (exploreBetPosts ?? [])
-    .filter((ebp: any) => {
-      if (seenExploreBetIds.has(ebp.explore_bet_id)) return false;
-      seenExploreBetIds.add(ebp.explore_bet_id);
-      return true;
-    })
-    .map((ebp: any) => {
-      const explore_bets = exploreBetMap.get(ebp.explore_bet_id as string) ?? null;
-      return { type: "explore_bet_post" as const, ...ebp, explore_bets };
-    });
+  const exploreBetPostItems = (exploreBetPosts ?? []).map((ebp: any) => {
+    const explore_bets = exploreBetMap.get(ebp.explore_bet_id as string) ?? null;
+    return { type: "explore_bet_post" as const, ...ebp, explore_bets };
+  });
 
   const merged = [...betItems, ...postItems, ...pollPostItems, ...exploreBetPostItems]
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
