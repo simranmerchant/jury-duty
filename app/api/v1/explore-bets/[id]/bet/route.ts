@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/privy";
 import { supabase } from "@/lib/supabase";
+import { sendPushToUsers } from "@/lib/push";
 
 // POST /api/v1/explore-bets/[id]/bet — place a wager on an explore bet
 export async function POST(
@@ -22,7 +23,7 @@ export async function POST(
 
   const { data: bet } = await supabase
     .from("explore_bets")
-    .select("id, status, closes_at")
+    .select("id, status, closes_at, question, creator_id")
     .eq("id", id)
     .single();
 
@@ -67,6 +68,16 @@ export async function POST(
     // Roll back entry
     await supabase.from("explore_bet_entries").delete().eq("id", entryResult.data.id);
     return NextResponse.json({ error: "could not deduct points" }, { status: 500 });
+  }
+
+  if (bet.creator_id && bet.creator_id !== user.userId) {
+    const { data: voter } = await supabase.from("balances").select("display_name").eq("user_id", user.userId).single();
+    const voterName = voter?.display_name ?? "someone";
+    const notifBody = `${voterName} voted on "${bet.question}"`;
+    await Promise.all([
+      supabase.from("notifications").insert({ user_id: bet.creator_id, type: "explore_bet_vote", title: "new vote 🗳️", body: notifBody, data: { explore_bet_id: id } }),
+      sendPushToUsers([bet.creator_id], { title: "new vote 🗳️", body: notifBody, data: { explore_bet_id: id } }),
+    ]);
   }
 
   return NextResponse.json({ ok: true });

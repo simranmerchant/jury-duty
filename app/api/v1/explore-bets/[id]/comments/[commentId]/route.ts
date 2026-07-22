@@ -26,7 +26,10 @@ export async function DELETE(
     return NextResponse.json({ error: "not your comment" }, { status: 403 });
   }
 
-  await supabase.from("explore_bet_comments").delete().eq("id", commentId);
+  await Promise.all([
+    supabase.from("notifications").delete().like("data::text", `%${commentId}%`),
+    supabase.from("explore_bet_comments").delete().eq("id", commentId),
+  ]);
 
   return NextResponse.json({ ok: true });
 }

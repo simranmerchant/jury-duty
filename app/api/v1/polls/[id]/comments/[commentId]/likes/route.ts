@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/privy";
 import { supabase } from "@/lib/supabase";
+import { sendPushToUsers } from "@/lib/push";
 
 // POST /api/v1/polls/[id]/comments/[commentId]/likes — toggle like
 export async function POST(
@@ -15,23 +16,26 @@ export async function POST(
 
   const { commentId } = await params;
 
-  const { data: existing } = await supabase
-    .from("poll_comment_likes")
-    .select("user_id")
-    .eq("poll_comment_id", commentId)
-    .eq("user_id", user.userId)
-    .single();
+  const [{ data: comment }, { data: existing }] = await Promise.all([
+    supabase.from("poll_comments").select("user_id, body").eq("id", commentId).single(),
+    supabase.from("poll_comment_likes").select("user_id").eq("poll_comment_id", commentId).eq("user_id", user.userId).single(),
+  ]);
 
   if (existing) {
-    await supabase
-      .from("poll_comment_likes")
-      .delete()
-      .eq("poll_comment_id", commentId)
-      .eq("user_id", user.userId);
+    await supabase.from("poll_comment_likes").delete().eq("poll_comment_id", commentId).eq("user_id", user.userId);
   } else {
-    await supabase
-      .from("poll_comment_likes")
-      .insert({ poll_comment_id: commentId, user_id: user.userId });
+    await supabase.from("poll_comment_likes").insert({ poll_comment_id: commentId, user_id: user.userId });
+  }
+
+  if (!existing && comment && comment.user_id !== user.userId) {
+    const { data: liker } = await supabase.from("balances").select("display_name").eq("user_id", user.userId).single();
+    const likerName = liker?.display_name ?? "someone";
+    const preview = comment.body ? `"${comment.body.slice(0, 60)}"` : "your comment";
+    const notifBody = `${likerName} liked ${preview}`;
+    await Promise.all([
+      supabase.from("notifications").insert({ user_id: comment.user_id, type: "comment_like", title: "new like ❤️", body: notifBody, data: { poll_comment_id: commentId } }),
+      sendPushToUsers([comment.user_id], { title: "new like ❤️", body: notifBody, data: { poll_comment_id: commentId } }),
+    ]);
   }
 
   return NextResponse.json({ ok: true });

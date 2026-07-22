@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/privy";
 import { supabase } from "@/lib/supabase";
+import { sendPushToUsers } from "@/lib/push";
 
 // GET /api/v1/explore-bets/[id]/comments — list comments oldest-first
 export async function GET(
@@ -59,7 +60,7 @@ export async function POST(
 
   const { data: bet } = await supabase
     .from("explore_bets")
-    .select("id")
+    .select("id, question, creator_id")
     .eq("id", id)
     .single();
 
@@ -78,6 +79,25 @@ export async function POST(
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  const commenterName = (comment as any).user?.display_name ?? "someone";
+  const commentBody = text?.trim() ? `${commenterName}: ${text.trim().slice(0, 80)}` : `${commenterName} left a GIF`;
+
+  if (parent_id) {
+    // Reply: notify the parent comment author
+    const { data: parentComment } = await supabase.from("explore_bet_comments").select("user_id").eq("id", parent_id).single();
+    if (parentComment && parentComment.user_id !== user.userId) {
+      await Promise.all([
+        supabase.from("notifications").insert({ user_id: parentComment.user_id, type: "comment_reply", title: `${commenterName} replied to you`, body: commentBody, data: { explore_bet_id: id } }),
+        sendPushToUsers([parentComment.user_id], { title: `${commenterName} replied to you`, body: commentBody, data: { explore_bet_id: id } }),
+      ]);
+    }
+  } else if (bet.creator_id && bet.creator_id !== user.userId) {
+    await Promise.all([
+      supabase.from("notifications").insert({ user_id: bet.creator_id, type: "explore_bet_comment", title: `comment on "${bet.question}"`, body: commentBody, data: { explore_bet_id: id } }),
+      sendPushToUsers([bet.creator_id], { title: `comment on "${bet.question}"`, body: commentBody, data: { explore_bet_id: id } }),
+    ]);
+  }
 
   return NextResponse.json({
     comment: {

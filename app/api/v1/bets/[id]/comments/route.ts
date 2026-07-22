@@ -134,12 +134,10 @@ export async function DELETE(
   const commentId = searchParams.get("commentId");
   if (!commentId) return NextResponse.json({ error: "commentId required" }, { status: 400 });
 
-  const { error } = await supabase
-    .from("bet_comments")
-    .delete()
-    .eq("id", commentId)
-    .eq("bet_id", betId)
-    .eq("user_id", user.userId);
+  const [, { error }] = await Promise.all([
+    supabase.from("notifications").delete().like("data::text", `%${commentId}%`),
+    supabase.from("bet_comments").delete().eq("id", commentId).eq("bet_id", betId).eq("user_id", user.userId),
+  ]);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/privy";
 import { supabase } from "@/lib/supabase";
+import { sendPushToUsers } from "@/lib/push";
 
 // POST /api/v1/polls/[id]/vote — cast or change vote
 export async function POST(
@@ -23,7 +24,7 @@ export async function POST(
 
   const { data: poll } = await supabase
     .from("polls")
-    .select("id, closes_at")
+    .select("id, closes_at, question, creator_id")
     .eq("id", id)
     .single();
 
@@ -51,6 +52,16 @@ export async function POST(
   for (const v of allVotes ?? []) voteByUser.set(v.user_id, v.side);
   const votes_a = [...voteByUser.values()].filter((s) => s === "a").length;
   const votes_b = [...voteByUser.values()].filter((s) => s === "b").length;
+
+  if (poll.creator_id && poll.creator_id !== user.userId) {
+    const { data: voter } = await supabase.from("balances").select("display_name").eq("user_id", user.userId).single();
+    const voterName = voter?.display_name ?? "someone";
+    const notifBody = `${voterName} voted on "${poll.question}"`;
+    await Promise.all([
+      supabase.from("notifications").insert({ user_id: poll.creator_id, type: "poll_vote", title: "new vote 🗳️", body: notifBody, data: { poll_id: id } }),
+      sendPushToUsers([poll.creator_id], { title: "new vote 🗳️", body: notifBody, data: { poll_id: id } }),
+    ]);
+  }
 
   return NextResponse.json({ side, votes_a, votes_b, total_votes: votes_a + votes_b });
 }
