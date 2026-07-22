@@ -43,22 +43,18 @@ export default function InstallPrompt() {
     if (pathname === "/onboarding") return;
 
     const plat = detectPlatform();
+    if (!plat) return; // desktop — never show
+
     const installed = isStandalone();
     const notifGranted = "Notification" in window && Notification.permission === "granted";
 
-    // Already fully set up — nothing to do
-    if (notifGranted) return;
+    // Fully set up — nothing to do
+    if (installed && notifGranted) return;
 
     // Snoozed — respect the cooldown
     if (isSnoozed()) return;
 
     setPlatform(plat);
-
-    if (!plat) {
-      // Desktop — skip install step, just prompt for notifications after 3s
-      const t = setTimeout(() => setStep("push"), 3000);
-      return () => clearTimeout(t);
-    }
 
     if (installed) {
       // Already on home screen, just need push permission
