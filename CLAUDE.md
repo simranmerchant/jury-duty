@@ -37,7 +37,7 @@ Next.js web app + API backend for **Jury Duty** — a social prediction app wher
 - `lib/payout.ts` — bet resolution payout math (tested)
 - `lib/push.ts` / `lib/webpush.ts` — push notification helpers
 
-**Database:** migrations live in `supabase/migrations/`. Latest is `041_polls.sql` (polls, poll_votes, poll_likes, poll_reactions, poll_comments, poll_posts tables). Apply with `npx supabase db push` after linking (`supabase link --project-ref gfcipzuqaldyebocmypw`).
+**Database:** migrations live in `supabase/migrations/`. Latest is `055_feed_rpc_invited_bets.sql` (updates `get_feed` RPC to include bets the viewer was invited to via `bet_invites`). Apply with `npx supabase db push` after linking (`supabase link --project-ref gfcipzuqaldyebocmypw`).
 
 **Key API routes added:**
 - `posts/` — POST to share a resolved bet to feed; DELETE to unshare (by `?bet_id=`)
@@ -48,6 +48,8 @@ Next.js web app + API backend for **Jury Duty** — a social prediction app wher
 - `polls/[id]/react/` — POST to toggle emoji reaction
 - `polls/[id]/post/` — POST to share poll to feed; DELETE to unshare
 - `polls/[id]/comments/` — GET list; POST to add comment
+- `bets/[id]/invite-link/` — GET (creator only) — generate shareable invite link for a feed bet
+- `join/bet/` — GET (public) bet preview by invite token; POST (auth) accept invite → adds to `bet_invites`
 
 **Current branch for ETHGlobal work:** `feat/ethglobal-prizes` (not merged to main).
 

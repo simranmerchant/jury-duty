@@ -76,3 +76,25 @@ describe("buildResolveNotifications — body content", () => {
     expect(note.body).toMatch(/jury has spoken/);
   });
 });
+
+describe("buildResolveNotifications — event_id propagation", () => {
+  it("omits event_id from data when not provided", () => {
+    const [note] = buildResolveNotifications(BET_ID, QUESTION, [ENTRY_A], "opt-1");
+    expect("event_id" in note.data).toBe(false);
+  });
+
+  it("includes event_id in data when provided", () => {
+    const [note] = buildResolveNotifications(BET_ID, QUESTION, [ENTRY_A], "opt-1", "evt-99");
+    expect(note.data.event_id).toBe("evt-99");
+  });
+
+  it("propagates event_id to every notification in the batch", () => {
+    const notes = buildResolveNotifications(BET_ID, QUESTION, [ENTRY_A, ENTRY_B], "opt-1", "evt-99");
+    expect(notes.every((n) => n.data.event_id === "evt-99")).toBe(true);
+  });
+
+  it("does not attach event_id for refunds either, when not provided", () => {
+    const [note] = buildResolveNotifications(BET_ID, QUESTION, [ENTRY_A], null);
+    expect("event_id" in note.data).toBe(false);
+  });
+});

@@ -52,3 +52,41 @@ export function buildFeedBetNotification(
     body: question.trim(),
   };
 }
+
+// ── Feed capabilities ─────────────────────────────────────────────────────────
+
+export function parseFeedCapabilities(header: string): {
+  supportsPollPost: boolean;
+  supportsExploreBetPost: boolean;
+} {
+  return {
+    supportsPollPost: header.includes("poll-post"),
+    supportsExploreBetPost: header.includes("explore-bet-post"),
+  };
+}
+
+// ── Reaction aggregation ──────────────────────────────────────────────────────
+
+export function aggregateBetReactions(
+  reactions: Array<{ user_id: string; emoji: string }>,
+  userId: string
+): { reactions: Array<{ emoji: string; count: number }>; myReaction: string | null } {
+  const counts: Record<string, number> = {};
+  for (const r of reactions) counts[r.emoji] = (counts[r.emoji] ?? 0) + 1;
+  return {
+    reactions: Object.entries(counts).map(([emoji, count]) => ({ emoji, count })),
+    myReaction: reactions.find((r) => r.user_id === userId)?.emoji ?? null,
+  };
+}
+
+// ── Feed item merge / sort / slice ────────────────────────────────────────────
+
+export function mergeFeedItems<T extends { created_at: string }>(
+  arrays: T[][],
+  limit = 20
+): T[] {
+  return arrays
+    .flat()
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .slice(0, limit);
+}
