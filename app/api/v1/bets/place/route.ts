@@ -17,6 +17,35 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "points must be a positive number" }, { status: 400 });
   }
 
+  // Access control: verify user can see this bet before letting them vote
+  const { data: bet } = await supabase
+    .from("bets")
+    .select("creator_id, audience")
+    .eq("id", bet_id)
+    .single();
+
+  if (!bet) return NextResponse.json({ error: "bet not found" }, { status: 404 });
+
+  const isCreator = bet.creator_id === user.userId;
+  if (!isCreator) {
+    const audience = (bet as any).audience as string;
+    if (audience === "select_people") {
+      const { data: invite } = await supabase
+        .from("bet_invites")
+        .select("user_id")
+        .eq("bet_id", bet_id)
+        .eq("user_id", user.userId)
+        .single();
+      if (!invite) return NextResponse.json({ error: "not authorized" }, { status: 403 });
+    } else if (audience === "followers") {
+      const [{ data: follow }, { data: invite }] = await Promise.all([
+        supabase.from("follows").select("follower_id").eq("follower_id", user.userId).eq("following_id", bet.creator_id).eq("status", "accepted").single(),
+        supabase.from("bet_invites").select("user_id").eq("bet_id", bet_id).eq("user_id", user.userId).single(),
+      ]);
+      if (!follow && !invite) return NextResponse.json({ error: "not authorized" }, { status: 403 });
+    }
+  }
+
   const { error } = await supabase.rpc("place_bet", {
     p_user_id: user.userId,
     p_bet_id: bet_id,

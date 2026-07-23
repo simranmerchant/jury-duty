@@ -57,21 +57,23 @@ export async function POST(
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Fetch bet + sender profile for notifications (always needed now)
+  // Fetch bet + sender profile + parent comment author for notifications
   const commentBody = validation.body ?? "";
   const mentionedUsernames = extractMentions(commentBody);
-  const [senderProfileRes, betRes, mentionedRes] = await Promise.all([
+  const [senderProfileRes, betRes, mentionedRes, parentCommentRes] = await Promise.all([
     supabase.from("balances").select("display_name, username").eq("user_id", user.userId).single(),
     supabase.from("bets").select("event_id, creator_id, question").eq("id", betId).single(),
     mentionedUsernames.length > 0
       ? supabase.from("balances").select("user_id, username").in("username", mentionedUsernames)
       : Promise.resolve({ data: [] }),
+    parentId
+      ? supabase.from("bet_comments").select("user_id").eq("id", parentId).single()
+      : Promise.resolve({ data: null }),
   ]);
 
   const senderName = senderProfileRes.data?.display_name ?? senderProfileRes.data?.username ?? "someone";
   const eventId = betRes.data?.event_id ?? null;
   const creatorId = betRes.data?.creator_id ?? null;
-  const betQuestion = betRes.data?.question ?? "a prediction";
   const notifData = { bet_id: betId, ...(eventId ? { event_id: eventId } : {}) };
 
   // Notify @mentioned users
@@ -98,19 +100,38 @@ export async function POST(
     ]);
   }
 
-  // Notify bet creator when someone else comments (skip if creator is the commenter or already mentioned)
-  if (creatorId && creatorId !== user.userId && !mentionedIds.includes(creatorId)) {
+  // Notify parent commenter on reply (skip if they're the sender or already mentioned)
+  const parentAuthorId = (parentCommentRes as { data: { user_id: string } | null }).data?.user_id ?? null;
+  if (parentAuthorId && parentAuthorId !== user.userId && !mentionedIds.includes(parentAuthorId)) {
+    await Promise.all([
+      supabase.from("notifications").insert({
+        user_id: parentAuthorId,
+        type: "comment_reply",
+        title: `${senderName} replied to your comment`,
+        body: commentBody.slice(0, 80) || "sent a GIF",
+        data: notifData,
+      }),
+      sendPushToUsers([parentAuthorId], {
+        title: `${senderName} replied to your comment`,
+        body: commentBody.slice(0, 80) || "sent a GIF",
+        data: notifData,
+      }),
+    ]);
+  }
+
+  // Notify bet creator when someone else comments (skip if creator is the commenter, parent author, or already mentioned)
+  if (creatorId && creatorId !== user.userId && creatorId !== parentAuthorId && !mentionedIds.includes(creatorId)) {
     await Promise.all([
       supabase.from("notifications").insert({
         user_id: creatorId,
         type: "comment_on_bet",
         title: `${senderName} commented on your prediction`,
-        body: commentBody.slice(0, 80),
+        body: commentBody.slice(0, 80) || "sent a GIF",
         data: notifData,
       }),
       sendPushToUsers([creatorId], {
         title: `${senderName} commented on your prediction`,
-        body: commentBody.slice(0, 80),
+        body: commentBody.slice(0, 80) || "sent a GIF",
         data: notifData,
       }),
     ]);

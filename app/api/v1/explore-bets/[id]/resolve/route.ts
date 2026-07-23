@@ -26,14 +26,23 @@ export async function POST(
 
   const { data: bet } = await supabase
     .from("explore_bets")
-    .select("id, question, status, creator_id")
+    .select("id, question, status, creator_id, closes_at")
     .eq("id", id)
     .single();
 
   const ADMIN_ID = "did:privy:cmng3anf401zu0cibp1adsvn3";
   if (!bet) return NextResponse.json({ error: "not found" }, { status: 404 });
-  if (bet.creator_id !== user.userId && user.userId !== ADMIN_ID) return NextResponse.json({ error: "only the creator can resolve" }, { status: 403 });
   if (bet.status === "resolved") return NextResponse.json({ error: "already resolved" }, { status: 422 });
+
+  const isCreator = bet.creator_id === user.userId;
+  const isAdmin = user.userId === ADMIN_ID;
+  const communityCanResolve = bet.closes_at
+    ? Date.now() >= new Date(bet.closes_at).getTime() + 24 * 60 * 60 * 1000
+    : false;
+
+  if (!isCreator && !isAdmin && !communityCanResolve) {
+    return NextResponse.json({ error: "only the creator can resolve until 24 hours after closing" }, { status: 403 });
+  }
 
   const { data: entries } = await supabase
     .from("explore_bet_entries")

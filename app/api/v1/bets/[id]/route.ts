@@ -31,9 +31,32 @@ export async function GET(
 
   if (!bet) return NextResponse.json({ error: "not found" }, { status: 404 });
 
-  // Feed bets are publicly visible to anyone authenticated
-  if ((bet as any).audience !== "followers") {
+  const audience = (bet as any).audience as string;
+
+  if (audience !== "followers" && audience !== "select_people") {
     return NextResponse.json({ error: "use the event screen for event bets" }, { status: 400 });
+  }
+
+  const isCreator = (bet as any).creator_id === user.userId;
+
+  if (!isCreator) {
+    if (audience === "select_people") {
+      // Must be explicitly invited
+      const { data: invite } = await supabase
+        .from("bet_invites")
+        .select("user_id")
+        .eq("bet_id", id)
+        .eq("user_id", user.userId)
+        .single();
+      if (!invite) return NextResponse.json({ error: "not found" }, { status: 404 });
+    } else {
+      // followers bet: must follow creator or be in bet_invites
+      const [{ data: follow }, { data: invite }] = await Promise.all([
+        supabase.from("follows").select("follower_id").eq("follower_id", user.userId).eq("following_id", (bet as any).creator_id).eq("status", "accepted").single(),
+        supabase.from("bet_invites").select("user_id").eq("bet_id", id).eq("user_id", user.userId).single(),
+      ]);
+      if (!follow && !invite) return NextResponse.json({ error: "not found" }, { status: 404 });
+    }
   }
 
   return NextResponse.json({ bet });
