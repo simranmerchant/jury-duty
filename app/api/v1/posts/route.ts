@@ -107,13 +107,13 @@ export async function DELETE(req: NextRequest) {
 
   if (post_id) {
     await Promise.all([
-      supabase.from("notifications").delete().like("data::text", `%${post_id}%`),
+      supabase.from("notifications").delete().filter("data->>post_id", "eq", post_id),
       supabase.from("posts").delete().eq("id", post_id).eq("user_id", user.userId),
     ]);
   } else if (bet_id) {
     const { data: deleted } = await supabase.from("posts").delete().eq("bet_id", bet_id).eq("user_id", user.userId).select("id");
     if (deleted && deleted.length > 0) {
-      await Promise.all(deleted.map((p) => supabase.from("notifications").delete().like("data::text", `%${p.id}%`)));
+      await Promise.all(deleted.map((p) => supabase.from("notifications").delete().filter("data->>post_id", "eq", p.id)));
     }
   } else {
     return NextResponse.json({ error: "post_id or bet_id required" }, { status: 400 });

@@ -151,7 +151,7 @@ export async function DELETE(
     }
   }
 
-  await supabase.from("notifications").delete().like("data::text", `%${id}%`);
+  await supabase.from("notifications").delete().filter("data->>bet_id", "eq", id);
   const { error } = await supabase.from("bets").delete().eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 

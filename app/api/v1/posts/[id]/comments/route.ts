@@ -82,7 +82,7 @@ export async function DELETE(
   if (!commentId) return NextResponse.json({ error: "commentId required" }, { status: 400 });
 
   await Promise.all([
-    supabase.from("notifications").delete().like("data::text", `%${commentId}%`),
+    supabase.from("notifications").delete().filter("data->>comment_id", "eq", commentId),
     supabase.from("post_comments").delete().eq("id", commentId).eq("post_id", postId).eq("user_id", user.userId),
   ]);
 

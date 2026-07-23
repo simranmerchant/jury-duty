@@ -27,7 +27,7 @@ export async function DELETE(
   }
 
   await Promise.all([
-    supabase.from("notifications").delete().like("data::text", `%${commentId}%`),
+    supabase.from("notifications").delete().filter("data->>comment_id", "eq", commentId),
     supabase.from("explore_bet_comments").delete().eq("id", commentId),
   ]);
 
