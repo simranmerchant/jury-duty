@@ -37,7 +37,7 @@ Next.js web app + API backend for **Jury Duty** — a social prediction app wher
 - `lib/payout.ts` — bet resolution payout math (tested)
 - `lib/push.ts` / `lib/webpush.ts` — push notification helpers
 
-**Database:** migrations live in `supabase/migrations/`. Latest is `055_feed_rpc_invited_bets.sql` (updates `get_feed` RPC to include bets the viewer was invited to via `bet_invites`). Apply with `npx supabase db push` after linking (`supabase link --project-ref gfcipzuqaldyebocmypw`).
+**Database:** migrations live in `supabase/migrations/`. Latest is `057_feed_rpc_bet_likes.sql` (adds `like_count` and `liked_by_me` to feed bet items in `get_feed` RPC). Apply with `npx supabase db push` after linking (`supabase link --project-ref gfcipzuqaldyebocmypw`).
 
 **Key API routes added:**
 - `posts/` — POST to share a resolved bet to feed; DELETE to unshare (by `?bet_id=`)

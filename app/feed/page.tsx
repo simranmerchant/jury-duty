@@ -20,7 +20,8 @@ type EmbeddedBet = {
   bet_entries: { user_id: string; option_id: string; points_staked: number; balances: { display_name: string | null; avatar_url: string | null; username: string | null } | null }[];
   balances: { display_name: string | null; avatar_url: string | null; username: string | null } | null;
 };
-type FeedBet = EmbeddedBet & { type: "bet"; audience: string };
+type FeedBet = EmbeddedBet & { type: "bet"; audience: string; like_count: number; liked_by_me: boolean; comment_count: number };
+type BetComment = { id: string; body?: string | null; gif_url?: string | null; created_at: string; user_id: string; parent_id?: string | null; balances?: { display_name: string | null; avatar_url: string | null; username?: string | null } | null; comment_likes?: { user_id: string }[] };
 type GifResult = { id: string; images: { fixed_height: { url: string }; fixed_height_small: { url: string } } };
 type PostComment = { id: string; body?: string | null; gif_url?: string | null; created_at: string; user_id: string; balances?: { display_name: string | null; avatar_url: string | null; username?: string | null } | null };
 type FeedPost = {
@@ -103,8 +104,6 @@ export default function FeedPage() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [votingId, setVotingId] = useState<string | null>(null);
   const [feedError, setFeedError] = useState<string | null>(null);
-  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [seenBetIds, setSeenBetIds] = useState<Set<string>>(() => {
     try { return new Set(JSON.parse(sessionStorage.getItem("seenFeedBetIds") ?? "[]")); } catch { return new Set(); }
   });
@@ -117,6 +116,12 @@ export default function FeedPage() {
   const [postDeadline, setPostDeadline] = useState("");
   const [posting, setPosting] = useState(false);
   const [postError, setPostError] = useState<string | null>(null);
+  const [postAudience, setPostAudience] = useState<"followers" | "specific">("followers");
+  const [targetedUsers, setTargetedUsers] = useState<{ user_id: string; display_name: string | null; username: string | null; avatar_url: string | null }[]>([]);
+  const [userSearch, setUserSearch] = useState("");
+  const [userResults, setUserResults] = useState<{ user_id: string; display_name: string | null; username: string | null; avatar_url: string | null }[]>([]);
+  const [userSearchLoading, setUserSearchLoading] = useState(false);
+  const userSearchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = useCallback(async (cursor?: string) => {
     const token = await getAccessToken();
@@ -172,13 +177,6 @@ export default function FeedPage() {
     return () => document.removeEventListener("visibilitychange", onVisible);
   }, [authenticated, load]);
 
-  useEffect(() => {
-    if (!menuOpenId) return;
-    function onClickOutside() { setMenuOpenId(null); }
-    document.addEventListener("click", onClickOutside);
-    return () => document.removeEventListener("click", onClickOutside);
-  }, [menuOpenId]);
-
   async function loadMore() {
     if (!nextCursor || loadingMore) return;
     setLoadingMore(true);
@@ -205,39 +203,52 @@ export default function FeedPage() {
     setVotingId(null);
   }
 
-  async function deleteBet(betId: string) {
-    setDeletingId(betId);
-    setMenuOpenId(null);
+  async function searchPostUsers(q: string) {
+    if (!q.trim()) { setUserResults([]); return; }
+    setUserSearchLoading(true);
     const token = await getAccessToken();
-    const res = await fetch(`/api/v1/bets/${encodeURIComponent(betId)}`, {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (res.ok) {
-      setItems((prev) => prev.filter((item) => item.id !== betId));
-    }
-    setDeletingId(null);
+    const res = await fetch(`/api/v1/users/search?q=${encodeURIComponent(q.trim())}`, { headers: { Authorization: `Bearer ${token}` } });
+    const data = await res.json().catch(() => ({}));
+    setUserResults(data.users ?? []);
+    setUserSearchLoading(false);
+  }
+
+  function onUserSearchChange(q: string) {
+    setUserSearch(q);
+    if (userSearchTimeout.current) clearTimeout(userSearchTimeout.current);
+    userSearchTimeout.current = setTimeout(() => searchPostUsers(q), 250);
+  }
+
+  function addTargetUser(u: { user_id: string; display_name: string | null; username: string | null; avatar_url: string | null }) {
+    if (targetedUsers.some((t) => t.user_id === u.user_id)) return;
+    setTargetedUsers((prev) => [...prev, u]);
+    setUserSearch("");
+    setUserResults([]);
   }
 
   async function postBet() {
     const filled = postOptions.filter((o) => o.trim());
     if (!postQuestion.trim() || filled.length < 2 || !postDeadline) return;
+    if (postAudience === "specific" && targetedUsers.length === 0) return;
     setPosting(true);
     setPostError(null);
     const token = await getAccessToken();
+    const body: Record<string, unknown> = {
+      question: postQuestion.trim(),
+      options: filled.map((o) => ({ label: o.trim() })),
+      deadline: new Date(postDeadline).toISOString(),
+    };
+    if (postAudience === "specific") body.targeted_user_ids = targetedUsers.map((u) => u.user_id);
     const res = await fetch("/api/v1/feed/bets", {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        question: postQuestion.trim(),
-        options: filled.map((o) => ({ label: o.trim() })),
-        deadline: new Date(postDeadline).toISOString(),
-      }),
+      body: JSON.stringify(body),
     });
     setPosting(false);
     if (res.ok) {
       setShowPost(false);
       setPostQuestion(""); setPostOptions(["", ""]); setPostDeadline(""); setPostError(null);
+      setPostAudience("followers"); setTargetedUsers([]); setUserSearch(""); setUserResults([]);
       setLoading(true);
       try { await load(); } finally { setLoading(false); }
     } else {
@@ -254,7 +265,8 @@ export default function FeedPage() {
     );
   }
 
-  const canPost = postQuestion.trim() && postOptions.filter((o) => o.trim()).length >= 2 && postDeadline;
+  const canPost = postQuestion.trim() && postOptions.filter((o) => o.trim()).length >= 2 && postDeadline &&
+    (postAudience === "followers" || targetedUsers.length > 0);
 
   return (
     <div className="min-h-screen" style={{ background: "var(--bg)", color: "var(--text)" }}>
@@ -337,133 +349,17 @@ export default function FeedPage() {
           }
 
           // type === "bet"
-          const bet = item;
-          const myEntry = bet.bet_entries.find((e) => e.user_id === privyUser?.id);
-          const isOpen = bet.status === "open" && new Date(bet.deadline) > new Date();
-          const totalStaked = bet.bet_entries.reduce((s, e) => s + e.points_staked, 0);
-          const creator = bet.balances;
-          const creatorName = creator?.display_name ?? creator?.username ?? "someone";
-          const isVoting = votingId === bet.id;
-
           return (
-            <div key={`bet-${bet.id}`} className="rounded-[16px] p-4 flex flex-col gap-3"
-              style={{ background: "var(--card)", border: "1px solid var(--border-soft)" }}>
-              {/* Creator row */}
-              <div className="flex items-center justify-between">
-                <button
-                  className="flex items-center gap-2.5"
-                  onClick={() => creator?.username && router.push(`/u/${creator.username}`)}
-                  style={{ opacity: creator?.username ? 1 : 0.7 }}
-                >
-                  <div className="rounded-full flex items-center justify-center overflow-hidden flex-shrink-0"
-                    style={{ width: 32, height: 32, background: "var(--accent-dim)", border: "1px solid var(--accent-border)" }}>
-                    {creator?.avatar_url
-                      ? <img src={creator.avatar_url} alt="" className="w-full h-full object-cover" />
-                      : <span className="text-[12px] font-black" style={{ color: "var(--accent)", fontFamily: "var(--font-nunito)" }}>{creatorName[0]?.toUpperCase() ?? "?"}</span>
-                    }
-                  </div>
-                  <div className="text-left">
-                    <p className="text-[13px] font-bold leading-none" style={{ color: "var(--text)" }}>{creatorName}</p>
-                    <p className="text-[11px] mt-0.5" style={{ color: "var(--muted)" }}>{timeAgo(bet.created_at)}</p>
-                  </div>
-                </button>
-                <div className="flex items-center gap-2">
-                  {bet.status === "resolved" && (
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-[6px]"
-                      style={{ background: "var(--win-dim)", color: "var(--win)", border: "1px solid var(--win-border)" }}>
-                      resolved
-                    </span>
-                  )}
-                  {isOpen && !seenBetIds.has(bet.id) && <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: "var(--accent)" }} />}
-                  {bet.creator_id === privyUser?.id && (
-                    <div className="relative">
-                      <button
-                        onClick={() => setMenuOpenId(menuOpenId === bet.id ? null : bet.id)}
-                        className="w-7 h-7 flex items-center justify-center rounded-full"
-                        style={{ color: "var(--muted)" }}
-                      >
-                        ···
-                      </button>
-                      {menuOpenId === bet.id && (
-                        <div className="absolute right-0 top-8 z-10 rounded-[12px] overflow-hidden shadow-lg"
-                          style={{ background: "var(--card)", border: "1px solid var(--border-soft)", minWidth: 130 }}>
-                          <button
-                            onClick={() => deleteBet(bet.id)}
-                            disabled={deletingId === bet.id}
-                            className="w-full px-4 py-3 text-left text-[13px] font-semibold"
-                            style={{ color: "var(--accent)" }}
-                          >
-                            {deletingId === bet.id ? "deleting…" : "delete bet"}
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Question */}
-              <p className="text-[15px] font-bold leading-snug" style={{ color: "var(--text)" }}>{bet.question}</p>
-
-              {/* Options */}
-              <div className="flex flex-col gap-2">
-                {bet.bet_options.map((opt) => {
-                  const optTotal = bet.bet_entries.filter((e) => e.option_id === opt.id).reduce((s, e) => s + e.points_staked, 0);
-                  const pct = totalStaked > 0 ? Math.round((optTotal / totalStaked) * 100) : 0;
-                  const isWinner = bet.winning_option_id === opt.id;
-                  const isMine = myEntry?.option_id === opt.id;
-                  const hasVoted = !!myEntry;
-
-                  if (hasVoted || !isOpen) {
-                    return (
-                      <div key={opt.id} className="rounded-[10px] p-2.5 flex flex-col gap-1.5"
-                        style={{
-                          background: isWinner ? "var(--win-dim)" : isMine ? "var(--accent-dim)" : "rgba(255,255,255,0.03)",
-                          border: `1px solid ${isWinner ? "var(--win-border)" : isMine ? "var(--accent-border)" : "rgba(255,255,255,0.06)"}`,
-                        }}>
-                        <div className="flex items-center justify-between">
-                          <span className="text-[13px] font-semibold" style={{ color: isMine || isWinner ? (isMine ? "var(--accent)" : "var(--win)") : "var(--text)" }}>{opt.label}</span>
-                          <span className="text-[13px] font-bold" style={{ color: isMine ? "var(--accent)" : "var(--muted)" }}>{pct}%</span>
-                        </div>
-                        <div className="rounded-full overflow-hidden" style={{ height: 3, background: "rgba(255,255,255,0.06)" }}>
-                          <div className="h-full rounded-full" style={{
-                            width: `${pct}%`,
-                            background: isWinner ? "var(--win-border)" : isMine ? "var(--accent-border)" : "rgba(255,255,255,0.18)",
-                          }} />
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <button key={opt.id}
-                      onClick={() => vote(bet.id, opt.id)}
-                      disabled={!!isVoting}
-                      className="rounded-[10px] py-2.5 px-3 text-[14px] font-semibold text-center transition-opacity"
-                      style={{
-                        background: "rgba(255,255,255,0.04)",
-                        border: "1px solid rgba(255,255,255,0.07)",
-                        color: "var(--text)",
-                        opacity: isVoting ? 0.5 : 1,
-                      }}>
-                      {isVoting ? "…" : opt.label}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Footer */}
-              <div className="flex items-center justify-between pt-1" style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}>
-                <span className="text-[11px]" style={{ color: "var(--dimmer)" }}>
-                  {bet.bet_entries.length} {bet.bet_entries.length === 1 ? "vote" : "votes"}
-                  {totalStaked > 0 ? ` · ${totalStaked.toLocaleString()} pts` : ""}
-                </span>
-                <span className="text-[11px]" style={{ color: "var(--dimmer)" }}>
-                  {isOpen ? "closes " : "closed "}
-                  {new Date(bet.deadline).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                </span>
-              </div>
-            </div>
+            <FeedBetCard
+              key={`bet-${item.id}`}
+              item={item}
+              currentUserId={privyUser?.id}
+              seenBetIds={seenBetIds}
+              getAccessToken={getAccessToken}
+              onVote={(betId, optionId) => vote(betId, optionId)}
+              onDelete={() => setItems((prev) => prev.filter((i) => i.id !== item.id))}
+              onPointsChange={(delta) => setMyPoints((p) => (p ?? 0) + delta)}
+            />
           );
         })}
 
@@ -543,6 +439,67 @@ export default function FeedPage() {
               />
             </div>
 
+            {/* Audience */}
+            <div className="flex flex-col gap-2">
+              <label className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: "var(--dimmer)" }}>who can see this</label>
+              <div className="flex gap-2">
+                {(["followers", "specific"] as const).map((mode) => (
+                  <button key={mode} onClick={() => { setPostAudience(mode); if (mode === "followers") { setTargetedUsers([]); setUserSearch(""); setUserResults([]); } }}
+                    className="flex-1 py-2 rounded-[10px] text-[13px] font-bold"
+                    style={{ background: postAudience === mode ? "var(--accent)" : "rgba(255,255,255,0.05)", color: postAudience === mode ? "#fff" : "var(--muted)", border: `1px solid ${postAudience === mode ? "var(--accent)" : "rgba(255,255,255,0.07)"}` }}>
+                    {mode === "followers" ? "all followers" : "specific people"}
+                  </button>
+                ))}
+              </div>
+              {postAudience === "specific" && (
+                <div className="flex flex-col gap-2">
+                  {targetedUsers.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {targetedUsers.map((u) => (
+                        <div key={u.user_id} className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[12px] font-semibold"
+                          style={{ background: "var(--accent-dim)", color: "var(--accent)", border: "1px solid var(--accent-border)" }}>
+                          {u.display_name ?? u.username ?? "user"}
+                          <button onClick={() => setTargetedUsers((prev) => prev.filter((t) => t.user_id !== u.user_id))} className="ml-0.5 opacity-70 hover:opacity-100">✕</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="relative">
+                    <input
+                      className="w-full rounded-[12px] px-4 py-2.5 text-[13px] outline-none"
+                      style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--accent-border)", color: "var(--text)" }}
+                      placeholder="search people…"
+                      value={userSearch}
+                      onChange={(e) => onUserSearchChange(e.target.value)}
+                    />
+                    {userResults.length > 0 && (
+                      <div className="absolute left-0 right-0 top-full mt-1 z-10 rounded-[12px] overflow-hidden shadow-lg"
+                        style={{ background: "var(--card)", border: "1px solid var(--border-soft)" }}>
+                        {userResults.slice(0, 5).map((u) => (
+                          <button key={u.user_id} onClick={() => addTargetUser(u)}
+                            className="w-full px-4 py-2.5 flex items-center gap-2.5 text-left"
+                            style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                            <div className="rounded-full flex items-center justify-center overflow-hidden flex-shrink-0"
+                              style={{ width: 28, height: 28, background: "var(--accent-dim)", border: "1px solid var(--accent-border)" }}>
+                              {u.avatar_url
+                                ? <img src={u.avatar_url} alt="" className="w-full h-full object-cover" />
+                                : <span className="text-[11px] font-black" style={{ color: "var(--accent)" }}>{(u.display_name ?? u.username ?? "?")[0]?.toUpperCase()}</span>
+                              }
+                            </div>
+                            <div>
+                              <p className="text-[13px] font-semibold leading-none" style={{ color: "var(--text)" }}>{u.display_name ?? u.username}</p>
+                              {u.username && <p className="text-[11px] mt-0.5" style={{ color: "var(--muted)" }}>@{u.username}</p>}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {userSearchLoading && <p className="text-[11px] mt-1" style={{ color: "var(--muted)" }}>searching…</p>}
+                  </div>
+                </div>
+              )}
+            </div>
+
             {postError && <p className="text-[13px] font-semibold" style={{ color: "var(--accent)" }}>{postError}</p>}
 
             <button
@@ -553,6 +510,340 @@ export default function FeedPage() {
               {posting ? "posting…" : "post prediction"}
             </button>
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FeedBetCard({
+  item,
+  currentUserId,
+  seenBetIds,
+  getAccessToken,
+  onVote,
+  onDelete,
+  onPointsChange,
+}: {
+  item: FeedBet;
+  currentUserId?: string;
+  seenBetIds: Set<string>;
+  getAccessToken: () => Promise<string | null>;
+  onVote: (betId: string, optionId: string) => void;
+  onDelete: () => void;
+  onPointsChange: (delta: number) => void;
+}) {
+  const router = useRouter();
+  const creator = item.balances;
+  const creatorName = creator?.display_name ?? creator?.username ?? "someone";
+  const isOpen = item.status === "open" && new Date(item.deadline) > new Date();
+  const myEntry = item.bet_entries.find((e) => e.user_id === currentUserId);
+  const totalStaked = item.bet_entries.reduce((s, e) => s + e.points_staked, 0);
+
+  const [liked, setLiked] = useState(item.liked_by_me);
+  const [likeCount, setLikeCount] = useState(item.like_count);
+  const [showComments, setShowComments] = useState(false);
+  const [comments, setComments] = useState<BetComment[]>([]);
+  const [commentCount, setCommentCount] = useState(item.comment_count);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [commentInput, setCommentInput] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [voting, setVoting] = useState(false);
+  const [doubleDownAmt, setDoubleDownAmt] = useState(25);
+  const [showDoubleDown, setShowDoubleDown] = useState(false);
+  const [doubleDowning, setDoubleDowning] = useState(false);
+  const [doubleDownError, setDoubleDownError] = useState<string | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showMenu) return;
+    function close(e: MouseEvent) { if (menuRef.current && !menuRef.current.contains(e.target as Node)) setShowMenu(false); }
+    document.addEventListener("click", close);
+    return () => document.removeEventListener("click", close);
+  }, [showMenu]);
+
+  async function toggleLike() {
+    const token = await getAccessToken();
+    setLiked((v) => !v);
+    setLikeCount((c) => liked ? c - 1 : c + 1);
+    await fetch(`/api/v1/bets/${item.id}/like`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+  }
+
+  async function fetchComments() {
+    setCommentsLoading(true);
+    const token = await getAccessToken();
+    const res = await fetch(`/api/v1/bets/${item.id}/comments`, { headers: { Authorization: `Bearer ${token}` } });
+    const data = await res.json().catch(() => ({}));
+    setComments(data.comments ?? []);
+    setCommentCount(data.comments?.length ?? commentCount);
+    setCommentsLoading(false);
+  }
+
+  async function submitComment(e: React.FormEvent) {
+    e.preventDefault();
+    if (!commentInput.trim() || submitting) return;
+    setSubmitting(true);
+    const token = await getAccessToken();
+    const res = await fetch(`/api/v1/bets/${item.id}/comments`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ body: commentInput.trim() }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) {
+      setComments((prev) => [...prev, data.comment]);
+      setCommentCount((c) => c + 1);
+      setCommentInput("");
+    }
+    setSubmitting(false);
+  }
+
+  async function deleteComment(commentId: string) {
+    const token = await getAccessToken();
+    await fetch(`/api/v1/bets/${item.id}/comments/${commentId}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+    setComments((prev) => prev.filter((c) => c.id !== commentId));
+    setCommentCount((c) => c - 1);
+  }
+
+  async function doVote(optionId: string) {
+    if (voting) return;
+    setVoting(true);
+    onVote(item.id, optionId);
+    setVoting(false);
+  }
+
+  async function doDoubleDown() {
+    setDoubleDowning(true);
+    setDoubleDownError(null);
+    const token = await getAccessToken();
+    const res = await fetch(`/api/v1/bets/${item.id}/double-down`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ points: doubleDownAmt }),
+    });
+    if (res.ok) {
+      onPointsChange(-doubleDownAmt);
+      setShowDoubleDown(false);
+    } else {
+      const data = await res.json().catch(() => ({}));
+      setDoubleDownError(data.error ?? "something went wrong");
+    }
+    setDoubleDowning(false);
+  }
+
+  async function doDelete() {
+    setDeleting(true);
+    const token = await getAccessToken();
+    const res = await fetch(`/api/v1/bets/${encodeURIComponent(item.id)}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+    if (res.ok) onDelete();
+    setDeleting(false);
+  }
+
+  return (
+    <div className="rounded-[16px] p-4 flex flex-col gap-3" style={{ background: "var(--card)", border: "1px solid var(--border-soft)" }}>
+      {/* Creator row */}
+      <div className="flex items-center justify-between">
+        <button className="flex items-center gap-2.5" onClick={() => creator?.username && router.push(`/u/${creator.username}`)} style={{ opacity: creator?.username ? 1 : 0.7 }}>
+          <div className="rounded-full flex items-center justify-center overflow-hidden flex-shrink-0"
+            style={{ width: 32, height: 32, background: "var(--accent-dim)", border: "1px solid var(--accent-border)" }}>
+            {creator?.avatar_url
+              ? <img src={creator.avatar_url} alt="" className="w-full h-full object-cover" />
+              : <span className="text-[12px] font-black" style={{ color: "var(--accent)", fontFamily: "var(--font-nunito)" }}>{creatorName[0]?.toUpperCase() ?? "?"}</span>
+            }
+          </div>
+          <div className="text-left">
+            <p className="text-[13px] font-bold leading-none" style={{ color: "var(--text)" }}>{creatorName}</p>
+            <p className="text-[11px] mt-0.5" style={{ color: "var(--muted)" }}>{timeAgo(item.created_at)}</p>
+          </div>
+        </button>
+        <div className="flex items-center gap-2">
+          {item.status === "resolved" && (
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-[6px]"
+              style={{ background: "var(--win-dim)", color: "var(--win)", border: "1px solid var(--win-border)" }}>resolved</span>
+          )}
+          {isOpen && !seenBetIds.has(item.id) && <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: "var(--accent)" }} />}
+          {item.creator_id === currentUserId && (
+            <div className="relative" ref={menuRef}>
+              <button onClick={() => setShowMenu((s) => !s)} className="w-7 h-7 flex items-center justify-center rounded-full text-[15px] font-bold" style={{ color: "var(--muted)" }}>···</button>
+              {showMenu && (
+                <div className="absolute right-0 top-8 z-10 rounded-[12px] shadow-lg" style={{ background: "var(--card)", border: "1px solid var(--border-soft)", minWidth: 140 }}>
+                  {confirmDelete ? (
+                    <div className="px-4 py-2.5 flex flex-col gap-2">
+                      <p className="text-[12px] font-semibold" style={{ color: "var(--muted)" }}>delete this bet?</p>
+                      <div className="flex gap-2">
+                        <button onClick={() => { setShowMenu(false); setConfirmDelete(false); doDelete(); }} disabled={deleting}
+                          className="flex-1 py-1.5 rounded-lg text-[12px] font-bold" style={{ background: "var(--loss)", color: "#fff" }}>delete</button>
+                        <button onClick={() => setConfirmDelete(false)}
+                          className="flex-1 py-1.5 rounded-lg text-[12px] font-bold" style={{ background: "rgba(255,255,255,0.08)", color: "var(--muted)" }}>cancel</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button onClick={() => setConfirmDelete(true)} className="w-full px-4 py-3 text-left text-[13px] font-semibold" style={{ color: "var(--accent)" }}>
+                      delete bet
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Question */}
+      <p className="text-[15px] font-bold leading-snug" style={{ color: "var(--text)" }}>{item.question}</p>
+
+      {/* Options */}
+      <div className="flex flex-col gap-2">
+        {item.bet_options.map((opt) => {
+          const optTotal = item.bet_entries.filter((e) => e.option_id === opt.id).reduce((s, e) => s + e.points_staked, 0);
+          const pct = totalStaked > 0 ? Math.round((optTotal / totalStaked) * 100) : 0;
+          const isWinner = item.winning_option_id === opt.id;
+          const isMine = myEntry?.option_id === opt.id;
+          const hasVoted = !!myEntry;
+
+          if (hasVoted || !isOpen) {
+            return (
+              <div key={opt.id} className="rounded-[10px] p-2.5 flex flex-col gap-1.5"
+                style={{ background: isWinner ? "var(--win-dim)" : isMine ? "var(--accent-dim)" : "rgba(255,255,255,0.03)", border: `1px solid ${isWinner ? "var(--win-border)" : isMine ? "var(--accent-border)" : "rgba(255,255,255,0.06)"}` }}>
+                <div className="flex items-center justify-between">
+                  <span className="text-[13px] font-semibold" style={{ color: isWinner ? "var(--win)" : isMine ? "var(--accent)" : "var(--text)" }}>{opt.label}</span>
+                  <span className="text-[13px] font-bold" style={{ color: isMine ? "var(--accent)" : "var(--muted)" }}>{pct}%</span>
+                </div>
+                <div className="rounded-full overflow-hidden" style={{ height: 3, background: "rgba(255,255,255,0.06)" }}>
+                  <div className="h-full rounded-full" style={{ width: `${pct}%`, background: isWinner ? "var(--win-border)" : isMine ? "var(--accent-border)" : "rgba(255,255,255,0.18)" }} />
+                </div>
+              </div>
+            );
+          }
+
+          return (
+            <button key={opt.id} onClick={() => doVote(opt.id)} disabled={voting}
+              className="rounded-[10px] py-2.5 px-3 text-[14px] font-semibold text-center"
+              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", color: "var(--text)", opacity: voting ? 0.5 : 1 }}>
+              {voting ? "…" : opt.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Double-down */}
+      {myEntry && isOpen && (
+        <div>
+          {showDoubleDown ? (
+            <div className="rounded-[12px] p-3 flex flex-col gap-2" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+              <p className="text-[12px] font-semibold" style={{ color: "var(--muted)" }}>double down — add more points</p>
+              <div className="flex gap-2 items-center">
+                {[25, 50, 100].map((amt) => (
+                  <button key={amt} onClick={() => setDoubleDownAmt(amt)}
+                    className="px-3 py-1.5 rounded-[8px] text-[12px] font-bold"
+                    style={{ background: doubleDownAmt === amt ? "var(--accent)" : "rgba(255,255,255,0.06)", color: doubleDownAmt === amt ? "#fff" : "var(--muted)" }}>
+                    {amt}
+                  </button>
+                ))}
+                <input type="number" min={1} value={doubleDownAmt} onChange={(e) => setDoubleDownAmt(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="w-16 rounded-[8px] px-2 py-1.5 text-[12px] text-center outline-none"
+                  style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "var(--text)" }} />
+              </div>
+              {doubleDownError && <p className="text-[11px]" style={{ color: "var(--accent)" }}>{doubleDownError}</p>}
+              <div className="flex gap-2">
+                <button onClick={doDoubleDown} disabled={doubleDowning}
+                  className="flex-1 py-2 rounded-[10px] text-[13px] font-bold"
+                  style={{ background: "var(--accent)", color: "#fff", opacity: doubleDowning ? 0.6 : 1 }}>
+                  {doubleDowning ? "adding…" : `+${doubleDownAmt} pts`}
+                </button>
+                <button onClick={() => { setShowDoubleDown(false); setDoubleDownError(null); }}
+                  className="px-4 py-2 rounded-[10px] text-[13px] font-semibold"
+                  style={{ background: "rgba(255,255,255,0.06)", color: "var(--muted)" }}>cancel</button>
+              </div>
+            </div>
+          ) : (
+            <button onClick={() => setShowDoubleDown(true)}
+              className="w-full py-2 rounded-[10px] text-[12px] font-bold"
+              style={{ background: "rgba(255,255,255,0.04)", border: "1px dashed rgba(255,255,255,0.1)", color: "var(--muted)" }}>
+              double down
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Footer: stats + like + comment */}
+      <div className="flex items-center justify-between pt-1" style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}>
+        <span className="text-[11px]" style={{ color: "var(--dimmer)" }}>
+          {item.bet_entries.length} {item.bet_entries.length === 1 ? "vote" : "votes"}
+          {totalStaked > 0 ? ` · ${totalStaked.toLocaleString()} pts` : ""}
+          {" · "}
+          {isOpen ? "closes " : "closed "}
+          {new Date(item.deadline).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+        </span>
+        <div className="flex items-center gap-3">
+          <button onClick={() => { if (!showComments) fetchComments(); setShowComments((s) => !s); }}
+            className="flex items-center gap-1 text-[12px] font-semibold"
+            style={{ color: showComments ? "var(--accent)" : "var(--muted)" }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            </svg>
+            {commentCount > 0 ? commentCount : ""}
+          </button>
+          <button onClick={toggleLike} className="flex items-center gap-1 text-[12px] font-semibold" style={{ color: liked ? "var(--accent)" : "var(--muted)" }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill={liked ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+            </svg>
+            {likeCount > 0 ? likeCount : ""}
+          </button>
+        </div>
+      </div>
+
+      {/* Comments */}
+      {showComments && (
+        <div className="flex flex-col gap-2 pt-1" style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}>
+          {commentsLoading ? (
+            <p className="text-[12px]" style={{ color: "var(--muted)" }}>loading…</p>
+          ) : comments.length === 0 ? (
+            <p className="text-[12px]" style={{ color: "var(--dimmer)" }}>no comments yet</p>
+          ) : (
+            comments.map((c) => {
+              const name = c.balances?.display_name ?? c.balances?.username ?? "someone";
+              return (
+                <div key={c.id} className="flex gap-2 items-start">
+                  <div className="rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden"
+                    style={{ width: 24, height: 24, background: "var(--accent-dim)", border: "1px solid var(--accent-border)" }}>
+                    {c.balances?.avatar_url
+                      ? <img src={c.balances.avatar_url} alt="" className="w-full h-full object-cover" />
+                      : <span className="text-[9px] font-black" style={{ color: "var(--accent)" }}>{name[0]?.toUpperCase()}</span>
+                    }
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-[12px] font-bold" style={{ color: "var(--text)" }}>{name}</span>
+                      <span className="text-[10px]" style={{ color: "var(--dimmer)" }}>{timeAgo(c.created_at)}</span>
+                    </div>
+                    {c.body && <p className="text-[13px] leading-snug mt-0.5" style={{ color: "var(--text)" }}>{c.body}</p>}
+                    {c.gif_url && <img src={c.gif_url} alt="gif" className="mt-1 rounded-[8px] max-w-[160px]" />}
+                  </div>
+                  {c.user_id === currentUserId && (
+                    <button onClick={() => deleteComment(c.id)} className="text-[11px] flex-shrink-0" style={{ color: "var(--dimmer)" }}>✕</button>
+                  )}
+                </div>
+              );
+            })
+          )}
+          <form onSubmit={submitComment} className="flex gap-2 mt-1">
+            <input
+              className="flex-1 rounded-[10px] px-3 py-2 text-[13px] outline-none"
+              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "var(--text)" }}
+              placeholder="add a comment…"
+              value={commentInput}
+              onChange={(e) => setCommentInput(e.target.value)}
+            />
+            <button type="submit" disabled={!commentInput.trim() || submitting}
+              className="px-3 py-2 rounded-[10px] text-[13px] font-bold"
+              style={{ background: "var(--accent)", color: "#fff", opacity: (!commentInput.trim() || submitting) ? 0.4 : 1 }}>
+              {submitting ? "…" : "post"}
+            </button>
+          </form>
         </div>
       )}
     </div>
