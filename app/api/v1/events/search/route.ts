@@ -17,14 +17,15 @@ export async function GET(req: NextRequest) {
 
   const ql = q.toLowerCase();
 
-  // Fetch open events/groups the user belongs to (same pattern as GET /api/v1/events)
+  // Fetch events/groups the user belongs to (same pattern as GET /api/v1/events)
   const { data: eventsData } = await supabase
     .from("events")
     .select("id, name, type, ends_at, event_guests!inner(user_id)")
-    .eq("event_guests.user_id", user.userId)
-    .or(`ends_at.is.null,ends_at.gt.${new Date().toISOString()}`);
+    .eq("event_guests.user_id", user.userId);
 
-  const openEvents = (eventsData ?? []) as { id: string; name: string; type: string; ends_at: string | null }[];
+  // Filter to open (groups have no ends_at; events must not be in the past)
+  const openEvents = ((eventsData ?? []) as { id: string; name: string; type: string; ends_at: string | null }[])
+    .filter((e) => !e.ends_at || new Date(e.ends_at) > new Date());
   if (openEvents.length === 0) return NextResponse.json({ events: [] });
 
   const eventIds = openEvents.map((e) => e.id);
