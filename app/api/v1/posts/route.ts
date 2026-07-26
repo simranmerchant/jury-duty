@@ -13,13 +13,15 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const body = await req.json().catch(() => ({}));
-  const { bet_id, caption, photo_url, targeted_user_ids } = body;
+  const { bet_id, caption, photo_url, targeted_user_ids, tag_user_ids } = body;
 
   if (!bet_id) return NextResponse.json({ error: "bet_id required" }, { status: 400 });
   if (caption && caption.length > 280) return NextResponse.json({ error: "caption too long" }, { status: 400 });
   if (photo_url && typeof photo_url !== "string") return NextResponse.json({ error: "invalid photo_url" }, { status: 400 });
   if (targeted_user_ids !== undefined && !Array.isArray(targeted_user_ids))
     return NextResponse.json({ error: "targeted_user_ids must be an array" }, { status: 400 });
+  if (tag_user_ids !== undefined && !Array.isArray(tag_user_ids))
+    return NextResponse.json({ error: "tag_user_ids must be an array" }, { status: 400 });
 
   // Validate bet: must exist, be resolved, and be public
   const { data: bet } = await supabase
@@ -58,6 +60,36 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Insert post_tags and notify tagged users
+  const tagIds = (Array.isArray(tag_user_ids) ? tag_user_ids : []).filter((id) => typeof id === "string" && id !== user.userId);
+  if (tagIds.length > 0) {
+    const [senderRes] = await Promise.all([
+      supabase.from("balances").select("display_name, username").eq("user_id", user.userId).single(),
+      supabase.from("post_tags").upsert(
+        tagIds.map((uid: string) => ({ post_id: post.id, tagged_user_id: uid })),
+        { onConflict: "post_id,tagged_user_id", ignoreDuplicates: true }
+      ),
+    ]);
+    const senderName = senderRes.data?.display_name ?? senderRes.data?.username ?? "someone";
+    const tagNotifData = { post_id: post.id, bet_id };
+    await Promise.all([
+      supabase.from("notifications").insert(
+        tagIds.map((uid: string) => ({
+          user_id: uid,
+          type: "post_tag",
+          title: `${senderName} tagged you in a post`,
+          body: caption?.trim()?.slice(0, 80) ?? "you were tagged in a prediction",
+          data: tagNotifData,
+        }))
+      ),
+      sendPushToUsers(tagIds, {
+        title: `${senderName} tagged you in a post`,
+        body: caption?.trim()?.slice(0, 80) ?? "you were tagged in a prediction",
+        data: tagNotifData,
+      }),
+    ]);
+  }
 
   // Notify @mentioned users
   const captionText = caption?.trim() ?? "";

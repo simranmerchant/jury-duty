@@ -52,10 +52,10 @@ export async function POST(
     if (notifications.length > 0) {
       await supabase.from("notifications").insert(notifications);
 
-      // Push notifications
-      const wonIds = notifications.filter((n) => n.type === "bet_resolved_won").map((n) => n.user_id);
-      const lostIds = notifications.filter((n) => n.type === "bet_resolved_lost").map((n) => n.user_id);
-      const refundIds = notifications.filter((n) => n.type === "bet_resolved_refunded").map((n) => n.user_id);
+      // Push notifications — exclude the resolver (they triggered it, no need to push them)
+      const wonIds = notifications.filter((n) => n.type === "bet_resolved_won" && n.user_id !== user.userId).map((n) => n.user_id);
+      const lostIds = notifications.filter((n) => n.type === "bet_resolved_lost" && n.user_id !== user.userId).map((n) => n.user_id);
+      const refundIds = notifications.filter((n) => n.type === "bet_resolved_refunded" && n.user_id !== user.userId).map((n) => n.user_id);
       const pushData = (outcome: string) => ({ bet_id: betId, outcome, ...(eventId ? { event_id: eventId } : {}) });
       await Promise.all([
         wonIds.length > 0 && sendPushToUsers(wonIds, { title: "jury's in — you won 🎉", body: `you called it on "${bet.question}"`, data: pushData("won") }),

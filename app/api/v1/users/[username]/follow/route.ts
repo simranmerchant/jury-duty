@@ -43,9 +43,10 @@ export async function POST(
   const followerName = follower?.display_name ?? follower?.username ?? "someone";
   const notif = buildFollowNotification(followerName, status);
 
+  const notifData = { user_id: user.userId, username: follower?.username ?? null };
   await Promise.all([
-    supabase.from("notifications").insert({ user_id: targetId, ...notif, data: { user_id: user.userId } }),
-    sendPushToUsers([targetId], { ...notif, data: { user_id: user.userId } }),
+    supabase.from("notifications").insert({ user_id: targetId, ...notif, data: notifData }),
+    sendPushToUsers([targetId], { ...notif, data: notifData }),
   ]);
 
   return NextResponse.json({ status });

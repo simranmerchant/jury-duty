@@ -37,9 +37,10 @@ export async function POST(
   const accepterName = accepter?.display_name ?? accepter?.username ?? "someone";
   const notif = buildAcceptNotification(accepterName);
 
+  const notifData = { user_id: user.userId, username: accepter?.username ?? null };
   await Promise.all([
-    supabase.from("notifications").insert({ user_id: requesterId, ...notif, data: { user_id: user.userId } }),
-    sendPushToUsers([requesterId], { ...notif, data: { user_id: user.userId } }),
+    supabase.from("notifications").insert({ user_id: requesterId, ...notif, data: notifData }),
+    sendPushToUsers([requesterId], { ...notif, data: notifData }),
   ]);
 
   return NextResponse.json({ ok: true });

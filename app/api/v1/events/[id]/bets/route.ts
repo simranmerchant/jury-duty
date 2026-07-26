@@ -187,18 +187,18 @@ export async function POST(
       supabase.from("notifications").insert(otherGuestIds.map((uid) => ({
         user_id: uid,
         type: "new_bet",
-        title: `new bet in ${event.name} 🗳️`,
-        body: `${creatorName} just posted a new prediction. tap to vote.`,
+        title: `${creatorName} posted a bet in ${event.name} 🗳️`,
+        body: question.trim(),
         data: { bet_id: bet.id, event_id: eventId },
       }))),
       sendPushToUsers(otherGuestIds, {
-        title: `new bet in ${event.name} 🗳️`,
-        body: "tap to vote",
+        title: `${creatorName} posted a bet in ${event.name} 🗳️`,
+        body: question.trim(),
         data: { event_id: eventId, bet_id: bet.id },
       }),
       sendWebPushToUsers(otherGuestIds, {
-        title: `new bet in ${event.name} 🗳️`,
-        body: "tap to vote",
+        title: `${creatorName} posted a bet in ${event.name} 🗳️`,
+        body: question.trim(),
         data: { event_id: eventId, bet_id: bet.id },
       }),
     ]);
