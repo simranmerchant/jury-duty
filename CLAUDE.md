@@ -37,7 +37,7 @@ Next.js web app + API backend for **Jury Duty** — a social prediction app wher
 - `lib/payout.ts` — bet resolution payout math (tested)
 - `lib/push.ts` / `lib/webpush.ts` — push notification helpers
 
-**Database:** migrations live in `supabase/migrations/`. Latest is `060_perf_indexes.sql` (adds `post_tags` table for photo tagging; updates `get_feed` to include `tagged_users` on posts and expand visibility to tagged users' followers when poster is public). Apply with `npx supabase db push` after linking (`supabase link --project-ref gfcipzuqaldyebocmypw`).
+**Database:** migrations live in `supabase/migrations/`. Latest is `062_explore_topics.sql` (adds `topics` table, `topic_id` FK on `explore_bets`, seeds "World Cup Final" topic, assigns all existing explore bets to it) (adds `get_user_stats(p_user_id)` and `get_user_win_rate(p_user_id)` RPCs — used by `/me` and `/users/[username]` to compute stats without fetching all bet_entries rows). Apply with `npx supabase db push` after linking (`supabase link --project-ref gfcipzuqaldyebocmypw`).
 
 **Key API routes added:**
 - `posts/` — POST to share a resolved bet to feed; DELETE to unshare (by `?bet_id=`)
@@ -50,6 +50,9 @@ Next.js web app + API backend for **Jury Duty** — a social prediction app wher
 - `polls/[id]/comments/` — GET list; POST to add comment
 - `bets/[id]/invite-link/` — GET (creator only) — generate shareable invite link for a feed bet
 - `join/bet/` — GET (public) bet preview by invite token; POST (auth) accept invite → adds to `bet_invites`
+- `topics/` — GET list all topics with bet counts; POST create topic
+- `users/[username]/posts/` — GET paginated post grid for a user profile (respects privacy)
+- Feed now returns `follow_statuses: Record<userId, status>` alongside items for +follow button in feed
 
 **Current branch for ETHGlobal work:** `feat/ethglobal-prizes` (not merged to main).
 

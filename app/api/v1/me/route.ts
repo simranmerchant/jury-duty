@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/privy";
 import { supabase } from "@/lib/supabase";
-import { computeOutcome } from "@/lib/outcome";
 
 export async function GET(req: NextRequest) {
   const token = req.headers.get("authorization")?.replace("Bearer ", "");
@@ -10,25 +9,14 @@ export async function GET(req: NextRequest) {
   const user = await requireUser(token).catch(() => null);
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  const [{ data: balance }, { data: entries }, { data: agreementRow }, { data: blockRows }, { count: followerCount }, { count: followingCount }] = await Promise.all([
+  const [{ data: balance }, { data: statsData }, { data: agreementRow }, { data: blockRows }, { count: followerCount }, { count: followingCount }] = await Promise.all([
     supabase
       .from("balances")
       .select("points, display_name, avatar_url, username, referral_code, is_private")
       .eq("user_id", user.userId)
       .single(),
 
-    supabase
-      .from("bet_entries")
-      .select(`
-        id, points_staked, option_id, is_hidden_from_profile, is_anonymous,
-        bet_options(label),
-        bets(
-          id, question, status, winning_option_id,
-          events(id, name)
-        )
-      `)
-      .eq("user_id", user.userId)
-      .order("created_at", { ascending: false }),
+    (supabase as any).rpc("get_user_stats", { p_user_id: user.userId }),
 
     supabase.from("user_agreements").select("user_id").eq("user_id", user.userId).single(),
 
@@ -39,29 +27,7 @@ export async function GET(req: NextRequest) {
     supabase.from("follows").select("*", { count: "exact", head: true }).eq("follower_id", user.userId).eq("status", "accepted"),
   ]);
 
-  // Compute outcome for each entry
-  const history = (entries ?? []).map((e: any) => {
-    const bet = e.bets;
-    return {
-      id: e.id,
-      bet_id: bet.id,
-      event_id: bet.events?.id,
-      event_name: bet.events?.name,
-      question: bet.question,
-      pick: e.bet_options?.label,
-      points_staked: e.points_staked,
-      outcome: computeOutcome(bet.status, bet.winning_option_id, e.option_id),
-      is_hidden_from_profile: (e.is_hidden_from_profile || e.is_anonymous) ?? false,
-      is_anonymous: e.is_anonymous ?? false,
-    };
-  });
-
-  const stats = {
-    total: history.length,
-    won: history.filter((h) => h.outcome === "won").length,
-    lost: history.filter((h) => h.outcome === "lost").length,
-    pending: history.filter((h) => h.outcome === "pending").length,
-  };
+  const stats = statsData ?? { total: 0, won: 0, lost: 0, pending: 0 };
 
   return NextResponse.json({
     points: balance?.points ?? 0,
@@ -72,7 +38,6 @@ export async function GET(req: NextRequest) {
     is_private: balance?.is_private ?? false,
     follower_count: followerCount ?? 0,
     following_count: followingCount ?? 0,
-    history,
     stats,
     has_agreed_to_terms: !!agreementRow,
     blocked_user_ids: (blockRows ?? []).map((r) => r.blocked_id),

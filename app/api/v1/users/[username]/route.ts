@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/privy";
 import { supabase } from "@/lib/supabase";
-import { computeOutcome } from "@/lib/outcome";
 
 // GET /api/v1/users/[username] — public profile (auth optional)
 export async function GET(req: NextRequest, { params }: { params: Promise<{ username: string }> }) {
@@ -22,14 +21,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ user
 
   const userId = balance.user_id;
 
-  // Fetch entries, memberships, follow counts, and viewer's follow state in parallel
-  const [{ data: entries }, { data: memberships }, { count: followerCount }, { count: followingCount }, { data: viewerFollow }] = await Promise.all([
-    supabase
-      .from("bet_entries")
-      .select("option_id, bets(status, winning_option_id, visibility)")
-      .eq("user_id", userId)
-      .eq("is_anonymous", false)
-      .eq("is_hidden_from_profile", false),
+  // Fetch win rate via RPC, memberships, follow counts, and viewer's follow state in parallel
+  const [{ data: winRateData }, { data: memberships }, { count: followerCount }, { count: followingCount }, { data: viewerFollow }] = await Promise.all([
+    (supabase as any).rpc("get_user_win_rate", { p_user_id: userId }),
     supabase
       .from("event_guests")
       .select("events(id, name, type)")
@@ -54,13 +48,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ user
       : Promise.resolve({ data: null }),
   ]);
 
-  const publicEntries = (entries ?? []).filter((e: any) => e.bets?.visibility === "public");
-  const outcomes = publicEntries.map((e: any) =>
-    computeOutcome(e.bets.status, e.bets.winning_option_id, e.option_id),
-  );
-  const resolved = outcomes.filter((o) => o === "won" || o === "lost");
-  const won = outcomes.filter((o) => o === "won").length;
-  const win_rate = resolved.length > 0 ? Math.round((won / resolved.length) * 100) : null;
+  const totalResolved = winRateData?.total_resolved ?? 0;
+  const wonCount = winRateData?.won ?? 0;
+  const win_rate = totalResolved > 0 ? Math.round((wonCount / totalResolved) * 100) : null;
 
   const profileEventIds = new Set(
     (memberships ?? []).map((m: any) => m.events?.id).filter(Boolean),

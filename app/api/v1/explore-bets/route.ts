@@ -10,23 +10,30 @@ export async function GET(req: NextRequest) {
   const user = await requireUser(token).catch(() => null);
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
+  const { searchParams } = new URL(req.url);
+  const topicId = searchParams.get("topic_id");
+
+  const betsQuery = supabase
+    .from("explore_bets")
+    .select(`
+      id, question, option_a, option_b, status, winning_side, closes_at, created_at, creator_id, topic_id,
+      creator:creator_id(display_name, username, avatar_url),
+      explore_bet_entries(user_id, side, points_wagered, bettor:user_id(display_name, username, avatar_url)),
+      explore_bet_posts(
+        id, caption, photo_url, created_at,
+        user:user_id(user_id, display_name, username, avatar_url, is_private)
+      ),
+      explore_bet_likes(user_id),
+      explore_bet_reactions(user_id, emoji),
+      explore_bet_comments(id)
+    `)
+    .order("created_at", { ascending: false })
+    .limit(50);
+
+  if (topicId) betsQuery.eq("topic_id", topicId);
+
   const [{ data: bets, error }, { data: followRows }] = await Promise.all([
-    supabase
-      .from("explore_bets")
-      .select(`
-        id, question, option_a, option_b, status, winning_side, closes_at, created_at, creator_id,
-        creator:creator_id(display_name, username, avatar_url),
-        explore_bet_entries(user_id, side, points_wagered, bettor:user_id(display_name, username, avatar_url)),
-        explore_bet_posts(
-          id, caption, photo_url, created_at,
-          user:user_id(user_id, display_name, username, avatar_url, is_private)
-        ),
-        explore_bet_likes(user_id),
-        explore_bet_reactions(user_id, emoji),
-        explore_bet_comments(id)
-      `)
-      .order("created_at", { ascending: false })
-      .limit(50),
+    betsQuery,
     supabase
       .from("follows")
       .select("following_id")
@@ -112,7 +119,7 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const body = await req.json().catch(() => ({}));
-  const { question, option_a, option_b, closes_at } = body;
+  const { question, option_a, option_b, closes_at, topic_id } = body;
 
   if (!question?.trim()) return NextResponse.json({ error: "question required" }, { status: 400 });
   if (question.trim().length > 200) return NextResponse.json({ error: "question too long" }, { status: 400 });
@@ -132,6 +139,7 @@ export async function POST(req: NextRequest) {
       option_b: option_b.trim(),
       creator_id: user.userId,
       closes_at: closes_at ?? null,
+      topic_id: topic_id ?? null,
     })
     .select("id")
     .single();

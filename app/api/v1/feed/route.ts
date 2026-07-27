@@ -29,5 +29,30 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "feed unavailable" }, { status: 500 });
   }
 
-  return NextResponse.json(data);
+  // Collect unique author IDs across all feed items (exclude self)
+  const items: any[] = data?.items ?? (Array.isArray(data) ? data : []);
+  const authorIds = new Set<string>();
+  for (const item of items) {
+    const id = item.user_id ?? item.creator_id;
+    if (id && id !== user.userId) authorIds.add(id);
+  }
+
+  // Batch-fetch follow statuses for all authors in one query
+  let follow_statuses: Record<string, string> = {};
+  if (authorIds.size > 0) {
+    const { data: follows } = await supabase
+      .from("follows")
+      .select("following_id, status")
+      .eq("follower_id", user.userId)
+      .in("following_id", [...authorIds]);
+    for (const f of follows ?? []) {
+      follow_statuses[f.following_id] = f.status;
+    }
+  }
+
+  // Merge follow_statuses into the response without modifying item shapes
+  if (typeof data === "object" && data !== null && !Array.isArray(data)) {
+    return NextResponse.json({ ...data, follow_statuses });
+  }
+  return NextResponse.json({ items: data, follow_statuses });
 }
