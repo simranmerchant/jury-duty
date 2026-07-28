@@ -56,7 +56,7 @@ export async function GET(
     // Explore bet posts
     supabase
       .from("explore_bet_posts")
-      .select("id, explore_bet_id, caption, photo_url, created_at, explore_bets:explore_bet_id(question), explore_bet_likes(user_id), explore_bet_comments:explore_bet_id(id)")
+      .select("id, explore_bet_id, caption, photo_url, created_at, explore_bets:explore_bet_id(question, explore_bet_likes(user_id), explore_bet_comments(id))")
       .eq("user_id", targetId)
       .order("created_at", { ascending: false })
       .limit(60),
@@ -85,8 +85,8 @@ export async function GET(
       type: "explore_bet_post" as const,
       photo_url: p.photo_url ?? null,
       bet_question: (p.explore_bets as any)?.question ?? null,
-      like_count: (p.explore_bet_likes ?? []).length,
-      comment_count: (p.explore_bet_comments ?? []).length,
+      like_count: ((p.explore_bets as any)?.explore_bet_likes ?? []).length,
+      comment_count: ((p.explore_bets as any)?.explore_bet_comments ?? []).length,
       created_at: p.created_at,
     })),
     ...(pollPosts ?? []).map((p: any) => ({
