@@ -87,6 +87,39 @@ describe("computePayouts — multiple winners split pot", () => {
   });
 });
 
+describe("computePayouts — proportional distribution", () => {
+  it("larger staker receives proportionally more than smaller staker", () => {
+    // pot=350, winner stakes=250 → alice floor(350*200/250)=280, bob floor(350*50/250)=70
+    const entries = [
+      entry("alice", "opt-a", 200),
+      entry("bob", "opt-a", 50),
+      entry("carol", "opt-b", 100),
+    ];
+    const result = computePayouts(entries, "opt-a");
+    expect(result.alice).toBe(280);
+    expect(result.bob).toBe(70);
+    expect(result.carol).toBeUndefined();
+    expect(result.alice + result.bob).toBe(350);
+  });
+
+  it("winner always receives at least their stake back when only losers oppose them", () => {
+    // alice bets 200 on winning side; if payout were equal-split she'd get less
+    // than her stake. Proportional ensures she always profits.
+    const entries = [
+      entry("alice", "opt-a", 200),
+      entry("bob", "opt-a", 50),
+      entry("carol", "opt-b", 150),
+    ];
+    const result = computePayouts(entries, "opt-a");
+    // pot=400, winner stakes=250 → alice=floor(400*200/250)=320, bob=floor(400*50/250)=80
+    expect(result.alice).toBe(320);
+    expect(result.bob).toBe(80);
+    expect(result.alice + result.bob).toBe(400);
+    // alice staked 200, got 320 — net +120 ✓ (never loses points for winning)
+    expect(result.alice).toBeGreaterThan(200);
+  });
+});
+
 describe("computePayouts — edge cases", () => {
   it("handles empty entries array", () => {
     expect(computePayouts([], "opt-a")).toEqual({});
@@ -99,7 +132,7 @@ describe("computePayouts — edge cases", () => {
       entry("bob", "opt-b", 50),
     ];
     const result = computePayouts(entries, "opt-a");
-    // pot=200, winners_count=2 (both alice entries), payout_each=100, alice total=200
+    // pot=200, alice holds all winner stakes (150) → alice gets all 200
     expect(result.alice).toBe(200);
     expect(result.bob).toBeUndefined();
   });

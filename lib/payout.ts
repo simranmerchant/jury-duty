@@ -15,6 +15,8 @@ export function calculateRefunds(
 // Mirrors the resolve_bet Postgres function's payout logic.
 // Returns a map of userId → points to credit.
 // winningOptionId=null means void (refund everyone).
+// Payouts are proportional to each winner's stake so bigger bettors on the
+// right side are never penalised relative to smaller bettors.
 export function computePayouts(
   entries: BetEntry[],
   winningOptionId: string | null
@@ -35,12 +37,17 @@ export function computePayouts(
     return result;
   }
 
-  const payoutEach = Math.floor(totalPot / winners.length);
-  const remainder = totalPot - payoutEach * winners.length;
+  const totalWinnerStakes = winners.reduce((s, e) => s + e.staked, 0);
 
-  for (const w of winners) result[w.userId] = (result[w.userId] ?? 0) + payoutEach;
+  let distributed = 0;
+  for (const w of winners) {
+    const share = Math.floor(totalPot * w.staked / totalWinnerStakes);
+    result[w.userId] = (result[w.userId] ?? 0) + share;
+    distributed += share;
+  }
 
-  // Remainder goes to the first winner (matches SQL order by created_at asc)
+  // Remainder (from floor rounding) goes to the first winner
+  const remainder = totalPot - distributed;
   if (remainder > 0) result[winners[0].userId] += remainder;
 
   return result;
