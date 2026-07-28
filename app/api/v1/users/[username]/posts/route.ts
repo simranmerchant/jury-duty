@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/privy";
 import { supabase } from "@/lib/supabase";
 
-// GET /api/v1/users/[username]/posts — public posts grid for a user profile
+// GET /api/v1/users/[username]/posts — all posts for a user's profile grid
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ username: string }> }
@@ -40,40 +40,66 @@ export async function GET(
     }
   }
 
-  const { data: posts, error } = await supabase
-    .from("posts")
-    .select(`
-      id, caption, photo_url, created_at, bet_id,
-      post_likes(user_id),
-      post_comments!post_id(id),
-      bets:bet_id(question, status, winning_option_id,
-        bet_options!bet_id(id, label),
-        bet_entries(user_id, option_id)
-      )
-    `)
-    .eq("user_id", targetId)
-    .order("created_at", { ascending: false })
-    .limit(60);
+  const [
+    { data: betPosts },
+    { data: explorePosts },
+    { data: pollPosts },
+  ] = await Promise.all([
+    // Regular feed bet posts
+    supabase
+      .from("posts")
+      .select("id, caption, photo_url, created_at, bets:bet_id(question), post_likes(user_id), post_comments!post_id(id)")
+      .eq("user_id", targetId)
+      .order("created_at", { ascending: false })
+      .limit(60),
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    // Explore bet posts
+    supabase
+      .from("explore_bet_posts")
+      .select("id, explore_bet_id, caption, photo_url, created_at, explore_bets:explore_bet_id(question), explore_bet_likes(user_id), explore_bet_comments:explore_bet_id(id)")
+      .eq("user_id", targetId)
+      .order("created_at", { ascending: false })
+      .limit(60),
 
-  const shaped = (posts ?? []).map((p: any) => ({
-    id: p.id,
-    caption: p.caption ?? null,
-    photo_url: p.photo_url ?? null,
-    created_at: p.created_at,
-    bet_id: p.bet_id,
-    like_count: (p.post_likes ?? []).length,
-    liked_by_me: (p.post_likes ?? []).some((l: any) => l.user_id === user.userId),
-    comment_count: (p.post_comments ?? []).length,
-    bet: p.bets
-      ? {
-          question: p.bets.question,
-          status: p.bets.status,
-          options: p.bets.bet_options ?? [],
-        }
-      : null,
-  }));
+    // Poll posts
+    supabase
+      .from("poll_posts")
+      .select("poll_id, caption, photo_url, created_at, polls:poll_id(question), poll_likes(user_id), poll_comments:poll_id(id)")
+      .eq("user_id", targetId)
+      .order("created_at", { ascending: false })
+      .limit(60),
+  ]);
+
+  const shaped = [
+    ...(betPosts ?? []).map((p: any) => ({
+      id: p.id,
+      type: "post" as const,
+      photo_url: p.photo_url ?? null,
+      bet_question: (p.bets as any)?.question ?? null,
+      like_count: (p.post_likes ?? []).length,
+      comment_count: (p.post_comments ?? []).length,
+      created_at: p.created_at,
+    })),
+    ...(explorePosts ?? []).map((p: any) => ({
+      id: p.explore_bet_id,
+      type: "explore_bet_post" as const,
+      photo_url: p.photo_url ?? null,
+      bet_question: (p.explore_bets as any)?.question ?? null,
+      like_count: (p.explore_bet_likes ?? []).length,
+      comment_count: (p.explore_bet_comments ?? []).length,
+      created_at: p.created_at,
+    })),
+    ...(pollPosts ?? []).map((p: any) => ({
+      id: p.poll_id,
+      type: "poll_post" as const,
+      photo_url: p.photo_url ?? null,
+      bet_question: (p.polls as any)?.question ?? null,
+      like_count: (p.poll_likes ?? []).length,
+      comment_count: (p.poll_comments ?? []).length,
+      created_at: p.created_at,
+    })),
+  ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+   .slice(0, 60);
 
   return NextResponse.json({ posts: shaped });
 }
