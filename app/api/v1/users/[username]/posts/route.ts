@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/privy";
 import { supabase } from "@/lib/supabase";
+import { shapeProfilePosts } from "@/lib/profile-posts";
 
 // GET /api/v1/users/[username]/posts — all posts for a user's profile grid
 export async function GET(
@@ -70,36 +71,7 @@ export async function GET(
       .limit(60),
   ]);
 
-  const shaped = [
-    ...(betPosts ?? []).map((p: any) => ({
-      id: p.id,
-      type: "post" as const,
-      photo_url: p.photo_url ?? null,
-      bet_question: (p.bets as any)?.question ?? null,
-      like_count: (p.post_likes ?? []).length,
-      comment_count: (p.post_comments ?? []).length,
-      created_at: p.created_at,
-    })),
-    ...(explorePosts ?? []).map((p: any) => ({
-      id: p.explore_bet_id,
-      type: "explore_bet_post" as const,
-      photo_url: p.photo_url ?? null,
-      bet_question: (p.explore_bets as any)?.question ?? null,
-      like_count: ((p.explore_bets as any)?.explore_bet_likes ?? []).length,
-      comment_count: ((p.explore_bets as any)?.explore_bet_comments ?? []).length,
-      created_at: p.created_at,
-    })),
-    ...(pollPosts ?? []).map((p: any) => ({
-      id: p.poll_id,
-      type: "poll_post" as const,
-      photo_url: p.photo_url ?? null,
-      bet_question: (p.polls as any)?.question ?? null,
-      like_count: (p.poll_likes ?? []).length,
-      comment_count: (p.poll_comments ?? []).length,
-      created_at: p.created_at,
-    })),
-  ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-   .slice(0, 60);
+  const shaped = shapeProfilePosts(betPosts as any, explorePosts as any, pollPosts as any);
 
   return NextResponse.json({ posts: shaped });
 }

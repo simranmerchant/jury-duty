@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/privy";
 import { supabase } from "@/lib/supabase";
+import { validateTopic, buildTopicBetCounts } from "@/lib/topics";
 
 // GET /api/v1/topics — list all topics with bet counts
 export async function GET(req: NextRequest) {
@@ -23,10 +24,7 @@ export async function GET(req: NextRequest) {
     .select("topic_id")
     .not("topic_id", "is", null);
 
-  const countMap: Record<string, number> = {};
-  for (const r of counts ?? []) {
-    if (r.topic_id) countMap[r.topic_id] = (countMap[r.topic_id] ?? 0) + 1;
-  }
+  const countMap = buildTopicBetCounts(counts ?? []);
 
   return NextResponse.json({
     topics: (topics ?? []).map((t) => ({ ...t, bet_count: countMap[t.id] ?? 0 })),
@@ -42,8 +40,8 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const { name, emoji, description } = await req.json().catch(() => ({}));
-  if (!name?.trim()) return NextResponse.json({ error: "name required" }, { status: 400 });
-  if (name.trim().length > 60) return NextResponse.json({ error: "name max 60 chars" }, { status: 400 });
+  const validationError = validateTopic({ name, emoji, description });
+  if (validationError) return NextResponse.json({ error: validationError }, { status: 400 });
 
   const { data, error } = await supabase
     .from("topics")
