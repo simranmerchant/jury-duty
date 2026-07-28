@@ -24,11 +24,26 @@ export async function GET(
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+  const followerIds = (data ?? []).map((r: any) => r.follower_id);
+
+  // Check which of these users the authenticated user already follows
+  const { data: myFollows } = followerIds.length > 0
+    ? await supabase
+        .from("follows")
+        .select("following_id")
+        .eq("follower_id", user.userId)
+        .eq("status", "accepted")
+        .in("following_id", followerIds)
+    : { data: [] };
+
+  const followingSet = new Set((myFollows ?? []).map((r: any) => r.following_id));
+
   const followers = (data ?? []).map((r: any) => ({
     user_id: r.follower_id,
     display_name: r.balances?.display_name ?? null,
     username: r.balances?.username ?? null,
     avatar_url: r.balances?.avatar_url ?? null,
+    is_followed_by_me: followingSet.has(r.follower_id),
   }));
 
   return NextResponse.json({ followers });
