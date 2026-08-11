@@ -88,7 +88,8 @@ export async function GET(req: NextRequest) {
       followed_entries: entries
         .filter((e) => e.user_id !== user.userId && followingIds.has(e.user_id))
         .map((e) => ({ user_id: e.user_id, side: e.side as "a" | "b", bettor: e.bettor })),
-      other_entry_count: entries.filter((e) => e.user_id !== user.userId && !followingIds.has(e.user_id)).length,
+      other_entry_count_a: entries.filter((e) => e.side === "a" && e.user_id !== user.userId && !followingIds.has(e.user_id)).length,
+      other_entry_count_b: entries.filter((e) => e.side === "b" && e.user_id !== user.userId && !followingIds.has(e.user_id)).length,
       is_mine: (bet as any).creator_id === user.userId,
       my_post: myPost ? { id: myPost.id, caption: myPost.caption, photo_url: myPost.photo_url } : null,
       public_posts: publicPosts.map((p) => ({
