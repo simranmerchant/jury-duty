@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
 
   const { data: topics, error } = await supabase
     .from("topics")
-    .select("id, name, emoji, description, created_at")
+    .select("id, name, description, created_at")
     .order("created_at", { ascending: true });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -39,14 +39,14 @@ export async function POST(req: NextRequest) {
   const user = await requireUser(token).catch(() => null);
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  const { name, emoji, description } = await req.json().catch(() => ({}));
-  const validationError = validateTopic({ name, emoji, description });
+  const { name, description } = await req.json().catch(() => ({}));
+  const validationError = validateTopic({ name, description });
   if (validationError) return NextResponse.json({ error: validationError }, { status: 400 });
 
   const { data, error } = await supabase
     .from("topics")
-    .insert({ name: name.trim(), emoji: emoji ?? null, description: description ?? null })
-    .select("id, name, emoji, description, created_at")
+    .insert({ name: name.trim(), description: description ?? null })
+    .select("id, name, description, created_at")
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

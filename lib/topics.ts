@@ -1,4 +1,4 @@
-export type TopicInput = { name: unknown; emoji?: unknown; description?: unknown };
+export type TopicInput = { name: unknown; description?: unknown };
 export type TopicValidationError = "name required" | "name max 60 chars";
 
 export function validateTopic(input: TopicInput): TopicValidationError | null {
