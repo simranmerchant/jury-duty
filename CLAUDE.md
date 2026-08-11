@@ -37,7 +37,7 @@ Next.js web app + API backend for **Jury Duty** — a social prediction app wher
 - `lib/payout.ts` — bet resolution payout math (tested)
 - `lib/push.ts` / `lib/webpush.ts` — push notification helpers
 
-**Database:** migrations live in `supabase/migrations/`. Latest is `062_explore_topics.sql` (adds `topics` table, `topic_id` FK on `explore_bets`, seeds "World Cup Final" topic, assigns all existing explore bets to it) (adds `get_user_stats(p_user_id)` and `get_user_win_rate(p_user_id)` RPCs — used by `/me` and `/users/[username]` to compute stats without fetching all bet_entries rows). Apply with `npx supabase db push` after linking (`supabase link --project-ref gfcipzuqaldyebocmypw`).
+**Database:** migrations live in `supabase/migrations/`. Latest is `070_resolve_at_deadline.sql` (removes 24h grace period for community resolve — non-creators can resolve immediately after deadline; also allows stakers to resolve feed bets). Apply with `npx supabase db push` after linking (`supabase link --project-ref gfcipzuqaldyebocmypw`).
 
 **Key API routes added:**
 - `posts/` — POST to share a resolved bet to feed; DELETE to unshare (by `?bet_id=`)
@@ -53,6 +53,8 @@ Next.js web app + API backend for **Jury Duty** — a social prediction app wher
 - `topics/` — GET list all topics with bet counts; POST create topic
 - `users/[username]/posts/` — GET paginated post grid for a user profile (respects privacy)
 - Feed now returns `follow_statuses: Record<userId, status>` alongside items for +follow button in feed
+- `app/version/` — GET public endpoint returning `{ ios: { min_version }, android: { min_version } }` (env vars `MIN_IOS_VERSION`, `MIN_ANDROID_VERSION`)
+- `bets/[id]/nudge/` — POST (creator only, after deadline) sends push notification to a staker asking them to resolve
 
 **Current branch for ETHGlobal work:** `feat/ethglobal-prizes` (not merged to main).
 

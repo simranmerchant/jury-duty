@@ -11,7 +11,7 @@ export function validateBetJoinBody(body: unknown): string | null {
   return null;
 }
 
-// Feed bets (audience = "followers") are the only bets that support invite links.
+// Both follower-feed bets and select-people bets support invite links.
 export function isFeedBetAudience(audience: unknown): boolean {
-  return audience === "followers";
+  return audience === "followers" || audience === "select_people";
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isPostVisibleToUser, validateShareBody } from "../lib/share";
+import { isPostVisibleToUser, validateShareBody, validatePostUpdate } from "../lib/share";
 
 // ─── isPostVisibleToUser ───────────────────────────────────────────────────────
 
@@ -110,5 +110,81 @@ describe("validateShareBody — targeted_user_ids", () => {
 
   it("rejects array containing non-string", () => {
     expect(validateShareBody({ targeted_user_ids: ["user-1", 42] })).toBe("targeted_user_ids must contain non-empty strings");
+  });
+});
+
+// ─── validatePostUpdate ───────────────────────────────────────────────────────
+
+describe("validatePostUpdate — caption", () => {
+  it("accepts null caption", () => {
+    expect(validatePostUpdate({ caption: null })).toBeNull();
+  });
+
+  it("accepts undefined caption (field omitted)", () => {
+    expect(validatePostUpdate({})).toBeNull();
+  });
+
+  it("accepts valid caption string", () => {
+    expect(validatePostUpdate({ caption: "looks good!" })).toBeNull();
+  });
+
+  it("accepts caption exactly 280 chars", () => {
+    expect(validatePostUpdate({ caption: "a".repeat(280) })).toBeNull();
+  });
+
+  it("rejects caption over 280 chars", () => {
+    expect(validatePostUpdate({ caption: "a".repeat(281) })).toBe("caption too long");
+  });
+
+  it("rejects non-string caption (number)", () => {
+    expect(validatePostUpdate({ caption: 42 })).toBe("caption must be a string");
+  });
+
+  it("rejects non-string caption (boolean)", () => {
+    expect(validatePostUpdate({ caption: true })).toBe("caption must be a string");
+  });
+
+  it("rejects non-string caption (object)", () => {
+    expect(validatePostUpdate({ caption: {} })).toBe("caption must be a string");
+  });
+});
+
+describe("validatePostUpdate — photo_url", () => {
+  it("accepts string photo_url", () => {
+    expect(validatePostUpdate({ photo_url: "https://example.com/img.jpg" })).toBeNull();
+  });
+
+  it("accepts null photo_url (remove photo)", () => {
+    expect(validatePostUpdate({ photo_url: null })).toBeNull();
+  });
+
+  it("accepts undefined photo_url (not changed)", () => {
+    expect(validatePostUpdate({})).toBeNull();
+  });
+
+  it("rejects numeric photo_url", () => {
+    expect(validatePostUpdate({ photo_url: 123 })).toBe("invalid photo_url");
+  });
+
+  it("rejects object photo_url", () => {
+    expect(validatePostUpdate({ photo_url: { url: "x" } })).toBe("invalid photo_url");
+  });
+});
+
+describe("validatePostUpdate — combined", () => {
+  it("accepts both fields valid", () => {
+    expect(validatePostUpdate({ caption: "new caption", photo_url: "https://example.com/new.jpg" })).toBeNull();
+  });
+
+  it("caption error takes precedence over photo_url", () => {
+    expect(validatePostUpdate({ caption: "a".repeat(281), photo_url: 123 })).toBe("caption too long");
+  });
+
+  it("reports photo_url error when caption is valid", () => {
+    expect(validatePostUpdate({ caption: "fine", photo_url: 123 })).toBe("invalid photo_url");
+  });
+
+  it("accepts clearing both fields (null, null)", () => {
+    expect(validatePostUpdate({ caption: null, photo_url: null })).toBeNull();
   });
 });

@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
     typeof o === "string" ? { label: o } : { label: o.label }
   );
 
-  const isSelectPeople = Array.isArray(targeted_user_ids) && targeted_user_ids.length > 0;
+  const isSelectPeople = Array.isArray(targeted_user_ids);
 
   const [{ data: bet, error: betError }, { data: creatorData }] = await Promise.all([
     supabase

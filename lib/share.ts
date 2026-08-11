@@ -7,6 +7,22 @@ export function isPostVisibleToUser(
   return targetedUserIds.includes(viewerId);
 }
 
+/** Validates the body of an edit-post request (PATCH). Only caption and photo_url; targeted_user_ids is not editable. */
+export function validatePostUpdate(body: {
+  caption?: unknown;
+  photo_url?: unknown;
+}): string | null {
+  const { caption, photo_url } = body;
+  if (caption !== undefined && caption !== null) {
+    if (typeof caption !== "string") return "caption must be a string";
+    if (caption.length > 280) return "caption too long";
+  }
+  if (photo_url !== undefined && photo_url !== null && typeof photo_url !== "string") {
+    return "invalid photo_url";
+  }
+  return null;
+}
+
 /** Validates the body of a share request (bet or poll post). */
 export function validateShareBody(body: {
   caption?: unknown;

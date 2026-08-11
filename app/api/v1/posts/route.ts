@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
   // Validate bet: must exist, be resolved, and be public
   const { data: bet } = await supabase
     .from("bets")
-    .select("id, status, visibility, creator_id")
+    .select("id, status, visibility, creator_id, question")
     .eq("id", bet_id)
     .single();
 
@@ -60,6 +60,35 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Notify followers that someone they follow shared a post
+  const [followerRes, senderRes] = await Promise.all([
+    supabase.from("follows").select("follower_id").eq("following_id", user.userId).eq("status", "accepted"),
+    supabase.from("balances").select("display_name, username").eq("user_id", user.userId).single(),
+  ]);
+  const followerIds = (followerRes.data ?? []).map((f: { follower_id: string }) => f.follower_id);
+  if (followerIds.length > 0) {
+    const senderName = senderRes.data?.display_name ?? senderRes.data?.username ?? "someone";
+    const question = (bet as any).question as string ?? "";
+    const notifData = { post_id: post.id, bet_id };
+    const notifBody = question ? `"${question}"` : `${senderName} shared a prediction`;
+    await Promise.all([
+      supabase.from("notifications").insert(
+        followerIds.map((uid: string) => ({
+          user_id: uid,
+          type: "new_post",
+          title: `${senderName} shared a prediction`,
+          body: notifBody,
+          data: notifData,
+        }))
+      ),
+      sendPushToUsers(followerIds, {
+        title: `${senderName} shared a prediction`,
+        body: notifBody,
+        data: notifData,
+      }),
+    ]);
+  }
 
   // Insert post_tags and notify tagged users
   const tagIds = (Array.isArray(tag_user_ids) ? tag_user_ids : []).filter((id) => typeof id === "string" && id !== user.userId);

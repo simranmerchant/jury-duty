@@ -96,8 +96,8 @@ describe("isFeedBetAudience", () => {
     expect(isFeedBetAudience("private")).toBe(false);
   });
 
-  it("returns false for 'select_people'", () => {
-    expect(isFeedBetAudience("select_people")).toBe(false);
+  it("returns true for 'select_people'", () => {
+    expect(isFeedBetAudience("select_people")).toBe(true);
   });
 
   it("returns false for empty string", () => {

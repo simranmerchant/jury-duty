@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/privy";
 import { supabase } from "@/lib/supabase";
+import { sendPushToUsers } from "@/lib/push";
 
 export async function POST(req: NextRequest) {
   const token = req.headers.get("authorization")?.replace("Bearer ", "");
@@ -20,7 +21,7 @@ export async function POST(req: NextRequest) {
   // Access control: verify user can see this bet before letting them vote
   const { data: bet } = await supabase
     .from("bets")
-    .select("creator_id, audience")
+    .select("creator_id, audience, question, event_id")
     .eq("id", bet_id)
     .single();
 
@@ -75,6 +76,32 @@ export async function POST(req: NextRequest) {
     if (anonError) {
       return NextResponse.json({ error: "bet placed but failed to mark anonymous — try again" }, { status: 500 });
     }
+  }
+
+  // Notify bet creator when someone else stakes
+  if (!isCreator) {
+    const { data: staker } = await supabase
+      .from("balances")
+      .select("display_name")
+      .eq("user_id", user.userId)
+      .single();
+    const stakerName = staker?.display_name ?? "someone";
+    const question = (bet as any).question as string ?? "your prediction";
+    const eventId = (bet as any).event_id as string | null;
+    const notifData: Record<string, string> = { bet_id };
+    if (eventId) notifData.event_id = eventId;
+    const notifTitle = "new stake on your prediction 🗳️";
+    const notifBody = `${stakerName} staked ${points} pts on "${question}"`;
+    await Promise.all([
+      supabase.from("notifications").insert({
+        user_id: bet.creator_id,
+        type: "bet_staked",
+        title: notifTitle,
+        body: notifBody,
+        data: notifData,
+      }),
+      sendPushToUsers([bet.creator_id], { title: notifTitle, body: notifBody, data: notifData }),
+    ]);
   }
 
   return NextResponse.json({ ok: true });

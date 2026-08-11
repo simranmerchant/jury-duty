@@ -21,7 +21,7 @@ export async function GET(
       id, question, deadline, status, winning_option_id, creator_id, created_at, audience,
       event_id,
       bet_options!bet_id(id, label),
-      bet_entries(user_id, option_id, points_staked, is_anonymous),
+      bet_entries(user_id, option_id, points_staked, is_anonymous, balances:user_id(display_name, username)),
       balances:creator_id(display_name, avatar_url, username),
       bet_reactions(user_id, emoji),
       bet_comments!bet_id(id)
