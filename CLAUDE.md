@@ -37,7 +37,7 @@ Next.js web app + API backend for **Jury Duty** — a social prediction app wher
 - `lib/payout.ts` — bet resolution payout math (tested)
 - `lib/push.ts` / `lib/webpush.ts` — push notification helpers
 
-**Database:** migrations live in `supabase/migrations/`. Latest is `070_resolve_at_deadline.sql` (removes 24h grace period for community resolve — non-creators can resolve immediately after deadline; also allows stakers to resolve feed bets). Apply with `npx supabase db push` after linking (`supabase link --project-ref gfcipzuqaldyebocmypw`).
+**Database:** migrations live in `supabase/migrations/`. Latest is `071_non_negative_points.sql` (adds CHECK constraint `points >= 0` on `balances`; updates `increment_balance` to raise "insufficient balance" instead of violating constraint). Also `070_resolve_at_deadline.sql` (removes 24h grace period for community resolve — non-creators can resolve immediately after deadline; also allows stakers to resolve feed bets). Apply with `npx supabase db push` after linking (`supabase link --project-ref gfcipzuqaldyebocmypw`).
 
 **Key API routes added:**
 - `posts/` — POST to share a resolved bet to feed; DELETE to unshare (by `?bet_id=`)
