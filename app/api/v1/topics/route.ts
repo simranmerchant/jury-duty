@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/privy";
 import { supabase } from "@/lib/supabase";
-import { validateTopic, buildTopicBetCounts } from "@/lib/topics";
+import { validateTopic, buildTopicBetCounts, isTopicMine } from "@/lib/topics";
 
 // GET /api/v1/topics — list all topics with bet counts
 export async function GET(req: NextRequest) {
@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
 
   const { data: topics, error } = await supabase
     .from("topics")
-    .select("id, name, description, created_at")
+    .select("id, name, description, created_at, creator_id")
     .order("created_at", { ascending: true });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
   const countMap = buildTopicBetCounts(counts ?? []);
 
   return NextResponse.json({
-    topics: (topics ?? []).map((t) => ({ ...t, bet_count: countMap[t.id] ?? 0 })),
+    topics: (topics ?? []).map((t) => ({ ...t, bet_count: countMap[t.id] ?? 0, is_mine: isTopicMine(t.creator_id, user.userId) })),
   });
 }
 
@@ -45,8 +45,8 @@ export async function POST(req: NextRequest) {
 
   const { data, error } = await supabase
     .from("topics")
-    .insert({ name: name.trim(), description: description ?? null })
-    .select("id, name, description, created_at")
+    .insert({ name: name.trim(), description: description ?? null, creator_id: user.userId })
+    .select("id, name, description, created_at, creator_id")
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

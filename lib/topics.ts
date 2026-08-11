@@ -1,6 +1,22 @@
 export type TopicInput = { name: unknown; description?: unknown };
 export type TopicValidationError = "name required" | "name max 60 chars";
 
+/**
+ * Returns true when `userId` may delete or manage the topic.
+ * Unclaimed topics (creator_id === null) are manageable by any authenticated user.
+ */
+export function isTopicEditable(creatorId: string | null, userId: string): boolean {
+  return creatorId === null || creatorId === userId;
+}
+
+/**
+ * Returns true when `userId` is the topic's creator, or when the topic has no
+ * recorded creator (legacy topics created before creator tracking was added).
+ */
+export function isTopicMine(creatorId: string | null, userId: string): boolean {
+  return creatorId === null || creatorId === userId;
+}
+
 export function validateTopic(input: TopicInput): TopicValidationError | null {
   const { name } = input;
   if (typeof name !== "string" || !name.trim()) return "name required";

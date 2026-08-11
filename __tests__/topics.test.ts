@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { validateTopic, buildTopicBetCounts } from "../lib/topics";
+import { validateTopic, buildTopicBetCounts, isTopicEditable, isTopicMine } from "../lib/topics";
 
 // ─── validateTopic ────────────────────────────────────────────────────────────
 
@@ -12,8 +12,8 @@ describe("validateTopic — valid inputs", () => {
     expect(validateTopic({ name: "a".repeat(60) })).toBeNull();
   });
 
-  it("ignores optional emoji and description", () => {
-    expect(validateTopic({ name: "Sports", emoji: "⚽", description: "Soccer bets" })).toBeNull();
+  it("accepts an optional description field", () => {
+    expect(validateTopic({ name: "Sports", description: "Soccer bets" })).toBeNull();
   });
 
   it("trims leading/trailing whitespace before checking length", () => {
@@ -123,5 +123,62 @@ describe("buildTopicBetCounts — null handling", () => {
     const counts = buildTopicBetCounts(rows);
     const total = Object.values(counts).reduce((s, v) => s + v, 0);
     expect(total).toBe(3);
+  });
+});
+
+// ─── isTopicEditable ──────────────────────────────────────────────────────────
+
+describe("isTopicEditable — claimed topics", () => {
+  it("returns true when the user is the creator", () => {
+    expect(isTopicEditable("user-1", "user-1")).toBe(true);
+  });
+
+  it("returns false when the user is not the creator", () => {
+    expect(isTopicEditable("user-1", "user-2")).toBe(false);
+  });
+
+  it("returns false for a different user even when IDs are similar", () => {
+    expect(isTopicEditable("user-1", "user-10")).toBe(false);
+  });
+
+  it("is case-sensitive", () => {
+    expect(isTopicEditable("User-1", "user-1")).toBe(false);
+  });
+});
+
+describe("isTopicEditable — unclaimed topics (creator_id null)", () => {
+  it("returns true for any user when creator_id is null", () => {
+    expect(isTopicEditable(null, "any-user")).toBe(true);
+  });
+
+  it("returns true for a second user when creator_id is null", () => {
+    expect(isTopicEditable(null, "user-abc")).toBe(true);
+  });
+
+  it("returns true even with an empty string userId when creator_id is null", () => {
+    expect(isTopicEditable(null, "")).toBe(true);
+  });
+});
+
+// ─── isTopicMine ─────────────────────────────────────────────────────────────
+
+describe("isTopicMine — claimed topics", () => {
+  it("returns true for the owning user", () => {
+    expect(isTopicMine("alice", "alice")).toBe(true);
+  });
+
+  it("returns false for a different user", () => {
+    expect(isTopicMine("alice", "bob")).toBe(false);
+  });
+});
+
+describe("isTopicMine — legacy unclaimed topics (creator_id null)", () => {
+  it("returns true for any user so they can see the delete button", () => {
+    expect(isTopicMine(null, "alice")).toBe(true);
+    expect(isTopicMine(null, "bob")).toBe(true);
+  });
+
+  it("is consistent with isTopicEditable for the null case", () => {
+    expect(isTopicMine(null, "anyone")).toBe(isTopicEditable(null, "anyone"));
   });
 });
