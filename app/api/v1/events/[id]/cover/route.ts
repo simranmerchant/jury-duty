@@ -21,7 +21,17 @@ export async function POST(
     .single();
 
   if (!event) return NextResponse.json({ error: "not found" }, { status: 404 });
-  if (event.host_id !== user.userId) return NextResponse.json({ error: "only the host can set the cover" }, { status: 403 });
+
+  // Allow host or any guest to upload a cover photo
+  if (event.host_id !== user.userId) {
+    const { data: guest } = await supabase
+      .from("event_guests")
+      .select("user_id")
+      .eq("event_id", id)
+      .eq("user_id", user.userId)
+      .single();
+    if (!guest) return NextResponse.json({ error: "must be a member of this group" }, { status: 403 });
+  }
 
   const formData = await req.formData();
   const file = formData.get("file") as File | null;
