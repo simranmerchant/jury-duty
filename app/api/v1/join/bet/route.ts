@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
       bet_entries(id)
     `)
     .eq("invite_token", token)
-    .eq("audience", "followers")
+    .in("audience", ["followers", "select_people"])
     .single();
 
   if (!bet) return NextResponse.json({ error: "not found" }, { status: 404 });
