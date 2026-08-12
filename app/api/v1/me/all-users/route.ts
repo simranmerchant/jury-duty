@@ -23,7 +23,6 @@ export async function GET(req: NextRequest) {
     .from("balances")
     .select("user_id, display_name, username, avatar_url")
     .neq("user_id", userId)
-    .not("username", "is", null)
     .order("display_name", { ascending: true });
 
   const users = (balances ?? [])
