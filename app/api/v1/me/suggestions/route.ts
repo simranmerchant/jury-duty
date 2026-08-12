@@ -72,23 +72,25 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // All users for broad discovery — excludes only self, blocked, and already-in-suggestions
-  // Includes followed users so the section is never empty; frontend shows "following" state
-  const allUsersExclude = new Set([userId, ...blockedIds, ...suggestions.map((s) => s.user_id)]);
+  // All users for broad discovery — fetch everyone with a username except self, filter in JS
+  const suggestionUserIds = new Set(suggestions.map((s) => s.user_id));
   const { data: allBalances } = await supabase
     .from("balances")
     .select("user_id, display_name, username, avatar_url")
-    .not("user_id", "in", `(${[...allUsersExclude].join(",")})`)
+    .neq("user_id", userId)
     .not("username", "is", null)
-    .limit(50);
+    .limit(100);
 
-  const all_users = (allBalances ?? []).map((b: any) => ({
-    user_id: b.user_id,
-    display_name: b.display_name ?? null,
-    username: b.username ?? null,
-    avatar_url: b.avatar_url ?? null,
-    following: followedIds.has(b.user_id),
-  }));
+  const all_users = (allBalances ?? [])
+    .filter((b: any) => !blockedIds.has(b.user_id) && !suggestionUserIds.has(b.user_id))
+    .slice(0, 50)
+    .map((b: any) => ({
+      user_id: b.user_id,
+      display_name: b.display_name ?? null,
+      username: b.username ?? null,
+      avatar_url: b.avatar_url ?? null,
+      following: followedIds.has(b.user_id),
+    }));
 
   return NextResponse.json({ suggestions, all_users });
 }
