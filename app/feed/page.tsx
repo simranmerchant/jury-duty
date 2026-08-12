@@ -1923,7 +1923,7 @@ function ExploreBetPostCard({
             )}
             <div className="flex items-center gap-1.5 flex-wrap">
               <p className="text-[11px]" style={{ color: "var(--dimmer)" }}>{bet.total_entries ?? 0} entries · {totalPts.toLocaleString()} pts</p>
-              {((bet.followed_entries ?? []).length > 0 || (bet.other_entry_count ?? 0) > 0) && (
+              {((bet.followed_entries ?? []).length > 0 || ((bet.other_entry_count_a ?? 0) + (bet.other_entry_count_b ?? 0)) > 0) && (
                 <div className="flex items-center">
                   {(bet.followed_entries ?? []).map((e, i) => (
                     e.bettor?.avatar_url
@@ -1934,9 +1934,9 @@ function ExploreBetPostCard({
                           {(e.bettor?.display_name ?? "?")[0].toUpperCase()}
                         </button>
                   ))}
-                  {(bet.other_entry_count ?? 0) > 0 && (
+                  {((bet.other_entry_count_a ?? 0) + (bet.other_entry_count_b ?? 0)) > 0 && (
                     <div className="w-[18px] h-[18px] rounded-full flex items-center justify-center text-[7px] font-bold" style={{ marginLeft: (bet.followed_entries ?? []).length > 0 ? -4 : 0, zIndex: 0, background: "rgba(255,255,255,0.08)", border: "1.5px solid rgba(255,255,255,0.15)", color: "var(--muted)" }}>
-                      +{bet.other_entry_count}
+                      +{(bet.other_entry_count_a ?? 0) + (bet.other_entry_count_b ?? 0)}
                     </div>
                   )}
                 </div>
