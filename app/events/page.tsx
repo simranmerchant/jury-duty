@@ -1084,7 +1084,7 @@ function ExploreBetCard({
         {myEntry && ` · you bet ${myEntry.points_wagered.toLocaleString()} pts on ${myEntry.side === "a" ? bet.option_a : bet.option_b}`}
       </p>
 
-      {(bet.followed_entries.length > 0 || bet.other_entry_count > 0) && (
+      {(bet.followed_entries.length > 0 || (bet.other_entry_count_a + bet.other_entry_count_b) > 0) && (
         <div className="flex items-center gap-1.5">
           <div className="flex items-center">
             {bet.followed_entries.map((e, i) => (
@@ -1096,9 +1096,9 @@ function ExploreBetCard({
                     {(e.bettor?.display_name ?? "?")[0].toUpperCase()}
                   </button>
             ))}
-            {bet.other_entry_count > 0 && (
+            {(bet.other_entry_count_a + bet.other_entry_count_b) > 0 && (
               <div className="w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold" style={{ marginLeft: bet.followed_entries.length > 0 ? -4 : 0, zIndex: 0, background: "rgba(255,255,255,0.08)", border: "1.5px solid rgba(255,255,255,0.15)", color: "var(--muted)" }}>
-                +{bet.other_entry_count}
+                +{bet.other_entry_count_a + bet.other_entry_count_b}
               </div>
             )}
           </div>
