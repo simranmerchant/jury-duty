@@ -51,20 +51,26 @@ export default function RootLayout({
       lang="en"
       className={`${nunito.variable} ${dmSans.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-full flex flex-col items-center" style={{ background: "var(--bg)" }}>
           <div
             style={{
               position: "fixed",
               top: 0,
-              left: 0,
-              right: 0,
+              left: "50%",
+              transform: "translateX(-50%)",
+              width: "100%",
+              maxWidth: 430,
               height: 260,
               background: "linear-gradient(to bottom, rgba(216,180,254,0.14) 0%, rgba(255,143,163,0.07) 45%, transparent 100%)",
               pointerEvents: "none",
               zIndex: 0,
             }}
           />
-          <Providers>{children}</Providers>
+          <Providers>
+            <div style={{ width: "100%", maxWidth: 430, minHeight: "100dvh", position: "relative" }}>
+              {children}
+            </div>
+          </Providers>
           <InstallPrompt />
           <UpdatePrompt />
         </body>

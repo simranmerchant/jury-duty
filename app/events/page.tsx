@@ -62,7 +62,8 @@ type ExploreBet = {
   comment_count: number;
   my_entry: { side: "a" | "b"; points_wagered: number } | null;
   followed_entries: { user_id: string; side: "a" | "b"; bettor: { display_name: string; username: string; avatar_url: string | null } | null }[];
-  other_entry_count: number;
+  other_entry_count_a: number;
+  other_entry_count_b: number;
   my_post: { id: string; caption: string | null; photo_url: string | null } | null;
   public_posts: { id: string; caption: string | null; photo_url: string | null; created_at: string; user: { user_id: string; display_name: string; username: string; avatar_url: string | null } | null; side: string | null }[];
 };

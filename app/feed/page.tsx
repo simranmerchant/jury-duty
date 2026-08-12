@@ -75,7 +75,8 @@ type FeedExploreBetPost = {
     like_count: number;
     liked_by_me: boolean;
     followed_entries: { user_id: string; side: "a" | "b"; bettor: { display_name: string; username: string; avatar_url: string | null } | null }[];
-    other_entry_count: number;
+    other_entry_count_a: number;
+    other_entry_count_b: number;
   } | null;
 };
 type FeedItem = FeedBet | FeedPost | FeedPollPost | FeedExploreBetPost;

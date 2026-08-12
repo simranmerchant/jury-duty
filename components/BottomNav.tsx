@@ -109,8 +109,12 @@ export default function BottomNav() {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-50 flex items-center"
+      className="fixed bottom-0 z-50 flex items-center"
       style={{
+        left: "50%",
+        transform: "translateX(-50%)",
+        width: "100%",
+        maxWidth: 430,
         background: "var(--card)",
         borderTop: "1px solid var(--border)",
         height: 60,
