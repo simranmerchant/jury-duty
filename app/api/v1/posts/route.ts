@@ -61,33 +61,31 @@ export async function POST(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Notify followers
-  const [followerRes, senderRes] = await Promise.all([
-    supabase.from("follows").select("follower_id").eq("following_id", user.userId).eq("status", "accepted"),
-    supabase.from("balances").select("display_name, username").eq("user_id", user.userId).single(),
-  ]);
-  const followerIds = (followerRes.data ?? []).map((f: { follower_id: string }) => f.follower_id);
-  if (followerIds.length > 0) {
-    const senderName = senderRes.data?.display_name ?? senderRes.data?.username ?? "someone";
-    const question = (bet as any).question as string ?? "";
-    const notifData = { post_id: post.id, bet_id };
-    const notifTitle = isCreator ? `${senderName} posted the verdict` : `${senderName} shared a prediction`;
-    const notifBody = question ? `"${question}"` : notifTitle;
+  // Notify recipients — if post is targeted, only notify those users; otherwise notify all followers
+  const senderRes = await supabase.from("balances").select("display_name, username").eq("user_id", user.userId).single();
+  const senderName = senderRes.data?.display_name ?? senderRes.data?.username ?? "someone";
+  const question = (bet as any).question as string ?? "";
+  const notifData = { post_id: post.id, bet_id };
+  const notifTitle = isCreator ? `${senderName} posted the verdict` : `${senderName} shared a prediction`;
+  const notifBody = question ? `"${question}"` : notifTitle;
+
+  let recipientIds: string[];
+  if (targeted_user_ids?.length) {
+    // Targeted post — only notify the explicitly included users (excluding the poster)
+    recipientIds = (targeted_user_ids as string[]).filter((id) => id !== user.userId);
+  } else {
+    // Public post — notify all accepted followers
+    const { data: followerRows } = await supabase
+      .from("follows").select("follower_id").eq("following_id", user.userId).eq("status", "accepted");
+    recipientIds = (followerRows ?? []).map((f: { follower_id: string }) => f.follower_id);
+  }
+
+  if (recipientIds.length > 0) {
     await Promise.all([
       supabase.from("notifications").insert(
-        followerIds.map((uid: string) => ({
-          user_id: uid,
-          type: "new_post",
-          title: notifTitle,
-          body: notifBody,
-          data: notifData,
-        }))
+        recipientIds.map((uid: string) => ({ user_id: uid, type: "new_post", title: notifTitle, body: notifBody, data: notifData }))
       ),
-      sendPushToUsers(followerIds, {
-        title: notifTitle,
-        body: notifBody,
-        data: notifData,
-      }),
+      sendPushToUsers(recipientIds, { title: notifTitle, body: notifBody, data: notifData }),
     ]);
   }
 
