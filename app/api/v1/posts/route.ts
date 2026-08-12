@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Notify followers that someone they follow shared a post
+  // Notify followers
   const [followerRes, senderRes] = await Promise.all([
     supabase.from("follows").select("follower_id").eq("following_id", user.userId).eq("status", "accepted"),
     supabase.from("balances").select("display_name, username").eq("user_id", user.userId).single(),
@@ -71,19 +71,20 @@ export async function POST(req: NextRequest) {
     const senderName = senderRes.data?.display_name ?? senderRes.data?.username ?? "someone";
     const question = (bet as any).question as string ?? "";
     const notifData = { post_id: post.id, bet_id };
-    const notifBody = question ? `"${question}"` : `${senderName} shared a prediction`;
+    const notifTitle = isCreator ? `${senderName} posted the verdict` : `${senderName} shared a prediction`;
+    const notifBody = question ? `"${question}"` : notifTitle;
     await Promise.all([
       supabase.from("notifications").insert(
         followerIds.map((uid: string) => ({
           user_id: uid,
           type: "new_post",
-          title: `${senderName} shared a prediction`,
+          title: notifTitle,
           body: notifBody,
           data: notifData,
         }))
       ),
       sendPushToUsers(followerIds, {
-        title: `${senderName} shared a prediction`,
+        title: notifTitle,
         body: notifBody,
         data: notifData,
       }),

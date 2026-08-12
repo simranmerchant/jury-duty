@@ -16,15 +16,32 @@ export async function GET(
 
   const { id: postId } = await params;
 
-  const { data, error } = await supabase
-    .from("post_comments")
-    .select("id, body, gif_url, created_at, user_id, balances:user_id(display_name, avatar_url, username)")
-    .eq("post_id", postId)
-    .order("created_at", { ascending: true });
+  const { data: post } = await supabase.from("posts").select("bet_id").eq("id", postId).single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  const [postCommentsRes, betCommentsRes] = await Promise.all([
+    supabase
+      .from("post_comments")
+      .select("id, body, gif_url, created_at, user_id, balances:user_id(display_name, avatar_url, username)")
+      .eq("post_id", postId)
+      .order("created_at", { ascending: true }),
+    post?.bet_id
+      ? supabase
+          .from("bet_comments")
+          .select("id, body, gif_url, created_at, user_id, parent_id, balances:user_id(display_name, avatar_url, username)")
+          .eq("bet_id", post.bet_id)
+          .order("created_at", { ascending: true })
+      : Promise.resolve({ data: [] as any[], error: null }),
+  ]);
 
-  return NextResponse.json({ comments: data ?? [] });
+  if (postCommentsRes.error) return NextResponse.json({ error: postCommentsRes.error.message }, { status: 500 });
+
+  const postComments = (postCommentsRes.data ?? []).map((c: any) => ({ ...c, comment_type: "post" }));
+  const betComments = (betCommentsRes.data ?? []).map((c: any) => ({ ...c, comment_type: "bet" }));
+  const merged = [...postComments, ...betComments].sort(
+    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  );
+
+  return NextResponse.json({ comments: merged });
 }
 
 export async function POST(

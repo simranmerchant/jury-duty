@@ -19,10 +19,13 @@ export async function GET(req: NextRequest) {
     supabase.from("blocked_users").select("blocked_id").eq("blocker_id", userId),
   ]);
 
+  const followedIds = new Set((followedRows ?? []).map((r: any) => r.following_id));
+  const blockedIds = new Set((blockedRows ?? []).map((r: any) => r.blocked_id));
+
   const excludeIds = new Set([
     userId,
-    ...(followedRows ?? []).map((r: any) => r.following_id),
-    ...(blockedRows ?? []).map((r: any) => r.blocked_id),
+    ...followedIds,
+    ...blockedIds,
   ]);
 
   // Build mutual-event suggestions from co-members
@@ -69,19 +72,22 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // All other users not yet followed/blocked/suggested — for broad discovery
+  // All users for broad discovery — excludes only self, blocked, and already-in-suggestions
+  // Includes followed users so the section is never empty; frontend shows "following" state
+  const allUsersExclude = new Set([userId, ...blockedIds, ...suggestions.map((s) => s.user_id)]);
   const { data: allBalances } = await supabase
     .from("balances")
     .select("user_id, display_name, username, avatar_url")
-    .not("user_id", "in", `(${[...excludeIds].join(",")})`)
+    .not("user_id", "in", `(${[...allUsersExclude].join(",")})`)
     .not("username", "is", null)
-    .limit(40);
+    .limit(50);
 
   const all_users = (allBalances ?? []).map((b: any) => ({
     user_id: b.user_id,
     display_name: b.display_name ?? null,
     username: b.username ?? null,
     avatar_url: b.avatar_url ?? null,
+    following: followedIds.has(b.user_id),
   }));
 
   return NextResponse.json({ suggestions, all_users });
