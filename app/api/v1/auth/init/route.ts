@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/lib/privy";
+import { requireUser, privy } from "@/lib/privy";
 import { supabase } from "@/lib/supabase";
 
 // Called on first login to create the user's balance row.
@@ -17,6 +17,19 @@ export async function POST(req: NextRequest) {
     .upsert({ user_id: user.userId }, { onConflict: "user_id", ignoreDuplicates: true });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Pull linked phone from Privy and store it for contact matching.
+  // Fire-and-forget — don't block the response if this fails.
+  privy.getUser(user.userId).then((privyUser) => {
+    const phoneAccount = privyUser.linkedAccounts?.find((a: any) => a.type === "phone");
+    if (phoneAccount?.phoneNumber) {
+      supabase
+        .from("balances")
+        .update({ phone: phoneAccount.phoneNumber })
+        .eq("user_id", user.userId)
+        .then(() => {});
+    }
+  }).catch(() => {});
 
   const { data } = await supabase
     .from("balances")

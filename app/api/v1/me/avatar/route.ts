@@ -12,7 +12,8 @@ export async function POST(req: NextRequest) {
   const formData = await req.formData();
   const file = formData.get("file") as File | null;
   if (!file) return NextResponse.json({ error: "no file" }, { status: 400 });
-  if (!file.type.startsWith("image/")) return NextResponse.json({ error: "must be an image" }, { status: 400 });
+  const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+  if (!ALLOWED_TYPES.includes(file.type)) return NextResponse.json({ error: "must be a jpeg, png, webp, or gif" }, { status: 400 });
   if (file.size > 2 * 1024 * 1024) return NextResponse.json({ error: "max 2MB" }, { status: 400 });
 
   const ext = file.type.split("/")[1]?.replace("jpeg", "jpg") ?? "jpg";

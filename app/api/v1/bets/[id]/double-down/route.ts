@@ -27,7 +27,7 @@ export async function POST(
 
   if (error) {
     const msg = error.message;
-    if (msg.includes("insufficient balance")) return NextResponse.json({ error: "not enough points" }, { status: 422 });
+    if (msg.includes("insufficient balance")) return NextResponse.json({ error: "insufficient balance" }, { status: 422 });
     if (msg.includes("deadline has passed")) return NextResponse.json({ error: "deadline has passed" }, { status: 422 });
     if (msg.includes("not open")) return NextResponse.json({ error: "bet is not open" }, { status: 422 });
     if (msg.includes("no existing bet")) return NextResponse.json({ error: "you haven't bet on this yet" }, { status: 422 });

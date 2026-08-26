@@ -119,7 +119,7 @@ export async function GET(
     if (!guest) return NextResponse.json({ error: "not found" }, { status: 404 });
   }
 
-  const [{ data: event, error }, { data: lastSeen }] = await Promise.all([
+  const [{ data: event, error }, { data: lastSeen }, { data: myBalance }] = await Promise.all([
     supabase
       .from("events")
       .select(`
@@ -150,6 +150,11 @@ export async function GET(
       .select("seen_at")
       .eq("user_id", user.userId)
       .eq("event_id", id)
+      .single(),
+    supabase
+      .from("balances")
+      .select("points")
+      .eq("user_id", user.userId)
       .single(),
   ]);
 
@@ -210,5 +215,6 @@ export async function GET(
   return NextResponse.json({
     event: { ...eventFields, event_guests: eventGuests, bets: filteredBets, polls: transformedPolls },
     userId: user.userId,
+    userPoints: myBalance?.points ?? 0,
   });
 }

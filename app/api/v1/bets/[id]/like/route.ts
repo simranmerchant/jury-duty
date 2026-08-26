@@ -23,9 +23,11 @@ export async function POST(
     .single();
 
   if (existing) {
-    await supabase.from("bet_likes").delete().eq("bet_id", id).eq("user_id", user.userId);
+    const { error } = await supabase.from("bet_likes").delete().eq("bet_id", id).eq("user_id", user.userId);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   } else {
-    await supabase.from("bet_likes").insert({ bet_id: id, user_id: user.userId });
+    const { error } = await supabase.from("bet_likes").insert({ bet_id: id, user_id: user.userId });
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
   const { count } = await supabase

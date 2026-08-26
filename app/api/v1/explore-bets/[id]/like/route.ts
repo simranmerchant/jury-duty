@@ -23,9 +23,11 @@ export async function POST(
   ]);
 
   if (existing) {
-    await supabase.from("explore_bet_likes").delete().eq("explore_bet_id", id).eq("user_id", user.userId);
+    const { error } = await supabase.from("explore_bet_likes").delete().eq("explore_bet_id", id).eq("user_id", user.userId);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   } else {
-    await supabase.from("explore_bet_likes").insert({ explore_bet_id: id, user_id: user.userId });
+    const { error } = await supabase.from("explore_bet_likes").insert({ explore_bet_id: id, user_id: user.userId });
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
   const liked = !existing;

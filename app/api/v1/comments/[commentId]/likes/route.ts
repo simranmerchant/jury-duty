@@ -21,10 +21,12 @@ export async function POST(
     .single();
 
   if (existing) {
-    await supabase.from("comment_likes").delete().eq("id", existing.id);
+    const { error } = await supabase.from("comment_likes").delete().eq("id", existing.id);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ ok: true, action: "unliked" });
   }
 
-  await supabase.from("comment_likes").insert({ comment_id: commentId, user_id: user.userId });
+  const { error } = await supabase.from("comment_likes").insert({ comment_id: commentId, user_id: user.userId });
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true, action: "liked" });
 }

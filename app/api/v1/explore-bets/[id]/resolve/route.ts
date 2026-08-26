@@ -30,12 +30,12 @@ export async function POST(
     .eq("id", id)
     .single();
 
-  const ADMIN_ID = "did:privy:cmng3anf401zu0cibp1adsvn3";
+  const ADMIN_ID = process.env.ADMIN_PRIVY_ID;
   if (!bet) return NextResponse.json({ error: "not found" }, { status: 404 });
   if (bet.status === "resolved") return NextResponse.json({ error: "already resolved" }, { status: 422 });
 
   const isCreator = bet.creator_id === user.userId;
-  const isAdmin = user.userId === ADMIN_ID;
+  const isAdmin = ADMIN_ID ? user.userId === ADMIN_ID : false;
   const communityCanResolve = bet.closes_at
     ? Date.now() >= new Date(bet.closes_at).getTime() + 24 * 60 * 60 * 1000
     : false;

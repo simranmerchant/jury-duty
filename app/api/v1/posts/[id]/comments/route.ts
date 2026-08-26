@@ -16,32 +16,17 @@ export async function GET(
 
   const { id: postId } = await params;
 
-  const { data: post } = await supabase.from("posts").select("bet_id").eq("id", postId).single();
+  const { data: postComments, error } = await supabase
+    .from("post_comments")
+    .select("id, body, gif_url, created_at, user_id, balances:user_id(display_name, avatar_url, username)")
+    .eq("post_id", postId)
+    .order("created_at", { ascending: true });
 
-  const [postCommentsRes, betCommentsRes] = await Promise.all([
-    supabase
-      .from("post_comments")
-      .select("id, body, gif_url, created_at, user_id, balances:user_id(display_name, avatar_url, username)")
-      .eq("post_id", postId)
-      .order("created_at", { ascending: true }),
-    post?.bet_id
-      ? supabase
-          .from("bet_comments")
-          .select("id, body, gif_url, created_at, user_id, parent_id, balances:user_id(display_name, avatar_url, username)")
-          .eq("bet_id", post.bet_id)
-          .order("created_at", { ascending: true })
-      : Promise.resolve({ data: [] as any[], error: null }),
-  ]);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  if (postCommentsRes.error) return NextResponse.json({ error: postCommentsRes.error.message }, { status: 500 });
+  const comments = (postComments ?? []).map((c: any) => ({ ...c, comment_type: "post" }));
 
-  const postComments = (postCommentsRes.data ?? []).map((c: any) => ({ ...c, comment_type: "post" }));
-  const betComments = (betCommentsRes.data ?? []).map((c: any) => ({ ...c, comment_type: "bet" }));
-  const merged = [...postComments, ...betComments].sort(
-    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-  );
-
-  return NextResponse.json({ comments: merged });
+  return NextResponse.json({ comments });
 }
 
 export async function POST(
@@ -60,17 +45,33 @@ export async function POST(
   const validation = validateComment(body, gif_url);
   if (!validation.ok) return NextResponse.json({ error: validation.error }, { status: 400 });
 
-  const [{ data: post }, insertResult] = await Promise.all([
-    supabase.from("posts").select("user_id, bets:bet_id(question)").eq("id", postId).single(),
-    supabase.from("post_comments")
-      .insert({ post_id: postId, user_id: user.userId, ...(validation.body ? { body: validation.body } : {}), ...(validation.gif_url ? { gif_url: validation.gif_url } : {}) })
-      .select("id, body, gif_url, created_at, user_id, balances:user_id(display_name, avatar_url, username)")
-      .single(),
-  ]);
+  const { data: post } = await supabase
+    .from("posts")
+    .select("user_id, bets:bet_id(question)")
+    .eq("id", postId)
+    .single();
+
+  if (!post) return NextResponse.json({ error: "not found" }, { status: 404 });
+
+  if (post.user_id !== user.userId) {
+    const { data: follow } = await supabase
+      .from("follows")
+      .select("id")
+      .eq("follower_id", user.userId)
+      .eq("following_id", post.user_id)
+      .single();
+    if (!follow) return NextResponse.json({ error: "not authorized" }, { status: 403 });
+  }
+
+  const insertResult = await supabase
+    .from("post_comments")
+    .insert({ post_id: postId, user_id: user.userId, ...(validation.body ? { body: validation.body } : {}), ...(validation.gif_url ? { gif_url: validation.gif_url } : {}) })
+    .select("id, body, gif_url, created_at, user_id, balances:user_id(display_name, avatar_url, username)")
+    .single();
 
   if (insertResult.error) return NextResponse.json({ error: insertResult.error.message }, { status: 500 });
 
-  if (post && post.user_id !== user.userId) {
+  if (post.user_id !== user.userId) {
     const commenterName = (insertResult.data as any).balances?.display_name ?? "someone";
     const question = (post.bets as any)?.question;
     const notifTitle = question ? `comment on "${question}"` : "new comment on your post";

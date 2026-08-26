@@ -13,12 +13,13 @@ export async function DELETE(
   const user = await requireUser(token).catch(() => null);
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  const { commentId } = await params;
+  const { id: betId, commentId } = await params;
 
   const { data: comment } = await supabase
     .from("explore_bet_comments")
     .select("user_id")
     .eq("id", commentId)
+    .eq("explore_bet_id", betId)
     .single();
 
   if (!comment) return NextResponse.json({ error: "not found" }, { status: 404 });

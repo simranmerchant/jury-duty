@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
     const { error: inviteError } = await supabase
       .from("bet_invites")
       .upsert({ bet_id, user_id: user.userId }, { onConflict: "bet_id,user_id", ignoreDuplicates: true });
-    if (inviteError) console.error("bet_invites upsert failed:", inviteError.message);
+    if (inviteError) return NextResponse.json({ error: inviteError.message }, { status: 500 });
   }
 
   return NextResponse.json({ eventId: event.id, eventName: event.name });
