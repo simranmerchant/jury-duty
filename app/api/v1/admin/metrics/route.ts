@@ -15,7 +15,6 @@ export async function GET(req: NextRequest) {
     { count: totalBets },
     { count: openBets },
     { count: resolvedBets },
-    { count: publicBets },
     { count: followersBets },
     { count: eventBets },
     { count: totalStakes },
@@ -36,7 +35,6 @@ export async function GET(req: NextRequest) {
     supabase.from("bets").select("*", { count: "exact", head: true }),
     supabase.from("bets").select("*", { count: "exact", head: true }).eq("status", "open"),
     supabase.from("bets").select("*", { count: "exact", head: true }).eq("status", "resolved"),
-    supabase.from("bets").select("*", { count: "exact", head: true }).eq("audience", "public"),
     supabase.from("bets").select("*", { count: "exact", head: true }).eq("audience", "followers"),
     supabase.from("bets").select("*", { count: "exact", head: true }).eq("audience", "event"),
     supabase.from("bet_entries").select("*", { count: "exact", head: true }),
@@ -77,7 +75,6 @@ export async function GET(req: NextRequest) {
     "Resolved Predictions": resolvedBets ?? 0,
     "Predictions in Events & Groups": eventBets ?? 0,
     "Predictions Shared to Feed (followers)": followersBets ?? 0,
-    "Predictions on Explore (public)": publicBets ?? 0,
     "New Predictions (Last 7 Days)": newBets7d ?? 0,
     "New Predictions (Last 30 Days)": newBets30d ?? 0,
 
