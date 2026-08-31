@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
   // Pull linked phone from Privy and store it for contact matching.
   // Fire-and-forget — don't block the response if this fails.
   privy.getUser(user.userId).then((privyUser) => {
-    const phoneAccount = privyUser.linkedAccounts?.find((a: any) => a.type === "phone");
+    const phoneAccount = privyUser.linkedAccounts?.find((a: any) => a.type === "phone") as any;
     if (phoneAccount?.phoneNumber) {
       supabase
         .from("balances")
