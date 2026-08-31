@@ -1,24 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 
-function groupByDay(rows: { created_at: string }[], days: number): Record<string, number> {
+function groupByDay(rows: { created_at: string }[]): Record<string, number> {
   const counts: Record<string, number> = {};
-  const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
   for (const row of rows) {
-    const d = new Date(row.created_at);
-    if (d.getTime() < cutoff) continue;
-    const key = d.toISOString().slice(0, 10);
+    const key = new Date(row.created_at).toISOString().slice(0, 10);
     counts[key] = (counts[key] ?? 0) + 1;
   }
   return counts;
 }
 
-function fillDays(counts: Record<string, number>, days: number): { date: string; count: number }[] {
+function fillFromDate(start: string, userCounts: Record<string, number>, betCounts: Record<string, number>, voteCounts: Record<string, number>) {
   const result = [];
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
-    const key = d.toISOString().slice(0, 10);
-    result.push({ date: key, count: counts[key] ?? 0 });
+  const startMs = new Date(start).getTime();
+  const todayMs = new Date(new Date().toISOString().slice(0, 10)).getTime();
+  for (let ms = startMs; ms <= todayMs; ms += 24 * 60 * 60 * 1000) {
+    const key = new Date(ms).toISOString().slice(0, 10);
+    result.push({ date: key, new_users: userCounts[key] ?? 0, new_predictions: betCounts[key] ?? 0, new_votes: voteCounts[key] ?? 0 });
   }
   return result;
 }
@@ -81,9 +79,9 @@ export async function GET(req: NextRequest) {
     supabase.from("bets").select("creator_id"),
     supabase.from("bet_entries").select("user_id"),
     supabase.from("balances").select("points"),
-    supabase.from("balances").select("created_at").gte("created_at", thirtyDaysAgo),
-    supabase.from("bets").select("created_at").gte("created_at", thirtyDaysAgo),
-    supabase.from("bet_entries").select("created_at").gte("created_at", thirtyDaysAgo),
+    supabase.from("balances").select("created_at"),
+    supabase.from("bets").select("created_at"),
+    supabase.from("bet_entries").select("created_at"),
   ]);
 
   const usersWhoCreatedBets = new Set((creatorRows ?? []).map((r) => r.creator_id)).size;
@@ -92,12 +90,12 @@ export async function GET(req: NextRequest) {
   const avgBalance = pts.length ? Math.round(pts.reduce((s, p) => s + p, 0) / pts.length) : 0;
   const totalPoints = pts.reduce((s, p) => s + p, 0);
 
-  const daily = fillDays({}, 30).map(({ date }) => ({
-    date,
-    new_users: groupByDay(dailyUserRows ?? [], 30)[date] ?? 0,
-    new_predictions: groupByDay(dailyBetRows ?? [], 30)[date] ?? 0,
-    new_votes: groupByDay(dailyVoteRows ?? [], 30)[date] ?? 0,
-  }));
+  const userCounts = groupByDay(dailyUserRows ?? []);
+  const betCounts = groupByDay(dailyBetRows ?? []);
+  const voteCounts = groupByDay(dailyVoteRows ?? []);
+  const allDates = [...Object.keys(userCounts), ...Object.keys(betCounts), ...Object.keys(voteCounts)].sort();
+  const firstDay = allDates[0] ?? new Date().toISOString().slice(0, 10);
+  const daily = fillFromDate(firstDay, userCounts, betCounts, voteCounts);
 
   const now = new Date();
   const generatedAt = now.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" });
