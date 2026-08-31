@@ -12,7 +12,7 @@
     },
     {
       "path": "/api/cron/keep-warm",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 9 * * *"
     }
   ]
 }
