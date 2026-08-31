@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
     { count: eventBets },
     { count: totalStakes },
     { count: totalComments },
-    { count: totalReactions },
+    { count: totalLikes },
     { count: totalFollows },
     { count: totalEvents },
     { count: newUsers30d },
@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
     supabase.from("bets").select("*", { count: "exact", head: true }).eq("audience", "event"),
     supabase.from("bet_entries").select("*", { count: "exact", head: true }),
     supabase.from("bet_comments").select("*", { count: "exact", head: true }),
-    supabase.from("bet_reactions").select("*", { count: "exact", head: true }),
+    supabase.from("bet_likes").select("*", { count: "exact", head: true }),
     supabase.from("follows").select("*", { count: "exact", head: true }).eq("status", "accepted"),
     supabase.from("events").select("*", { count: "exact", head: true }),
     supabase.from("balances").select("*", { count: "exact", head: true }).gte("created_at", thirtyDaysAgo),
@@ -60,38 +60,41 @@ export async function GET(req: NextRequest) {
   const avgBalance = pts.length ? Math.round(pts.reduce((s, p) => s + p, 0) / pts.length) : 0;
   const totalPoints = pts.reduce((s, p) => s + p, 0);
 
+  const now = new Date();
+  const generatedAt = now.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" });
+
   const metrics: Record<string, number | string> = {
     // Users
-    "Total Users": totalUsers ?? 0,
+    "Total Registered Users": totalUsers ?? 0,
     "Users Who Created a Bet": usersWhoCreatedBets,
-    "Users Who Staked on a Bet": usersWhoStaked,
+    "Users Who Voted on a Bet": usersWhoStaked,
     "New Users (Last 7 Days)": newUsers7d ?? 0,
     "New Users (Last 30 Days)": newUsers30d ?? 0,
 
     // Bets
-    "Total Bets Created": totalBets ?? 0,
-    "Open Bets": openBets ?? 0,
-    "Resolved Bets": resolvedBets ?? 0,
-    "Public Bets": publicBets ?? 0,
-    "Followers Bets": followersBets ?? 0,
-    "Event/Group Bets": eventBets ?? 0,
-    "New Bets (Last 7 Days)": newBets7d ?? 0,
-    "New Bets (Last 30 Days)": newBets30d ?? 0,
+    "Total Predictions Created": totalBets ?? 0,
+    "Currently Open Predictions": openBets ?? 0,
+    "Resolved Predictions": resolvedBets ?? 0,
+    "Predictions in Events & Groups": eventBets ?? 0,
+    "Predictions Shared to Feed (followers)": followersBets ?? 0,
+    "Predictions on Explore (public)": publicBets ?? 0,
+    "New Predictions (Last 7 Days)": newBets7d ?? 0,
+    "New Predictions (Last 30 Days)": newBets30d ?? 0,
 
     // Engagement
-    "Total Stakes (Votes)": totalStakes ?? 0,
-    "New Stakes (Last 30 Days)": newStakes30d ?? 0,
+    "Total Votes Cast": totalStakes ?? 0,
+    "New Votes (Last 30 Days)": newStakes30d ?? 0,
     "Total Comments": totalComments ?? 0,
-    "Total Reactions": totalReactions ?? 0,
-    "Total Follows": totalFollows ?? 0,
-    "Total Events/Groups": totalEvents ?? 0,
+    "Total Likes": totalLikes ?? 0,
+    "Total Follows (accepted)": totalFollows ?? 0,
+    "Total Events & Groups": totalEvents ?? 0,
 
     // Points economy
-    "Avg Points Balance": avgBalance,
+    "Avg Points Balance per User": avgBalance,
     "Total Points in Circulation": totalPoints,
 
     // Meta
-    "Generated At": new Date().toISOString(),
+    "Report Generated": generatedAt,
   };
 
   return NextResponse.json({ metrics });
