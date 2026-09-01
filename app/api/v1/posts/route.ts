@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const body = await req.json().catch(() => ({}));
-  const { bet_id, caption, photo_url, targeted_user_ids, tag_user_ids } = body;
+  const { bet_id, caption, photo_url, targeted_user_ids, tag_user_ids, feed_visible = true } = body;
 
   if (!bet_id) return NextResponse.json({ error: "bet_id required" }, { status: 400 });
   if (caption && caption.length > 280) return NextResponse.json({ error: "caption too long" }, { status: 400 });
@@ -54,6 +54,7 @@ export async function POST(req: NextRequest) {
       caption: caption?.trim() || null,
       photo_url: photo_url || null,
       targeted_user_ids: targeted_user_ids?.length ? targeted_user_ids : null,
+      feed_visible: feed_visible !== false,
       created_at: new Date().toISOString(),
     }, { onConflict: "user_id,bet_id" })
     .select("id")
@@ -70,7 +71,10 @@ export async function POST(req: NextRequest) {
   const notifBody = question ? `"${question}"` : notifTitle;
 
   let recipientIds: string[];
-  if (targeted_user_ids?.length) {
+  if (!feed_visible) {
+    // Group-only post — no feed notifications
+    recipientIds = [];
+  } else if (targeted_user_ids?.length) {
     // Targeted post — only notify the explicitly included users (excluding the poster)
     recipientIds = (targeted_user_ids as string[]).filter((id) => id !== user.userId);
   } else {
