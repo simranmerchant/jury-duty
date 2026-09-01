@@ -21,12 +21,31 @@ export async function PATCH(
     .single();
 
   if (!event) return NextResponse.json({ error: "not found" }, { status: 404 });
-  if (event.host_id !== user.userId) return NextResponse.json({ error: "only the host can edit this" }, { status: 403 });
 
-  const { name, ends_at } = await req.json();
-  const updates: Record<string, string> = {};
+  const isHost = event.host_id === user.userId;
+
+  // Non-hosts must be a member to set punishment
+  if (!isHost) {
+    const { data: guest } = await supabase
+      .from("event_guests")
+      .select("user_id")
+      .eq("event_id", id)
+      .eq("user_id", user.userId)
+      .single();
+    if (!guest) return NextResponse.json({ error: "not authorized" }, { status: 403 });
+  }
+
+  const { name, ends_at, punishment } = await req.json();
+
+  // Only host can rename or change end date
+  if ((name !== undefined || ends_at !== undefined) && !isHost) {
+    return NextResponse.json({ error: "only the host can edit name or end date" }, { status: 403 });
+  }
+
+  const updates: Record<string, string | null> = {};
   if (name?.trim()) updates.name = name.trim();
   if (ends_at && event.type === "event") updates.ends_at = ends_at;
+  if (punishment !== undefined) updates.punishment = punishment?.trim() || null;
   if (Object.keys(updates).length === 0) return NextResponse.json({ error: "nothing to update" }, { status: 400 });
 
   const { error } = await supabase.from("events").update(updates).eq("id", id);
@@ -123,11 +142,11 @@ export async function GET(
     supabase
       .from("events")
       .select(`
-        id, name, ends_at, type, host_id, invite_token, cover_url, cover_original_url,
+        id, name, ends_at, type, host_id, invite_token, cover_url, cover_original_url, punishment,
         host_balance:balances!events_host_id_fkey(display_name, avatar_url, username),
         event_guests(user_id, balances(display_name, avatar_url, username)),
         bets(
-          id, question, question_tagged_user_ids, deadline, visibility, status, winning_option_id, creator_id, created_at,
+          id, question, question_tagged_user_ids, deadline, visibility, status, winning_option_id, creator_id, created_at, photo_url,
           bet_options!bet_options_bet_id_fkey(id, label, tagged_user_id, balances!bet_options_tagged_user_id_fkey(display_name, avatar_url, username)),
           bet_entries(id, user_id, option_id, points_staked, is_anonymous),
           bet_invites(user_id),
