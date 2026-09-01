@@ -55,6 +55,7 @@ Next.js web app + API backend for **Jury Duty** — a social prediction app wher
 - Feed now returns `follow_statuses: Record<userId, status>` alongside items for +follow button in feed
 - `app/version/` — GET public endpoint returning `{ ios: { min_version }, android: { min_version } }` (env vars `MIN_IOS_VERSION`, `MIN_ANDROID_VERSION`)
 - `bets/[id]/nudge/` — POST (creator only, after deadline) sends push notification to a staker asking them to resolve
+- `leaderboard/` — GET global leaderboard sorted by points (users with usernames only)
 
 **Current branch for ETHGlobal work:** `feat/ethglobal-prizes` (not merged to main).
 
