@@ -8,7 +8,7 @@
   "crons": [
     {
       "path": "/api/cron/bet-deadlines",
-      "schedule": "0 9 * * *"
+      "schedule": "*/30 * * * *"
     },
     {
       "path": "/api/cron/keep-warm",
