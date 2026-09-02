@@ -35,7 +35,7 @@ export async function PATCH(
     if (!guest) return NextResponse.json({ error: "not authorized" }, { status: 403 });
   }
 
-  const { name, ends_at, punishment } = await req.json();
+  const { name, ends_at, punishment, prize } = await req.json();
 
   // Only host can rename or change end date
   if ((name !== undefined || ends_at !== undefined) && !isHost) {
@@ -46,6 +46,7 @@ export async function PATCH(
   if (name?.trim()) updates.name = name.trim();
   if (ends_at && event.type === "event") updates.ends_at = ends_at;
   if (punishment !== undefined) updates.punishment = punishment?.trim() || null;
+  if (prize !== undefined) updates.prize = prize?.trim() || null;
   if (Object.keys(updates).length === 0) return NextResponse.json({ error: "nothing to update" }, { status: 400 });
 
   const { error } = await supabase.from("events").update(updates).eq("id", id);
@@ -142,7 +143,7 @@ export async function GET(
     supabase
       .from("events")
       .select(`
-        id, name, ends_at, type, host_id, invite_token, cover_url, cover_original_url, punishment,
+        id, name, ends_at, type, host_id, invite_token, cover_url, cover_original_url, punishment, prize,
         host_balance:balances!events_host_id_fkey(display_name, avatar_url, username),
         event_guests(user_id, balances(display_name, avatar_url, username)),
         bets(

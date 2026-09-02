@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
   const user = await requireUser(token).catch(() => null);
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  const { name, ends_at, type = "event", punishment } = await req.json();
+  const { name, ends_at, type = "event", punishment, prize } = await req.json();
   if (!name?.trim()) return NextResponse.json({ error: "name required" }, { status: 400 });
   if (name.trim().length > 100) return NextResponse.json({ error: "name must be 100 chars or fewer" }, { status: 400 });
   if (!["event", "group"].includes(type)) return NextResponse.json({ error: "invalid type" }, { status: 400 });
@@ -27,6 +27,7 @@ export async function POST(req: NextRequest) {
       host_id: user.userId,
       invite_token: "pending",
       ...(punishment?.trim() ? { punishment: punishment.trim() } : {}),
+      ...(prize?.trim() ? { prize: prize.trim() } : {}),
     })
     .select("id")
     .single();
