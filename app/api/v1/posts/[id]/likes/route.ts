@@ -3,6 +3,42 @@ import { requireUser } from "@/lib/privy";
 import { supabase } from "@/lib/supabase";
 import { sendPushToUsers } from "@/lib/push";
 
+// GET /api/v1/posts/[id]/likes — list users who liked this post
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const token = req.headers.get("authorization")?.replace("Bearer ", "");
+  if (!token) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+  const user = await requireUser(token).catch(() => null);
+  if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+  const { id: postId } = await params;
+
+  const { data: likes } = await supabase
+    .from("post_likes")
+    .select("user_id")
+    .eq("post_id", postId)
+    .order("created_at", { ascending: false });
+
+  if (!likes || likes.length === 0) return NextResponse.json({ likes: [] });
+
+  const { data: users } = await supabase
+    .from("balances")
+    .select("user_id, display_name, username, avatar_url")
+    .in("user_id", likes.map((l) => l.user_id));
+
+  const usersMap = Object.fromEntries((users ?? []).map((u) => [u.user_id, u]));
+
+  return NextResponse.json({
+    likes: likes.map((l) => ({
+      user_id: l.user_id,
+      balances: usersMap[l.user_id] ?? null,
+    })),
+  });
+}
+
 // POST /api/v1/posts/[id]/likes — toggle like on a post
 export async function POST(
   req: NextRequest,
