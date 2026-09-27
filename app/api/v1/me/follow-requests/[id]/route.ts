@@ -82,5 +82,13 @@ export async function DELETE(
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+  // Remove the follow_request notification so it doesn't resurface on refresh
+  await supabase
+    .from("notifications")
+    .delete()
+    .eq("user_id", user.userId)
+    .eq("type", "follow_request")
+    .contains("data", { user_id: requesterId });
+
   return NextResponse.json({ ok: true });
 }
