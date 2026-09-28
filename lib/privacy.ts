@@ -71,6 +71,18 @@ export function canAccessBet({
 }
 
 /**
+ * Returns the display name to use for a bet creator in outbound notifications.
+ * When the bet is anonymous, always returns "someone" regardless of the real name.
+ */
+export function resolveCreatorName(
+  displayName: string | null | undefined,
+  isAnonymous: boolean
+): string {
+  if (isAnonymous) return "someone";
+  return displayName ?? "someone";
+}
+
+/**
  * Returns the staker notification body, hiding the staker's name when they
  * chose to remain anonymous.
  */

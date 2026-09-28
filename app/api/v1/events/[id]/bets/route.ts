@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/privy";
 import { supabase } from "@/lib/supabase";
 import { sendPushToUsers } from "@/lib/push";
 import { sendWebPushToUsers } from "@/lib/webpush";
+import { resolveCreatorName } from "@/lib/privacy";
 import { buildInviteIds, questionMentionRecipients, optionTagRecipients } from "@/lib/notification-recipients";
 
 export async function POST(
@@ -38,7 +39,7 @@ export async function POST(
     return NextResponse.json({ error: "event is closed" }, { status: 422 });
   }
 
-  const { question, options, visibility, invitedUserIds, deadline, question_tagged_user_ids } = await req.json();
+  const { question, options, visibility, invitedUserIds, deadline, question_tagged_user_ids, photo_url, is_anonymous } = await req.json();
 
   if (!question?.trim() || question.trim().length > 200) {
     return NextResponse.json({ error: "question required (max 200 chars)" }, { status: 400 });
@@ -73,6 +74,8 @@ export async function POST(
       question: question.trim(),
       deadline: betDeadline,
       visibility: visibility ?? "public",
+      is_anonymous: is_anonymous === true,
+      ...(photo_url ? { photo_url } : {}),
     })
     .select("id")
     .single();
@@ -94,7 +97,7 @@ export async function POST(
   if (optError) return NextResponse.json({ error: optError.message }, { status: 500 });
 
   const otherGuestIds = (allGuests ?? []).map((g: any) => g.user_id as string);
-  const creatorName = creatorData?.display_name ?? "someone";
+  const creatorName = resolveCreatorName(creatorData?.display_name, is_anonymous === true);
 
   const taggedUserIds = normalizedOptions
     .filter((o) => o.tagged_user_id)
@@ -187,17 +190,17 @@ export async function POST(
       supabase.from("notifications").insert(otherGuestIds.map((uid) => ({
         user_id: uid,
         type: "new_bet",
-        title: `${creatorName} posted a bet in ${event.name} 🗳️`,
+        title: `new prediction in ${event.name} 🗳️`,
         body: question.trim(),
         data: { bet_id: bet.id, event_id: eventId },
       }))),
       sendPushToUsers(otherGuestIds, {
-        title: `${creatorName} posted a bet in ${event.name} 🗳️`,
+        title: `new prediction in ${event.name} 🗳️`,
         body: question.trim(),
         data: { event_id: eventId, bet_id: bet.id },
       }),
       sendWebPushToUsers(otherGuestIds, {
-        title: `${creatorName} posted a bet in ${event.name} 🗳️`,
+        title: `new prediction in ${event.name} 🗳️`,
         body: question.trim(),
         data: { event_id: eventId, bet_id: bet.id },
       }),

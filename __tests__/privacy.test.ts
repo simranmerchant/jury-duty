@@ -4,6 +4,7 @@ import {
   redactAnonymousBet,
   canAccessBet,
   buildStakeNotificationBody,
+  resolveCreatorName,
   type EntryLike,
   type BetLike,
 } from "../lib/privacy";
@@ -251,6 +252,38 @@ describe("buildStakeNotificationBody — named stake", () => {
   it("does not include 'anonymous' language when not anonymous", () => {
     const body = buildStakeNotificationBody("Alice", 100, "will it rain?", false);
     expect(body.toLowerCase()).not.toContain("anonymous");
+  });
+});
+
+// ─── resolveCreatorName ──────────────────────────────────────────────────────
+
+describe("resolveCreatorName — non-anonymous bet", () => {
+  it("returns the display name when not anonymous", () => {
+    expect(resolveCreatorName("Alice", false)).toBe("Alice");
+  });
+
+  it("returns 'someone' when display_name is null and not anonymous", () => {
+    expect(resolveCreatorName(null, false)).toBe("someone");
+  });
+
+  it("returns 'someone' when display_name is undefined and not anonymous", () => {
+    expect(resolveCreatorName(undefined, false)).toBe("someone");
+  });
+});
+
+describe("resolveCreatorName — anonymous bet", () => {
+  it("returns 'someone' even when display_name is provided", () => {
+    expect(resolveCreatorName("Alice", true)).toBe("someone");
+  });
+
+  it("returns 'someone' when display_name is null", () => {
+    expect(resolveCreatorName(null, true)).toBe("someone");
+  });
+
+  it("never leaks the real name in tagged or invited notifications", () => {
+    const name = resolveCreatorName("Bob", true);
+    expect(name).not.toContain("Bob");
+    expect(name).toBe("someone");
   });
 });
 
