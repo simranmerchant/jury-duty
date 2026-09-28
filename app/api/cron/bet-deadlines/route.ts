@@ -33,14 +33,14 @@ export async function GET(req: NextRequest) {
   const notifications = overdueBets.map((bet) => ({
     user_id: bet.creator_id,
     type: "bet_deadline",
-    title: "the people need to know.",
-    body: `"${bet.question}" is past its deadline. resolve your bet.`,
+    title: "the jury is waiting 🏛️",
+    body: `voting has closed on "${bet.question}" — announce the verdict!`,
     data: { bet_id: bet.id, event_id: bet.event_id },
   }));
 
   const pushPayloads = overdueBets.map((b) => ({
-    title: "the people need to know.",
-    body: `"${b.question}" is past its deadline. resolve it.`,
+    title: "the jury is waiting 🏛️",
+    body: `voting has closed on "${b.question}" — announce the verdict!`,
     data: { bet_id: b.id, event_id: b.event_id },
   }));
 

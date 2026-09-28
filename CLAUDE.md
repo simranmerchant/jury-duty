@@ -37,7 +37,7 @@ Next.js web app + API backend for **Jury Duty** — a social prediction app wher
 - `lib/payout.ts` — bet resolution payout math (tested)
 - `lib/push.ts` / `lib/webpush.ts` — push notification helpers
 
-**Database:** migrations live in `supabase/migrations/`. Latest is `071_non_negative_points.sql` (adds CHECK constraint `points >= 0` on `balances`; updates `increment_balance` to raise "insufficient balance" instead of violating constraint). Also `070_resolve_at_deadline.sql` (removes 24h grace period for community resolve — non-creators can resolve immediately after deadline; also allows stakers to resolve feed bets). Apply with `npx supabase db push` after linking (`supabase link --project-ref gfcipzuqaldyebocmypw`).
+**Database:** migrations live in `supabase/migrations/`. Latest is `090_group_bets_in_feed_and_anonymous.sql` (adds `is_anonymous` column to `bets`; `get_feed` RPC now includes event-member bets and exposes `event_id`, `events`, `is_anonymous` on bet items; anonymous bets hide `balances` from non-creators). Apply with `npx supabase db push` after linking (`supabase link --project-ref gfcipzuqaldyebocmypw`).
 
 **Key API routes added:**
 - `posts/` — POST to share a resolved bet to feed; DELETE to unshare (by `?bet_id=`)
@@ -56,6 +56,10 @@ Next.js web app + API backend for **Jury Duty** — a social prediction app wher
 - `app/version/` — GET public endpoint returning `{ ios: { min_version }, android: { min_version } }` (env vars `MIN_IOS_VERSION`, `MIN_ANDROID_VERSION`)
 - `bets/[id]/nudge/` — POST (creator only, after deadline) sends push notification to a staker asking them to resolve
 - `leaderboard/` — GET global leaderboard sorted by points (users with usernames only)
+- `posts/upload/` — POST accepts image/* (max 10MB) or video/* (max 100MB); returns `photo_url` or `video_url`
+- `bets/[id]/resolve` — POST now accepts `caption`, `photo_url`, `video_url`; auto-upserts post for feed bets (no separate new_post notification)
+- `bets/[id]` PATCH — now accepts `photo_url` (creator only, open bets); GET now returns `resolved_at`
+- `events/[id]/bets/` POST — now accepts `is_anonymous: boolean`; anonymous bets use "someone" in push notifications; `events/[id]/` GET bets now include `is_anonymous`
 
 **Current branch for ETHGlobal work:** `feat/ethglobal-prizes` (not merged to main).
 

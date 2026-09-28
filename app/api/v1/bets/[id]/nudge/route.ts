@@ -14,10 +14,18 @@ export async function POST(
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const { id: betId } = await params;
-  const { target_user_id } = await req.json();
 
-  if (!target_user_id || typeof target_user_id !== "string") {
-    return NextResponse.json({ error: "target_user_id required" }, { status: 400 });
+  let message: string | undefined;
+  try {
+    const text = await req.text();
+    if (text) {
+      const parsed = JSON.parse(text);
+      if (typeof parsed?.message === "string" && parsed.message.trim()) {
+        message = parsed.message.trim().slice(0, 200);
+      }
+    }
+  } catch {
+    // body is optional
   }
 
   const { data: bet } = await supabase
@@ -27,40 +35,57 @@ export async function POST(
     .single();
 
   if (!bet) return NextResponse.json({ error: "not found" }, { status: 404 });
-  if (bet.creator_id !== user.userId) return NextResponse.json({ error: "only the creator can nudge" }, { status: 403 });
+  if (bet.creator_id === user.userId) return NextResponse.json({ error: "you can't nudge yourself — just resolve it!" }, { status: 403 });
   if (bet.status !== "open") return NextResponse.json({ error: "bet already resolved" }, { status: 422 });
   if (new Date(bet.deadline) > new Date()) return NextResponse.json({ error: "deadline hasn't passed yet" }, { status: 422 });
 
+  // Caller must have staked on this bet
   const { data: entry } = await supabase
     .from("bet_entries")
     .select("user_id")
     .eq("bet_id", betId)
-    .eq("user_id", target_user_id)
+    .eq("user_id", user.userId)
     .single();
 
-  if (!entry) return NextResponse.json({ error: "that person hasn't staked on this bet" }, { status: 422 });
+  if (!entry) return NextResponse.json({ error: "you haven't staked on this bet" }, { status: 403 });
 
-  const { data: creator } = await supabase
+  // Rate limit: one nudge per staker per bet per 24h
+  const { data: recentNudge } = await supabase
+    .from("notifications")
+    .select("id")
+    .eq("user_id", bet.creator_id)
+    .eq("type", "nudge_resolve")
+    .contains("data", { bet_id: betId, sender_id: user.userId })
+    .gte("created_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+    .limit(1)
+    .maybeSingle();
+
+  if (recentNudge) return NextResponse.json({ error: "already nudged in the last 24 hours" }, { status: 429 });
+
+  const { data: nudger } = await supabase
     .from("balances")
     .select("display_name, username")
     .eq("user_id", user.userId)
     .single();
 
-  const creatorName = creator?.display_name ?? creator?.username ?? "someone";
-  const title = "can you resolve this? 🙏";
-  const body = `${creatorName} is asking you to call it on "${bet.question}"`;
-  const notifData: Record<string, string> = { bet_id: betId };
+  const nudgerName = nudger?.display_name ?? nudger?.username ?? "someone";
+  const title = "hey, time to resolve! 🏛️";
+  const body = message
+    ? `${nudgerName}: ${message}`
+    : `${nudgerName} is waiting. resolve the bet.`;
+  const notifData: Record<string, string> = { bet_id: betId, sender_id: user.userId };
   if (bet.event_id) notifData.event_id = bet.event_id;
+  if (nudger?.username) notifData.sender_username = nudger.username;
 
   await Promise.all([
     supabase.from("notifications").insert({
-      user_id: target_user_id,
+      user_id: bet.creator_id,
       type: "nudge_resolve",
       title,
       body,
       data: notifData,
     }),
-    sendPushToUsers([target_user_id], { title, body, data: notifData }),
+    sendPushToUsers([bet.creator_id], { title, body, data: notifData }),
   ]);
 
   return NextResponse.json({ ok: true });
