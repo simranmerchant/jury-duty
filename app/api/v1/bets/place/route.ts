@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/privy";
 import { supabase } from "@/lib/supabase";
 import { sendPushToUsers } from "@/lib/push";
+import { buildStakeNotificationBody } from "@/lib/privacy";
 
 export async function POST(req: NextRequest) {
   const token = req.headers.get("authorization")?.replace("Bearer ", "");
@@ -80,18 +81,21 @@ export async function POST(req: NextRequest) {
 
   // Notify bet creator when someone else stakes
   if (!isCreator) {
-    const { data: staker } = await supabase
-      .from("balances")
-      .select("display_name")
-      .eq("user_id", user.userId)
-      .single();
-    const stakerName = staker?.display_name ?? "someone";
     const question = (bet as any).question as string ?? "your prediction";
     const eventId = (bet as any).event_id as string | null;
     const notifData: Record<string, string> = { bet_id };
     if (eventId) notifData.event_id = eventId;
     const notifTitle = "new stake on your prediction 🗳️";
-    const notifBody = `${stakerName} staked ${points} pts on "${question}"`;
+    let stakerName = "someone";
+    if (!is_anonymous) {
+      const { data: staker } = await supabase
+        .from("balances")
+        .select("display_name")
+        .eq("user_id", user.userId)
+        .single();
+      stakerName = staker?.display_name ?? "someone";
+    }
+    const notifBody = buildStakeNotificationBody(stakerName, points, question, !!is_anonymous);
     await Promise.all([
       supabase.from("notifications").insert({
         user_id: bet.creator_id,

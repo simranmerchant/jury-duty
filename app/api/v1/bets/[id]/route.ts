@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/privy";
 import { supabase } from "@/lib/supabase";
 import { calculateRefunds } from "@/lib/payout";
+import { redactAnonymousBet, redactAnonymousEntries } from "@/lib/privacy";
 
 export async function GET(
   req: NextRequest,
@@ -18,7 +19,7 @@ export async function GET(
   const { data: bet } = await supabase
     .from("bets")
     .select(`
-      id, question, deadline, status, winning_option_id, creator_id, created_at, audience,
+      id, question, deadline, status, winning_option_id, creator_id, created_at, resolved_at, audience, photo_url,
       event_id,
       bet_options!bet_id(id, label),
       bet_entries(user_id, option_id, points_staked, is_anonymous, balances:user_id(display_name, username, avatar_url)),
@@ -59,7 +60,13 @@ export async function GET(
     }
   }
 
-  return NextResponse.json({ bet });
+  const rawBet = bet as any;
+  const sanitized = {
+    ...redactAnonymousBet(rawBet, user.userId),
+    bet_entries: redactAnonymousEntries(rawBet.bet_entries ?? [], user.userId),
+  };
+
+  return NextResponse.json({ bet: sanitized });
 }
 
 export async function PATCH(
@@ -88,11 +95,36 @@ export async function PATCH(
   const isHost = (eventHost as { host_id: string } | null)?.host_id === user.userId;
   if (!isCreator && !isHost) return NextResponse.json({ error: "not authorized" }, { status: 403 });
 
-  const { deadline, question, question_tagged_user_ids } = await req.json();
+  const { deadline, question, question_tagged_user_ids, options, photo_url } = await req.json();
 
-  // Only the creator can update question text / tags
-  if ((question !== undefined || question_tagged_user_ids !== undefined) && !isCreator) {
-    return NextResponse.json({ error: "only the bet creator can tag users in the question" }, { status: 403 });
+  // Only the creator can update question text / tags / options / photo
+  if ((question !== undefined || question_tagged_user_ids !== undefined || options !== undefined || photo_url !== undefined) && !isCreator) {
+    return NextResponse.json({ error: "only the bet creator can edit the question or options" }, { status: 403 });
+  }
+
+  // Editing options or question requires no one has staked yet
+  if (options !== undefined || question !== undefined) {
+    const { count } = await supabase
+      .from("bet_entries")
+      .select("*", { count: "exact", head: true })
+      .eq("bet_id", id);
+    if (count && count > 0) {
+      return NextResponse.json({ error: "can't edit — someone has already staked on this prediction" }, { status: 422 });
+    }
+  }
+
+  if (options !== undefined) {
+    if (!Array.isArray(options) || options.length < 2) {
+      return NextResponse.json({ error: "at least 2 options required" }, { status: 400 });
+    }
+    const labels = (options as unknown[]).map((o) => (typeof o === "string" ? o.trim() : "")).filter(Boolean);
+    if (labels.length < 2) return NextResponse.json({ error: "options must be non-empty strings" }, { status: 400 });
+
+    const { error: delError } = await supabase.from("bet_options").delete().eq("bet_id", id);
+    if (delError) return NextResponse.json({ error: delError.message }, { status: 500 });
+
+    const { error: insError } = await supabase.from("bet_options").insert(labels.map((label) => ({ bet_id: id, label })));
+    if (insError) return NextResponse.json({ error: insError.message }, { status: 500 });
   }
 
   const updates: Record<string, unknown> = {};
@@ -101,11 +133,12 @@ export async function PATCH(
   if (question_tagged_user_ids !== undefined && isCreator) {
     updates.question_tagged_user_ids = Array.isArray(question_tagged_user_ids) ? question_tagged_user_ids : [];
   }
+  if (photo_url !== undefined && isCreator) updates.photo_url = photo_url;
 
-  if (Object.keys(updates).length === 0) return NextResponse.json({ error: "nothing to update" }, { status: 400 });
-
-  const { error } = await supabase.from("bets").update(updates).eq("id", id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (Object.keys(updates).length > 0) {
+    const { error } = await supabase.from("bets").update(updates).eq("id", id);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 
   return NextResponse.json({ ok: true });
 }
