@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/privy";
 import { supabase } from "@/lib/supabase";
+import { redactAnonymousBet, redactAnonymousEntries } from "@/lib/privacy";
 
 export async function PATCH(
   req: NextRequest,
@@ -147,13 +148,13 @@ export async function GET(
         host_balance:balances!events_host_id_fkey(display_name, avatar_url, username),
         event_guests(user_id, balances(display_name, avatar_url, username)),
         bets(
-          id, question, question_tagged_user_ids, deadline, visibility, status, winning_option_id, creator_id, created_at, photo_url,
+          id, question, question_tagged_user_ids, deadline, visibility, status, winning_option_id, creator_id, created_at, photo_url, is_anonymous,
           bet_options!bet_options_bet_id_fkey(id, label, tagged_user_id, balances!bet_options_tagged_user_id_fkey(display_name, avatar_url, username)),
           bet_entries(id, user_id, option_id, points_staked, is_anonymous),
           bet_invites(user_id),
           bet_reactions(user_id, emoji),
           bet_comments!bet_comments_bet_id_fkey(id),
-          posts!posts_bet_id_fkey(id, user_id, caption, photo_url, created_at, balances:user_id(display_name, avatar_url, username))
+          posts!posts_bet_id_fkey(id, user_id, caption, photo_url, feed_visible, created_at, balances:user_id(display_name, avatar_url, username))
         ),
         polls(
           id, question, option_a, option_b, creator_id, created_at, closes_at,
@@ -192,7 +193,8 @@ export async function GET(
       return bet.bet_invites?.some((inv: any) => inv.user_id === user.userId);
     })
     .map((bet: any) => ({
-      ...bet,
+      ...redactAnonymousBet(bet, user.userId),
+      bet_entries: redactAnonymousEntries(bet.bet_entries ?? [], user.userId),
       isNew: bet.creator_id !== user.userId && (!seenAt || new Date(bet.created_at) > new Date(seenAt)),
     }));
 
