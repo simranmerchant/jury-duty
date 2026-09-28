@@ -14,12 +14,11 @@ export async function GET(req: NextRequest) {
   const t = Date.now();
 
   await Promise.all([
-    // Warm the feed RPC path
     supabase.from("posts").select("id").limit(1),
-    // Warm the suggestions/balances path
     supabase.from("balances").select("user_id").limit(1),
-    // Warm the notifications path
     supabase.from("notifications").select("id").limit(1),
+    supabase.from("events").select("id").limit(1),
+    supabase.from("bet_entries").select("bet_id").limit(1),
   ]);
 
   return NextResponse.json({ ok: true, ms: Date.now() - t });

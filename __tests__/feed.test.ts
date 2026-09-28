@@ -127,9 +127,10 @@ describe("buildFeedBetNotification", () => {
     expect(n.type).toBe("new_feed_bet");
   });
 
-  it("includes creator name in title", () => {
+  it("title does not include creator name (anonymous)", () => {
     const n = buildFeedBetNotification("Alice", "will it rain?");
-    expect(n.title).toContain("Alice");
+    expect(n.title).not.toContain("Alice");
+    expect(n.title).toContain("new prediction");
   });
 
   it("uses the question as the body", () => {
@@ -142,9 +143,9 @@ describe("buildFeedBetNotification", () => {
     expect(n.body).toBe("spaced");
   });
 
-  it("works with anonymous creator name 'someone'", () => {
+  it("returns consistent title regardless of creator name", () => {
     const n = buildFeedBetNotification("someone", "q?");
-    expect(n.title).toContain("someone");
+    expect(n.title).toBe("new prediction 🗳️");
     expect(n.type).toBe("new_feed_bet");
   });
 });

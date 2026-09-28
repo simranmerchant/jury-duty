@@ -50,15 +50,13 @@ export async function GET(req: NextRequest) {
   const user = await requireUser(token).catch(() => null);
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  const [{ data: events, error }, { data: lastSeenRows }] = await Promise.all([
+  const [{ data: events, error }, { data: lastSeenRows }, { data: myEntries }] = await Promise.all([
     supabase
       .from("events")
       .select(`
         id, name, ends_at, type, host_id, invite_token, cover_url,
         event_guests!inner(user_id),
-        bets(id, status, visibility, creator_id, created_at, deadline,
-          bet_entries(user_id)
-        )
+        bets(id, status, visibility, creator_id, created_at, deadline)
       `)
       .eq("event_guests.user_id", user.userId)
       .order("created_at", { ascending: false }),
@@ -66,22 +64,29 @@ export async function GET(req: NextRequest) {
       .from("event_last_seen")
       .select("event_id, seen_at")
       .eq("user_id", user.userId),
+    supabase
+      .from("bet_entries")
+      .select("bet_id")
+      .eq("user_id", user.userId),
   ]);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   const seenMap = new Map((lastSeenRows ?? []).map((r) => [r.event_id, r.seen_at]));
+  const enteredBetIds = new Set((myEntries ?? []).map((e: any) => e.bet_id as string));
 
   const eventsWithNew = (events ?? []).map((event) => {
-    // Only count bets the user can actually see (public, or private where they're creator/invited)
     const visibleBets = (event.bets ?? []).filter((b: any) =>
       b.visibility !== "private" || b.creator_id === user.userId
     );
     const seenAt = seenMap.get(event.id);
-    const normalised = visibleBets.map((b: any) => ({ ...b, bet_entries: b.bet_entries ?? [] }));
+    const normalised = visibleBets.map((b: any) => ({
+      ...b,
+      bet_entries: enteredBetIds.has(b.id) ? [{ user_id: user.userId }] : [],
+    }));
     const hasNew = hasNewBets(normalised, user.userId, seenAt);
     const hasUnvotedOpen = computeHasUnvotedOpen(normalised, user.userId);
-    const betsStripped = visibleBets.map(({ bet_entries: _, ...rest }: any) => rest);
+    const betsStripped = visibleBets.map(({ ...rest }: any) => rest);
     return { ...event, bets: betsStripped, hasNew, hasUnvotedOpen };
   });
 

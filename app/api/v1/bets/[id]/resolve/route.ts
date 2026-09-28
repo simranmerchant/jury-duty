@@ -16,7 +16,7 @@ export async function POST(
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const { id: betId } = await params;
-  const { winning_option_id } = await req.json();
+  const { winning_option_id, caption, photo_url, video_url } = await req.json();
 
   // winning_option_id = null means no winner — refund all
   const { error } = await supabase.rpc("resolve_bet", {
@@ -38,6 +38,21 @@ export async function POST(
     .select("question, winning_option_id, event_id, bet_entries(user_id, option_id)")
     .eq("id", betId)
     .single();
+
+  // Auto-create/update post for feed bets (event_id === null) on resolution
+  if (bet && bet.event_id === null) {
+    await supabase.from("posts").upsert(
+      {
+        user_id: user.userId,
+        bet_id: betId,
+        caption: caption ?? null,
+        photo_url: photo_url ?? null,
+        video_url: video_url ?? null,
+        feed_visible: true,
+      },
+      { onConflict: "user_id,bet_id" }
+    );
+  }
 
   if (bet) {
     const eventId = bet.event_id ?? undefined;

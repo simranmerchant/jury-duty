@@ -43,12 +43,12 @@ export function validateFeedBet(
 }
 
 export function buildFeedBetNotification(
-  creatorName: string,
+  _creatorName: string,
   question: string
 ): { type: string; title: string; body: string } {
   return {
     type: "new_feed_bet",
-    title: `${creatorName} posted a new prediction 🗳️`,
+    title: `new prediction 🗳️`,
     body: question.trim(),
   };
 }

@@ -12,10 +12,15 @@ export async function POST(req: NextRequest) {
   const formData = await req.formData();
   const file = formData.get("file") as File | null;
   if (!file) return NextResponse.json({ error: "no file" }, { status: 400 });
-  if (!file.type.startsWith("image/")) return NextResponse.json({ error: "must be an image" }, { status: 400 });
-  if (file.size > 10 * 1024 * 1024) return NextResponse.json({ error: "max 10MB" }, { status: 400 });
 
-  const ext = file.type.split("/")[1]?.replace("jpeg", "jpg") ?? "jpg";
+  const isVideo = file.type.startsWith("video/");
+  const isImage = file.type.startsWith("image/");
+  if (!isImage && !isVideo) return NextResponse.json({ error: "must be an image or video" }, { status: 400 });
+
+  const maxBytes = isVideo ? 100 * 1024 * 1024 : 10 * 1024 * 1024;
+  if (file.size > maxBytes) return NextResponse.json({ error: isVideo ? "max 100MB for video" : "max 10MB" }, { status: 400 });
+
+  const ext = file.type.split("/")[1]?.replace("jpeg", "jpg") ?? (isVideo ? "mp4" : "jpg");
   const path = `${user.userId}/${Date.now()}.${ext}`;
   const buffer = Buffer.from(await file.arrayBuffer());
 
@@ -26,5 +31,5 @@ export async function POST(req: NextRequest) {
   if (uploadError) return NextResponse.json({ error: uploadError.message }, { status: 500 });
 
   const { data: { publicUrl } } = supabase.storage.from("post-photos").getPublicUrl(path);
-  return NextResponse.json({ photo_url: publicUrl });
+  return NextResponse.json(isVideo ? { video_url: publicUrl } : { photo_url: publicUrl });
 }

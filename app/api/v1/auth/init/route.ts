@@ -12,11 +12,12 @@ export async function POST(req: NextRequest) {
   const user = await requireUser(token).catch((e: any) => { verifyError = e?.message ?? String(e); return null; });
   if (!user) return NextResponse.json({ error: "unauthorized", detail: verifyError }, { status: 401 });
 
-  const { error } = await supabase
-    .from("balances")
-    .upsert({ user_id: user.userId }, { onConflict: "user_id", ignoreDuplicates: true });
+  // Single round-trip: insert-or-ignore + select in one SQL function.
+  const { data, error } = await (supabase as any).rpc("init_user", { p_user_id: user.userId });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  const row = Array.isArray(data) ? data[0] : data;
 
   // Pull linked phone from Privy and store it for contact matching.
   // Fire-and-forget — don't block the response if this fails.
@@ -31,16 +32,10 @@ export async function POST(req: NextRequest) {
     }
   }).catch(() => {});
 
-  const { data } = await supabase
-    .from("balances")
-    .select("points, display_name, username")
-    .eq("user_id", user.userId)
-    .single();
-
   return NextResponse.json({
     userId: user.userId,
-    points: data?.points ?? 300,
-    hasName: !!data?.display_name,
-    hasUsername: !!data?.username,
+    points: row?.points ?? 300,
+    hasName: !!row?.display_name,
+    hasUsername: !!row?.username,
   });
 }

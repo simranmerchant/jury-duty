@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
   const user = await requireUser(token).catch(() => null);
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  const { question, options, deadline, targeted_user_ids } = await req.json();
+  const { question, options, deadline, targeted_user_ids, photo_url } = await req.json();
 
   const validationError = validateFeedBet({ question, options, deadline });
   if (validationError) return NextResponse.json({ error: validationError }, { status: 400 });
@@ -33,6 +33,7 @@ export async function POST(req: NextRequest) {
         deadline,
         visibility: "public",
         audience: isSelectPeople ? "select_people" : "followers",
+        ...(photo_url ? { photo_url } : {}),
       })
       .select("id")
       .single(),
