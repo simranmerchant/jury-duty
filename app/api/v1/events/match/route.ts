@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
   type Info = { name: string; type: string; users: Set<string> };
   const eventMap = new Map<string, Info>();
   for (const r of rows ?? []) {
-    const ev = r.events as { id: string; name: string; type: string } | null;
+    const ev = (Array.isArray(r.events) ? r.events[0] : r.events) as { id: string; name: string; type: string } | null;
     if (!ev || !["group", "event"].includes(ev.type)) continue;
     if (!eventMap.has(r.event_id)) {
       eventMap.set(r.event_id, { name: ev.name, type: ev.type, users: new Set() });
