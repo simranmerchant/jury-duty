@@ -39,17 +39,7 @@ export async function POST(
   if (bet.status !== "open") return NextResponse.json({ error: "bet already resolved" }, { status: 422 });
   if (new Date(bet.deadline) > new Date()) return NextResponse.json({ error: "deadline hasn't passed yet" }, { status: 422 });
 
-  // Caller must have staked on this bet
-  const { data: entry } = await supabase
-    .from("bet_entries")
-    .select("user_id")
-    .eq("bet_id", betId)
-    .eq("user_id", user.userId)
-    .single();
-
-  if (!entry) return NextResponse.json({ error: "you haven't staked on this bet" }, { status: 403 });
-
-  // Rate limit: one nudge per staker per bet per 24h
+  // Rate limit: one nudge per user per bet per 24h
   const { data: recentNudge } = await supabase
     .from("notifications")
     .select("id")
