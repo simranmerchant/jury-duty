@@ -53,15 +53,6 @@ export async function POST(
 
   if (!post) return NextResponse.json({ error: "not found" }, { status: 404 });
 
-  if (post.user_id !== user.userId) {
-    const { data: follow } = await supabase
-      .from("follows")
-      .select("id")
-      .eq("follower_id", user.userId)
-      .eq("following_id", post.user_id)
-      .single();
-    if (!follow) return NextResponse.json({ error: "not authorized" }, { status: 403 });
-  }
 
   const insertResult = await supabase
     .from("post_comments")
