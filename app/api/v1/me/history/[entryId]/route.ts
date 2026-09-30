@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/lib/privy";
+import { requireUser } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 
 // PATCH /api/v1/me/history/[entryId] — toggle is_hidden_from_profile

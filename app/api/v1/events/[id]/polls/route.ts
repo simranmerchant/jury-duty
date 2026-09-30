@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/lib/privy";
+import { requireUser } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 
 // POST /api/v1/events/[id]/polls — create a poll inside an event/group

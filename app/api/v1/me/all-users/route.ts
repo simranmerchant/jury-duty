@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/lib/privy";
+import { requireUser } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 
 // GET /api/v1/me/all-users — every user on the platform except self and blocked

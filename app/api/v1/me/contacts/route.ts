@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/lib/privy";
+import { requireUser } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 
 // Returns all users who share at least one event/group with the current user.

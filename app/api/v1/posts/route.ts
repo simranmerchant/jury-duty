@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/lib/privy";
+import { requireUser } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { sendPushToUsers } from "@/lib/push";
 import { extractMentions } from "@/lib/mention";

@@ -4,7 +4,7 @@
 
 Next.js web app + API backend for **Jury Duty** — a social prediction app where friends bet points on personal events. The mobile frontend lives in the companion repo `jury-duty-mobile` (Expo). Deployed on Vercel at `https://juryduty.xyz`. Database is Supabase (Postgres).
 
-**Tech stack:** Next.js (App Router), Supabase, Privy (auth), Tailwind CSS, TypeScript, Bun.
+**Tech stack:** Next.js (App Router), Supabase, Supabase Auth (phone OTP), Tailwind CSS, TypeScript, Bun.
 
 **Key pages (app/):**
 - `page.tsx` — root redirect
@@ -32,12 +32,13 @@ Next.js web app + API backend for **Jury Duty** — a social prediction app wher
 
 **Key lib files:**
 - `lib/supabase.ts` — Supabase client
-- `lib/privy.ts` — auth token verification
+- `lib/auth.ts` — dual-mode `requireUser`: Supabase Auth first, Privy fallback for old app versions
+- `lib/privy.ts` — Privy client (kept for fallback; remove once all users on new app)
 - `lib/follow.ts` — follow status logic (tested)
 - `lib/payout.ts` — bet resolution payout math (tested)
 - `lib/push.ts` / `lib/webpush.ts` — push notification helpers
 
-**Database:** migrations live in `supabase/migrations/`. Latest is `090_group_bets_in_feed_and_anonymous.sql` (adds `is_anonymous` column to `bets`; `get_feed` RPC now includes event-member bets and exposes `event_id`, `events`, `is_anonymous` on bet items; anonymous bets hide `balances` from non-creators). Apply with `npx supabase db push` after linking (`supabase link --project-ref gfcipzuqaldyebocmypw`).
+**Database:** migrations live in `supabase/migrations/`. Latest is `093_migrate_user_id_fn.sql` (adds `migrate_user_id(old_id, new_id)` Postgres function for Privy→Supabase Auth bridging; `092_add_phone_to_balances.sql` added `phone` column used as matching key) (adds `is_anonymous` column to `bets`; `get_feed` RPC now includes event-member bets and exposes `event_id`, `events`, `is_anonymous` on bet items; anonymous bets hide `balances` from non-creators). Apply with `npx supabase db push` after linking (`supabase link --project-ref gfcipzuqaldyebocmypw`).
 
 **Key API routes added:**
 - `posts/` — POST to share a resolved bet to feed; DELETE to unshare (by `?bet_id=`)

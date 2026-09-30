@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/lib/privy";
+import { requireUser } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { generateInviteToken } from "@/lib/invite";
 import { hasUnvotedOpen as computeHasUnvotedOpen, hasNewBets } from "@/lib/events";
