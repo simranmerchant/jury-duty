@@ -1133,17 +1133,7 @@ function PostCard({
               style={{ display: "flex", overflowX: "auto", width: "100%", scrollSnapType: "x mandatory", scrollbarWidth: "none" } as React.CSSProperties}
               onScroll={(e) => setCarouselPage(Math.round(e.currentTarget.scrollLeft / e.currentTarget.clientWidth))}
             >
-              <div style={{ minWidth: "100%", flexShrink: 0, scrollSnapAlign: "start" }}>{embeddedBet}</div>
               <div style={{ minWidth: "100%", flexShrink: 0, scrollSnapAlign: "start", display: "flex", flexDirection: "column", gap: 10 }}>
-                {bet.events?.name && bet.event_id && (
-                  <div className="flex items-center gap-1">
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--dimmer)" }}>
-                      <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
-                    </svg>
-                    <span className="text-[11px] font-semibold" style={{ color: "var(--muted)" }}>{bet.events.name}</span>
-                  </div>
-                )}
-                <p className="text-[14px] font-bold leading-snug" style={{ color: "var(--text)" }}>{bet.question}</p>
                 {item.photo_url && <img src={item.photo_url} alt="" className="w-full rounded-[12px] object-cover" style={{ maxHeight: 300 }} />}
                 {item.caption && (
                   <p className="text-[14px] leading-snug" style={{ color: "var(--text)" }}>
@@ -1155,6 +1145,7 @@ function PostCard({
                   </p>
                 )}
               </div>
+              <div style={{ minWidth: "100%", flexShrink: 0, scrollSnapAlign: "start" }}>{embeddedBet}</div>
             </div>
             {/* Page dots */}
             <div className="flex justify-center gap-1.5">
@@ -1590,7 +1581,6 @@ function PollPostCard({
           <div className="flex flex-col gap-2">
             <div style={{ display: "flex", overflowX: "auto", width: "100%", scrollSnapType: "x mandatory", scrollbarWidth: "none" } as React.CSSProperties}
               onScroll={(e) => setCarouselPage(Math.round(e.currentTarget.scrollLeft / e.currentTarget.clientWidth))}>
-              <div style={{ minWidth: "100%", flexShrink: 0, scrollSnapAlign: "start" }}>{embeddedPoll}</div>
               <div style={{ minWidth: "100%", flexShrink: 0, scrollSnapAlign: "start", display: "flex", flexDirection: "column", gap: 10 }}>
                 {item.photo_url && <img src={item.photo_url} alt="" className="w-full rounded-[12px] object-cover" style={{ maxHeight: 300 }} />}
                 {item.caption && (
@@ -1603,6 +1593,7 @@ function PollPostCard({
                   </p>
                 )}
               </div>
+              <div style={{ minWidth: "100%", flexShrink: 0, scrollSnapAlign: "start" }}>{embeddedPoll}</div>
             </div>
             <div className="flex justify-center gap-1.5">
               <div style={{ width: 5, height: 5, borderRadius: "50%", background: carouselPage === 0 ? "#a855f7" : "rgba(255,255,255,0.2)", transition: "background 0.2s" }} />
@@ -1962,7 +1953,6 @@ function ExploreBetPostCard({
           <div className="flex flex-col gap-2">
             <div style={{ display: "flex", overflowX: "auto", width: "100%", scrollSnapType: "x mandatory", scrollbarWidth: "none" } as React.CSSProperties}
               onScroll={(e) => setCarouselPage(Math.round(e.currentTarget.scrollLeft / e.currentTarget.clientWidth))}>
-              <div style={{ minWidth: "100%", flexShrink: 0, scrollSnapAlign: "start" }}>{embeddedBetCard}</div>
               <div style={{ minWidth: "100%", flexShrink: 0, scrollSnapAlign: "start", display: "flex", flexDirection: "column", gap: 10 }}>
                 {item.photo_url && <img src={item.photo_url} alt="" className="w-full rounded-[12px] object-cover" style={{ maxHeight: 300 }} />}
                 {item.caption && (
@@ -1975,6 +1965,7 @@ function ExploreBetPostCard({
                   </p>
                 )}
               </div>
+              <div style={{ minWidth: "100%", flexShrink: 0, scrollSnapAlign: "start" }}>{embeddedBetCard}</div>
             </div>
             <div className="flex justify-center gap-1.5">
               <div style={{ width: 5, height: 5, borderRadius: "50%", background: carouselPage === 0 ? "var(--accent)" : "rgba(255,255,255,0.2)", transition: "background 0.2s" }} />
