@@ -112,10 +112,7 @@ export default function PlayPage() {
           font-weight: 800;
           letter-spacing: -0.03em;
           line-height: 1.05;
-          background: linear-gradient(135deg, #fff 0%, rgba(255,143,163,0.9) 40%, rgba(167,139,250,0.9) 80%, rgba(100,180,210,0.8) 100%);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          background-clip: text;
+          color: #000;
         }
 
         .gate-sub {
@@ -123,6 +120,11 @@ export default function PlayPage() {
           color: rgba(237, 232, 224, 0.55);
           max-width: 380px;
           line-height: 1.6;
+        }
+
+        @keyframes pulse-glow {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(255, 143, 163, 0.5); opacity: 1; }
+          50% { box-shadow: 0 0 18px 6px rgba(255, 143, 163, 0.25); opacity: 0.75; }
         }
 
         .gate-btn {
@@ -138,11 +140,13 @@ export default function PlayPage() {
           transition: all 0.2s;
           letter-spacing: 0.02em;
           backdrop-filter: blur(8px);
+          animation: pulse-glow 1.8s ease-in-out infinite;
         }
         .gate-btn:hover {
           background: rgba(255, 143, 163, 0.2);
           border-color: rgba(255, 143, 163, 0.55);
           transform: translateY(-1px);
+          animation: none;
         }
 
         /* Main page */
