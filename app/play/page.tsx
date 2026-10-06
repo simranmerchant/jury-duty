@@ -498,7 +498,7 @@ export default function PlayPage() {
                     <div className="prize-body">
                       <p className="prize-title">most interacted bet</p>
                       <p className="prize-desc">
-                        the bet that got the most reactions, comments, and stakers. peak discourse.
+                        the bet that got the most stakers. peak discourse.
                       </p>
                     </div>
                     <span className="prize-amount">$100</span>
@@ -518,7 +518,7 @@ export default function PlayPage() {
                     <div className="prize-body">
                       <p className="prize-title">wild card</p>
                       <p className="prize-desc">
-                        one random submission from all entries wins. just show up.
+                        one random feed post (photo + caption) wins. just show up.
                       </p>
                     </div>
                     <span className="prize-amount">$100</span>
