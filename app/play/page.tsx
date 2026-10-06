@@ -177,10 +177,7 @@ export default function PlayPage() {
           font-weight: 800;
           letter-spacing: -0.03em;
           line-height: 1.1;
-          background: linear-gradient(135deg, #fff 0%, rgba(255,143,163,0.95) 50%, rgba(167,139,250,0.9) 100%);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          background-clip: text;
+          color: #000;
         }
 
         .header-sub {
