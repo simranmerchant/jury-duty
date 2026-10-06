@@ -470,9 +470,9 @@ export default function PlayPage() {
                 <p className="section-label">the story</p>
                 <div className="story">
                   <p>
-                    Jury Duty started as a group chat argument about whether someone would actually
-                    go to the gym three times a week. Someone made a bet. Everyone had opinions.
-                    It spiraled.
+                    Jury Duty started when someone in the group chat said they were finally
+                    deleting their ex&apos;s number. Nobody believed them. Someone made a bet.
+                    Everyone had opinions. It spiraled.
                   </p>
                   <p>
                     Now it&apos;s an app where you and your friends bet points on real life — weddings,
