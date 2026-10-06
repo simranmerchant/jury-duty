@@ -441,7 +441,7 @@ export default function PlayPage() {
         <div className="play-content">
           {!entered ? (
             <div className="gate">
-              <span className="gate-badge">jury duty</span>
+              <span className="gate-badge">jury·<em>duty</em></span>
               <h1 className="gate-heading">
                 you&apos;ve been<br />summoned.
               </h1>
