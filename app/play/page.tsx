@@ -637,7 +637,7 @@ export default function PlayPage() {
 
                     <p className="form-note">
                       by submitting you agree to let us share your bet publicly if you win.
-                      no spam, ever.
+                      we can remove names on request. no spam, ever.
                     </p>
                   </form>
                 )}
