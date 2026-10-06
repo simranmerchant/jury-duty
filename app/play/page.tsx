@@ -96,15 +96,10 @@ export default function PlayPage() {
         }
 
         .gate-badge {
-          font-size: 11px;
-          font-weight: 700;
-          letter-spacing: 0.16em;
-          text-transform: uppercase;
-          color: rgba(255, 143, 163, 0.8);
-          background: rgba(255, 143, 163, 0.08);
-          border: 1px solid rgba(255, 143, 163, 0.2);
-          padding: 6px 14px;
-          border-radius: 100px;
+          font-size: 13px;
+          font-weight: 600;
+          color: rgba(255, 143, 163, 0.7);
+          letter-spacing: 0.01em;
         }
 
         .gate-heading {
