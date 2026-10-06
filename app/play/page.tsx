@@ -531,7 +531,7 @@ export default function PlayPage() {
                 </p>
                 <div className="download-links">
                   <a
-                    href="https://apps.apple.com/app/jury-duty-bet-with-friends/id6741449685"
+                    href="https://apps.apple.com/us/app/jury-duty/id6770705837"
                     className="dl-btn"
                     target="_blank"
                     rel="noopener noreferrer"
