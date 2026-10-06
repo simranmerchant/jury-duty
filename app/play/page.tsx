@@ -8,25 +8,24 @@ const GOOGLE_FORM_URL =
 export default function PlayPage() {
   const [entered, setEntered] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [form, setForm] = useState({ name: "", username: "", category: "", screenshot: "", caption: "" });
+  const [form, setForm] = useState({ name: "", username: "", category: "", caption: "" });
+  const [file, setFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [fileError, setFileError] = useState("");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!file) { setFileError("please upload a screenshot"); return; }
+    setFileError("");
     setSubmitting(true);
     try {
-      const params = new URLSearchParams({
-        "entry.name": form.name,
-        "entry.username": form.username,
-        "entry.category": form.category,
-        "entry.screenshot": form.screenshot,
-        "entry.caption": form.caption,
-      });
-      await fetch(`/api/play-submit`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
+      const fd = new FormData();
+      fd.append("name", form.name);
+      fd.append("username", form.username);
+      fd.append("category", form.category);
+      fd.append("caption", form.caption);
+      fd.append("screenshot", file);
+      await fetch("/api/play-submit", { method: "POST", body: fd });
       setSubmitted(true);
     } catch {
       setSubmitted(true);
@@ -456,7 +455,7 @@ export default function PlayPage() {
             <div className="page">
               {/* Header */}
               <div className="header">
-                <span className="header-eyebrow">jury duty — open competition</span>
+                <span className="header-eyebrow">jury duty — case open</span>
                 <h1 className="header-title">the jury awards</h1>
                 <p className="header-sub">
                   $300 in prizes for the best bets on the app. submit your most interacted,
@@ -554,7 +553,7 @@ export default function PlayPage() {
 
               {/* Submit */}
               <div>
-                <p className="section-label">submit your entry</p>
+                <p className="section-label">submit your evidence</p>
                 {submitted ? (
                   <div className="success">
                     <span className="success-icon">⚖️</span>
@@ -606,15 +605,25 @@ export default function PlayPage() {
                     </div>
 
                     <div className="field">
-                      <label htmlFor="screenshot">screenshot or link</label>
+                      <label htmlFor="screenshot">screenshot</label>
                       <input
                         id="screenshot"
-                        type="text"
-                        placeholder="paste a link to your bet, or describe it"
-                        required
-                        value={form.screenshot}
-                        onChange={(e) => setForm((f) => ({ ...f, screenshot: e.target.value }))}
+                        type="file"
+                        accept="image/*"
+                        style={{ padding: "10px 16px", cursor: "pointer" }}
+                        onChange={(e) => {
+                          setFileError("");
+                          setFile(e.target.files?.[0] ?? null);
+                        }}
                       />
+                      {file && (
+                        <p style={{ fontSize: 12, color: "rgba(237,232,224,0.4)", marginTop: 4 }}>
+                          {file.name}
+                        </p>
+                      )}
+                      {fileError && (
+                        <p style={{ fontSize: 12, color: "#ff8fa3", marginTop: 4 }}>{fileError}</p>
+                      )}
                     </div>
 
                     <div className="field">

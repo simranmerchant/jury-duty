@@ -19,6 +19,7 @@ Next.js web app + API backend for **Jury Duty** — a social prediction app wher
 - `login/page.tsx`, `onboarding/page.tsx` — auth + first-run flow
 - `how-it-works/page.tsx` — explainer carousel
 - `join/[token]/page.tsx` — invite link landing
+- `play/page.tsx` — competition portal ("the jury awards") — no-auth, standalone layout
 
 **Key API routes (app/api/v1/):**
 - `me/` — get/update own profile, followers, following, history, avatar, push tokens
