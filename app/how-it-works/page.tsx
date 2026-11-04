@@ -20,13 +20,6 @@ function IconVote() {
     </svg>
   );
 }
-function IconStar() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-    </svg>
-  );
-}
 function IconMessage() {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
@@ -56,7 +49,7 @@ const SLIDES: Slide[] = [
     icon: <IconScale />,
     label: "overview",
     title: "what is jury duty?",
-    body: "predict anything with your friends. put points on things that only your group would care about.",
+    body: "predict anything with your friends. things only your group would care about.",
     bullets: [
       { text: "will she text back? who leaves first? does the trip make it out of the group chat?" },
       { text: "tied to real events — weddings, game nights, birthday dinners, concerts" },
@@ -67,24 +60,12 @@ const SLIDES: Slide[] = [
     icon: <IconVote />,
     label: "predictions",
     title: "how it works",
-    body: "create a prediction, pick your options, put points in. when it settles, winners split the pool.",
+    body: "create a prediction, pick your options, pick a side. when it settles, see who was right.",
     bullets: [
       { text: "create a prediction inside any event" },
-      { text: "put points on the option you think will win" },
-      { text: "creator settles it — winner takes the pool" },
+      { text: "pick the option you think will win" },
+      { text: "creator settles it after it happens" },
       { text: "after 24 hrs, anyone in the event can resolve it" },
-    ],
-  },
-  {
-    icon: <IconStar />,
-    label: "points",
-    title: "earning points",
-    body: "points are your prediction power. you never buy them — you earn them.",
-    bullets: [
-      { text: "join jury duty  —  +300 pts" },
-      { text: "nail a prediction  —  your points back + winnings" },
-      { text: "create a prediction  —  +25 pts" },
-      { text: "create a group or event  —  +50 pts" },
     ],
   },
   {

@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
-import { computeExplorePayout } from "@/lib/explore-payout";
-
 // GET /api/v1/explore-bets/[id] — full detail: all entries + all public posts
 export async function GET(
   req: NextRequest,
@@ -142,23 +140,6 @@ export async function DELETE(
   if (bet.creator_id !== user.userId) return NextResponse.json({ error: "only the creator can delete this" }, { status: 403 });
 
   // Refund all entries if the bet hasn't been resolved yet
-  if (bet.status === "open") {
-    const { data: entries } = await supabase
-      .from("explore_bet_entries")
-      .select("user_id, side, points_wagered")
-      .eq("explore_bet_id", id);
-
-    const allEntries = (entries ?? []) as Array<{ user_id: string; side: "a" | "b"; points_wagered: number }>;
-    if (allEntries.length > 0) {
-      const refunds = computeExplorePayout(allEntries, null); // null = void/refund all
-      await Promise.all(
-        Object.entries(refunds).map(([uid, pts]) =>
-          supabase.rpc("increment_balance", { p_user_id: uid, p_amount: pts })
-        )
-      );
-    }
-  }
-
   await supabase.from("notifications").delete().like("data::text", `%${id}%`);
 
   const { error } = await supabase.from("explore_bets").delete().eq("id", id);

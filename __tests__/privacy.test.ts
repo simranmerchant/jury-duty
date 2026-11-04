@@ -243,14 +243,13 @@ describe("canAccessBet — followers bets", () => {
 
 describe("buildStakeNotificationBody — named stake", () => {
   it("includes staker name when not anonymous", () => {
-    const body = buildStakeNotificationBody("Alice", 100, "will it rain?", false);
+    const body = buildStakeNotificationBody("Alice", "will it rain?", false);
     expect(body).toContain("Alice");
-    expect(body).toContain("100");
     expect(body).toContain("will it rain?");
   });
 
   it("does not include 'anonymous' language when not anonymous", () => {
-    const body = buildStakeNotificationBody("Alice", 100, "will it rain?", false);
+    const body = buildStakeNotificationBody("Alice", "will it rain?", false);
     expect(body.toLowerCase()).not.toContain("anonymous");
   });
 });
@@ -289,19 +288,18 @@ describe("resolveCreatorName — anonymous bet", () => {
 
 describe("buildStakeNotificationBody — anonymous stake", () => {
   it("does not include staker name when anonymous", () => {
-    const body = buildStakeNotificationBody("Alice", 100, "will it rain?", true);
+    const body = buildStakeNotificationBody("Alice", "will it rain?", true);
     expect(body).not.toContain("Alice");
   });
 
-  it("says 'someone anonymously staked'", () => {
-    const body = buildStakeNotificationBody("Alice", 100, "will it rain?", true);
+  it("says 'someone anonymously' picked a side", () => {
+    const body = buildStakeNotificationBody("Alice", "will it rain?", true);
     expect(body).toContain("someone");
     expect(body.toLowerCase()).toContain("anonymous");
   });
 
-  it("still includes points and question (aggregate stats ok)", () => {
-    const body = buildStakeNotificationBody("Alice", 75, "who wins tonight?", true);
-    expect(body).toContain("75");
+  it("includes question", () => {
+    const body = buildStakeNotificationBody("Alice", "who wins tonight?", true);
     expect(body).toContain("who wins tonight?");
   });
 });

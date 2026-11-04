@@ -31,11 +31,7 @@ export async function POST(req: NextRequest) {
   if (!referrer) return NextResponse.json({ error: "invalid referral code" }, { status: 404 });
   if (referrer.user_id === user.userId) return NextResponse.json({ error: "you can't use your own referral code" }, { status: 422 });
 
-  // Award referrer + mark this user as referred
-  await Promise.all([
-    supabase.from("balances").update({ referred_by: referrer.user_id }).eq("user_id", user.userId),
-    supabase.rpc("increment_balance", { p_user_id: referrer.user_id, p_amount: 100 }),
-  ]);
+  await supabase.from("balances").update({ referred_by: referrer.user_id }).eq("user_id", user.userId);
 
   return NextResponse.json({ ok: true });
 }

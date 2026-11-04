@@ -41,7 +41,7 @@ export default async function OgImage() {
         </div>
 
         <span style={{ fontSize: 18, color: "rgba(255,255,255,0.38)", fontWeight: 600, marginBottom: 32 }}>
-          make predictions. settle debates. earn points.
+          make predictions. settle debates.
         </span>
 
         <div style={{ height: 1, backgroundColor: "rgba(255,255,255,0.06)", marginBottom: 28 }} />

@@ -25,29 +25,13 @@ export async function PATCH(
 
   const isHost = event.host_id === user.userId;
 
-  // Non-hosts must be a member to set punishment
-  if (!isHost) {
-    const { data: guest } = await supabase
-      .from("event_guests")
-      .select("user_id")
-      .eq("event_id", id)
-      .eq("user_id", user.userId)
-      .single();
-    if (!guest) return NextResponse.json({ error: "not authorized" }, { status: 403 });
-  }
+  if (!isHost) return NextResponse.json({ error: "not authorized" }, { status: 403 });
 
-  const { name, ends_at, punishment, prize } = await req.json();
-
-  // Only host can rename or change end date
-  if ((name !== undefined || ends_at !== undefined) && !isHost) {
-    return NextResponse.json({ error: "only the host can edit name or end date" }, { status: 403 });
-  }
+  const { name, ends_at } = await req.json();
 
   const updates: Record<string, string | null> = {};
   if (name?.trim()) updates.name = name.trim();
   if (ends_at && event.type === "event") updates.ends_at = ends_at;
-  if (punishment !== undefined) updates.punishment = punishment?.trim() || null;
-  if (prize !== undefined) updates.prize = prize?.trim() || null;
   if (Object.keys(updates).length === 0) return NextResponse.json({ error: "nothing to update" }, { status: 400 });
 
   const { error } = await supabase.from("events").update(updates).eq("id", id);
@@ -77,31 +61,8 @@ export async function DELETE(
   if (!event) return NextResponse.json({ error: "not found" }, { status: 404 });
   if (event.host_id !== user.userId) return NextResponse.json({ error: "only the host can delete this event" }, { status: 403 });
 
-  // Refund all stakes from open bets before deleting so no one loses points
-  const { data: openEntries } = await supabase
-    .from("bet_entries")
-    .select("user_id, points_staked, bets!inner(event_id, status)")
-    .eq("bets.event_id", id)
-    .eq("bets.status", "open");
-
-  if (openEntries && openEntries.length > 0) {
-    // Group stakes by user and refund
-    const refunds: Record<string, number> = {};
-    for (const entry of openEntries) {
-      refunds[entry.user_id] = (refunds[entry.user_id] ?? 0) + entry.points_staked;
-    }
-    await Promise.all(
-      Object.entries(refunds).map(([userId, pts]) =>
-        supabase.rpc("increment_balance", { p_user_id: userId, p_amount: pts })
-      )
-    );
-  }
-
   const { error } = await supabase.from("events").delete().eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
-  // Claw back the creation reward from the host
-  await supabase.rpc("increment_balance", { p_user_id: user.userId, p_amount: -50 });
 
   return NextResponse.json({ ok: true });
 }
@@ -140,11 +101,11 @@ export async function GET(
     if (!guest) return NextResponse.json({ error: "not found" }, { status: 404 });
   }
 
-  const [{ data: event, error }, { data: lastSeen }, { data: myBalance }] = await Promise.all([
+  const [{ data: event, error }, { data: lastSeen }] = await Promise.all([
     supabase
       .from("events")
       .select(`
-        id, name, ends_at, type, host_id, invite_token, cover_url, cover_original_url, punishment, prize,
+        id, name, ends_at, type, host_id, invite_token, cover_url, cover_original_url,
         host_balance:balances!events_host_id_fkey(display_name, avatar_url, username),
         event_guests(user_id, balances(display_name, avatar_url, username)),
         bets(
@@ -171,11 +132,6 @@ export async function GET(
       .select("seen_at")
       .eq("user_id", user.userId)
       .eq("event_id", id)
-      .single(),
-    supabase
-      .from("balances")
-      .select("points")
-      .eq("user_id", user.userId)
       .single(),
   ]);
 
@@ -237,6 +193,5 @@ export async function GET(
   return NextResponse.json({
     event: { ...eventFields, event_guests: eventGuests, bets: filteredBets, polls: transformedPolls },
     userId: user.userId,
-    userPoints: myBalance?.points ?? 0,
   });
 }

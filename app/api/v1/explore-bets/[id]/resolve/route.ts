@@ -60,13 +60,6 @@ export async function POST(
 
   if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
 
-  // Credit winners
-  await Promise.all(
-    Object.entries(payouts).map(([uid, pts]) =>
-      supabase.rpc("increment_balance", { p_user_id: uid, p_amount: pts })
-    )
-  );
-
   // In-app + push notifications
   const allUserIds = [...new Set(allEntries.map((e) => e.user_id))];
   if (allUserIds.length > 0) {

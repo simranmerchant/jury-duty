@@ -16,7 +16,7 @@ export default function PrivacyPage() {
       <section className="space-y-10 text-[15px] leading-7 text-[var(--muted)]">
         <div>
           <h2 className="text-lg font-bold text-[var(--text)] mb-3">What is jury duty?</h2>
-          <p>jury duty is a social bet-on-anything app for friends. You create events, place bets using virtual points, and settle debates with your group. No real money is ever involved.</p>
+          <p>jury duty is a social bet-on-anything app for friends. You create events, make predictions, and settle debates with your group. No real money is ever involved.</p>
         </div>
 
         <div>
@@ -33,7 +33,7 @@ export default function PrivacyPage() {
         <div>
           <h2 className="text-lg font-bold text-[var(--text)] mb-3">What we don&apos;t collect</h2>
           <ul className="list-disc pl-5 space-y-2">
-            <li>We do not collect real financial information. jury duty uses virtual points only.</li>
+            <li>We do not collect real financial information. No real money is involved.</li>
             <li>We do not sell your data to third parties.</li>
             <li>We do not run ads.</li>
           </ul>

@@ -88,10 +88,9 @@ export function resolveCreatorName(
  */
 export function buildStakeNotificationBody(
   stakerName: string,
-  points: number,
   question: string,
   isAnonymous: boolean
 ): string {
-  if (isAnonymous) return `someone anonymously staked ${points} pts on "${question}"`;
-  return `${stakerName} staked ${points} pts on "${question}"`;
+  if (isAnonymous) return `someone anonymously picked a side on "${question}"`;
+  return `${stakerName} picked a side on "${question}"`;
 }

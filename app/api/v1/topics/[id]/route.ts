@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
-import { computeExplorePayout } from "@/lib/explore-payout";
 import { isTopicEditable } from "@/lib/topics";
 
 // DELETE /api/v1/topics/[id] — creator deletes topic; refunds open bets, then deletes all bets in topic
@@ -37,20 +36,6 @@ export async function DELETE(
 
   if (openBets && openBets.length > 0) {
     const betIds = openBets.map((b) => b.id);
-    const { data: entries } = await supabase
-      .from("explore_bet_entries")
-      .select("user_id, side, points_wagered")
-      .in("explore_bet_id", betIds);
-
-    const allEntries = (entries ?? []) as Array<{ user_id: string; side: "a" | "b"; points_wagered: number }>;
-    if (allEntries.length > 0) {
-      const refunds = computeExplorePayout(allEntries, null);
-      await Promise.all(
-        Object.entries(refunds).map(([uid, pts]) =>
-          supabase.rpc("increment_balance", { p_user_id: uid, p_amount: pts })
-        )
-      );
-    }
   }
 
   // Delete all explore_bets in this topic (cascade will clean up entries, posts, etc.)

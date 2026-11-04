@@ -42,7 +42,6 @@ export default function ProfilePage() {
   const { ready, authenticated, getAccessToken, logout } = usePrivy();
   const router = useRouter();
 
-  const [points, setPoints] = useState<number | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [displayName, setDisplayName] = useState<string>("");
@@ -72,7 +71,6 @@ export default function ProfilePage() {
       fetch("/api/v1/me/follow-requests", { headers: { Authorization: `Bearer ${token}` } }),
     ]);
     const data = await meRes.json();
-    setPoints(data.points);
     setDisplayName(data.display_name ?? "");
     setUsername(data.username ?? null);
     setAvatarUrl(data.avatar_url ?? null);
@@ -216,10 +214,6 @@ export default function ProfilePage() {
   const winRate = stats && stats.total - stats.pending > 0
     ? Math.round((stats.won / (stats.total - stats.pending)) * 100)
     : null;
-
-  const staked = history
-    .filter((h) => h.outcome === "pending")
-    .reduce((sum, h) => sum + h.points_staked, 0);
 
   return (
     <div className="min-h-screen" style={{ background: "var(--bg)", color: "var(--text)" }}>
@@ -381,28 +375,6 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {/* Balance card */}
-        <div
-          className="rounded-3xl p-6 flex flex-col gap-1"
-          style={{ background: "var(--card)", border: "1px solid var(--border-soft)" }}
-        >
-          <p className="text-[12px] font-semibold" style={{ color: "var(--muted)" }}>
-            your balance
-          </p>
-          <p
-            className="text-[48px] font-black leading-none tracking-tight"
-            style={{ fontFamily: "var(--font-nunito)", color: "var(--accent)" }}
-          >
-            {points?.toLocaleString() ?? "—"}
-          </p>
-          <p className="text-[13px]" style={{ color: "var(--dimmer)" }}>points available</p>
-          {staked > 0 && (
-            <p className="text-[12px] mt-1" style={{ color: "var(--muted)" }}>
-              + {staked.toLocaleString()} pts in {stats?.pending} open {stats?.pending === 1 ? "prediction" : "predictions"}
-            </p>
-          )}
-        </div>
-
         {/* Stats row */}
         {stats && stats.total > 0 && (
           <div className="grid grid-cols-3 gap-2">
@@ -464,7 +436,7 @@ export default function ProfilePage() {
                         {entry.question}
                       </p>
                       <p className="text-[11px]" style={{ color: "var(--muted)" }}>
-                        {entry.event_name} · {entry.pick} · {entry.points_staked.toLocaleString()} pts
+                        {entry.event_name} · {entry.pick}
                       </p>
                     </button>
                     <div className="flex items-center gap-2 flex-shrink-0">

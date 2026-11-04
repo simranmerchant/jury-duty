@@ -11,7 +11,6 @@ type Profile = {
   display_name: string | null;
   username: string;
   avatar_url: string | null;
-  points: number;
   is_private: boolean;
   follower_count: number;
   following_count: number;
@@ -209,27 +208,18 @@ export default function PublicProfilePage() {
       </div>
 
       <div className="px-4 pb-32 flex flex-col gap-4">
-        {/* Stats: points + win rate */}
-        <div className="grid grid-cols-2 gap-2">
+        {/* Stats: win rate */}
+        {winRate !== null && (
           <div
             className="rounded-2xl p-4 flex flex-col gap-0.5"
             style={{ background: "var(--card)", border: "1px solid var(--border-soft)" }}
           >
             <p className="text-[20px] font-black" style={{ fontFamily: "var(--font-nunito)" }}>
-              {(profile?.points ?? 0).toLocaleString()}
-            </p>
-            <p className="text-[11px]" style={{ color: "var(--muted)" }}>points</p>
-          </div>
-          <div
-            className="rounded-2xl p-4 flex flex-col gap-0.5"
-            style={{ background: "var(--card)", border: "1px solid var(--border-soft)" }}
-          >
-            <p className="text-[20px] font-black" style={{ fontFamily: "var(--font-nunito)" }}>
-              {winRate !== null ? `${winRate}%` : "—"}
+              {winRate}%
             </p>
             <p className="text-[11px]" style={{ color: "var(--muted)" }}>win rate</p>
           </div>
-        </div>
+        )}
 
         {/* Mutual events / groups */}
         {mutualEvents.length > 0 && (

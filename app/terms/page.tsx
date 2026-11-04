@@ -16,7 +16,7 @@ export default function TermsPage() {
       <section className="space-y-10 text-[15px] leading-7 text-[var(--muted)]">
         <div>
           <h2 className="text-lg font-bold text-[var(--text)] mb-3">The basics</h2>
-          <p>By using jury duty you agree to these terms. jury duty is a social entertainment app. All predictions use virtual points — no real money, no gambling.</p>
+          <p>By using jury duty you agree to these terms. jury duty is a social entertainment app. All predictions are for fun — no real money, no gambling.</p>
         </div>
 
         <div>
@@ -26,11 +26,6 @@ export default function TermsPage() {
             <li>You are responsible for activity that happens under your account.</li>
             <li>Don&apos;t share your login credentials.</li>
           </ul>
-        </div>
-
-        <div>
-          <h2 className="text-lg font-bold text-[var(--text)] mb-3">Virtual points</h2>
-          <p>Points in jury duty have no real-world monetary value and cannot be exchanged for cash, goods, or services. They exist solely to make bets between friends more interesting. We may adjust point values, earning rules, or balances at any time.</p>
         </div>
 
         <div>

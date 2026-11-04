@@ -11,22 +11,23 @@ export async function POST(req: NextRequest) {
   const user = await requireUser(token).catch(() => null);
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  const { bet_id, option_id, points, is_anonymous } = await req.json();
-  if (!bet_id || !option_id || !points) {
-    return NextResponse.json({ error: "bet_id, option_id, and points required" }, { status: 400 });
-  }
-  if (typeof points !== "number" || points <= 0) {
-    return NextResponse.json({ error: "points must be a positive number" }, { status: 400 });
+  const { bet_id, option_id, is_anonymous } = await req.json();
+  if (!bet_id || !option_id) {
+    return NextResponse.json({ error: "bet_id and option_id required" }, { status: 400 });
   }
 
   // Access control: verify user can see this bet before letting them vote
   const { data: bet } = await supabase
     .from("bets")
-    .select("creator_id, audience, question, event_id")
+    .select("creator_id, audience, question, event_id, status, deadline")
     .eq("id", bet_id)
     .single();
 
   if (!bet) return NextResponse.json({ error: "bet not found" }, { status: 404 });
+  if (bet.status !== "open") return NextResponse.json({ error: "bet is not open" }, { status: 422 });
+  if (bet.deadline && new Date(bet.deadline) < new Date()) {
+    return NextResponse.json({ error: "deadline has passed" }, { status: 422 });
+  }
 
   const isCreator = bet.creator_id === user.userId;
   if (!isCreator) {
@@ -48,35 +49,13 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const { error } = await supabase.rpc("place_bet", {
-    p_user_id: user.userId,
-    p_bet_id: bet_id,
-    p_option_id: option_id,
-    p_points: points,
-  });
+  const { error } = await supabase
+    .from("bet_entries")
+    .insert({ bet_id, user_id: user.userId, option_id, points_staked: 1, is_anonymous: !!is_anonymous });
 
   if (error) {
-    const msg = error.message;
-    if (msg.includes("insufficient balance")) return NextResponse.json({ error: "insufficient balance" }, { status: 422 });
-    if (msg.includes("deadline has passed")) return NextResponse.json({ error: "deadline has passed" }, { status: 422 });
-    if (msg.includes("not open")) return NextResponse.json({ error: "bet is not open" }, { status: 422 });
-    if (msg.includes("unique constraint") || msg.includes("bet_entries_bet_id_user_id_key")) {
-      return NextResponse.json({ error: "already placed a bet" }, { status: 422 });
-    }
-    return NextResponse.json({ error: msg }, { status: 500 });
-  }
-
-  // Mark anonymous — do this after RPC and check for errors
-  if (is_anonymous) {
-    const { error: anonError } = await supabase
-      .from("bet_entries")
-      .update({ is_anonymous: true })
-      .eq("bet_id", bet_id)
-      .eq("user_id", user.userId);
-
-    if (anonError) {
-      return NextResponse.json({ error: "bet placed but failed to mark anonymous — try again" }, { status: 500 });
-    }
+    if (error.code === "23505") return NextResponse.json({ error: "already placed a bet" }, { status: 422 });
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
   // Notify bet creator when someone else stakes
@@ -95,7 +74,7 @@ export async function POST(req: NextRequest) {
         .single();
       stakerName = staker?.display_name ?? "someone";
     }
-    const notifBody = buildStakeNotificationBody(stakerName, points, question, !!is_anonymous);
+    const notifBody = buildStakeNotificationBody(stakerName, question, !!is_anonymous);
     await Promise.all([
       supabase.from("notifications").insert({
         user_id: bet.creator_id,
