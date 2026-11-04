@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
   const user = await requireUser(token).catch(() => null);
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  const { name, ends_at, type = "event", punishment, prize } = await req.json();
+  const { name, ends_at, type = "event" } = await req.json();
   if (!name?.trim()) return NextResponse.json({ error: "name required" }, { status: 400 });
   if (name.trim().length > 100) return NextResponse.json({ error: "name must be 100 chars or fewer" }, { status: 400 });
   if (!["event", "group"].includes(type)) return NextResponse.json({ error: "invalid type" }, { status: 400 });
@@ -26,8 +26,6 @@ export async function POST(req: NextRequest) {
       type,
       host_id: user.userId,
       invite_token: "pending",
-      ...(punishment?.trim() ? { punishment: punishment.trim() } : {}),
-      ...(prize?.trim() ? { prize: prize.trim() } : {}),
     })
     .select("id")
     .single();
@@ -37,8 +35,6 @@ export async function POST(req: NextRequest) {
   const invite_token = generateInviteToken(event.id);
   await supabase.from("events").update({ invite_token }).eq("id", event.id);
   await supabase.from("event_guests").insert({ event_id: event.id, user_id: user.userId });
-
-  await supabase.rpc("increment_balance", { p_user_id: user.userId, p_amount: 50 });
 
   return NextResponse.json({ eventId: event.id, invite_token });
 }
@@ -59,6 +55,7 @@ export async function GET(req: NextRequest) {
         bets(id, status, visibility, creator_id, created_at, deadline)
       `)
       .eq("event_guests.user_id", user.userId)
+      .eq("is_hidden", false)
       .order("created_at", { ascending: false }),
     supabase
       .from("event_last_seen")
