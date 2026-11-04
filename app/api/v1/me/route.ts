@@ -53,41 +53,45 @@ export async function DELETE(req: NextRequest) {
 
   const uid = user.userId;
 
-  // 1. Refund any open bet entries (return staked points before deleting)
-  const { data: openEntries } = await supabase
-    .from("bet_entries")
-    .select("id, points_staked, bets(status)")
-    .eq("user_id", uid);
+  // 1. Delete user's bets — cascades bet_options, bet_entries, bet_invites, bet_likes, bet_comments
+  await supabase.from("bets").delete().eq("creator_id", uid);
 
-  const openStaked = (openEntries ?? [])
-    .filter((e: any) => e.bets?.status === "open")
-    .reduce((sum: number, e: any) => sum + e.points_staked, 0);
+  // 2. Delete remaining bet_entries in other users' bets
+  await supabase.from("bet_entries").delete().eq("user_id", uid);
 
-  if (openStaked > 0) {
-    const { data: bal } = await supabase
-      .from("balances")
-      .select("points")
-      .eq("user_id", uid)
-      .single();
-    if (bal) {
-      await supabase
-        .from("balances")
-        .update({ points: (bal.points ?? 0) + openStaked })
-        .eq("user_id", uid);
-    }
+  // 3. Handle events this user hosts
+  const { data: hostedEvents } = await supabase
+    .from("events")
+    .select("id")
+    .eq("host_id", uid);
+
+  await Promise.all(
+    (hostedEvents ?? []).map(async (event) => {
+      const { data: otherGuests } = await supabase
+        .from("event_guests")
+        .select("user_id")
+        .eq("event_id", event.id)
+        .neq("user_id", uid)
+        .limit(1);
+
+      if (otherGuests && otherGuests.length > 0) {
+        // Transfer host to another member
+        await supabase.from("events").update({ host_id: otherGuests[0].user_id }).eq("id", event.id);
+      } else {
+        // No other members — delete the event (cascades guests + bets inside it)
+        await supabase.from("events").delete().eq("id", event.id);
+      }
+    })
+  );
+
+  // 4. Delete balances row — cascades posts, follows, notifications, push_tokens,
+  //    event_guests, poll stuff, explore_bet_entries, post_likes, post_comments, etc.
+  await supabase.from("balances").delete().eq("user_id", uid);
+
+  // 5. Delete Supabase auth user
+  if (user.provider === "supabase") {
+    await supabase.auth.admin.deleteUser(uid);
   }
-
-  // 2. Delete user's bet entries and event guest rows
-  await Promise.all([
-    supabase.from("bet_entries").delete().eq("user_id", uid),
-    supabase.from("event_guests").delete().eq("user_id", uid),
-  ]);
-
-  // 3. Anonymize the balances row (keep it for FK integrity — events/bets reference it)
-  await supabase
-    .from("balances")
-    .update({ display_name: "Deleted User", username: null, avatar_url: null, points: 0 })
-    .eq("user_id", uid);
 
   return NextResponse.json({ ok: true });
 }
