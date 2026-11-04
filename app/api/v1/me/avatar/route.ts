@@ -31,8 +31,7 @@ export async function POST(req: NextRequest) {
 
   const { error: updateError } = await supabase
     .from("balances")
-    .update({ avatar_url: avatarUrl })
-    .eq("user_id", user.userId);
+    .upsert({ user_id: user.userId, avatar_url: avatarUrl }, { onConflict: "user_id" });
 
   if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
 

@@ -39,8 +39,8 @@ export async function POST(
     .eq("id", betId)
     .single();
 
-  // Auto-create/update post for feed bets (event_id === null) on resolution
-  if (bet && bet.event_id === null) {
+  // Auto-create/update post for feed bets only if the resolver added a photo or caption
+  if (bet && bet.event_id === null && (caption || photo_url || video_url)) {
     await supabase.from("posts").upsert(
       {
         user_id: user.userId,

@@ -38,8 +38,7 @@ export async function PATCH(req: NextRequest) {
 
   const { error } = await supabase
     .from("balances")
-    .update({ username: u })
-    .eq("user_id", user.userId);
+    .upsert({ user_id: user.userId, username: u }, { onConflict: "user_id" });
 
   if (error?.code === "23505") {
     return NextResponse.json({ error: "username taken" }, { status: 409 });

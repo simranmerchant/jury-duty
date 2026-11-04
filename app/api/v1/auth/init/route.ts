@@ -43,8 +43,8 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({
     userId: user.userId,
-    points: row?.points ?? 300,
     hasName: !!row?.display_name,
     hasUsername: !!row?.username,
+    username: row?.username ?? null,
   });
 }

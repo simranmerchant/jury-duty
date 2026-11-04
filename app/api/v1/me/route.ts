@@ -120,8 +120,7 @@ export async function PATCH(req: NextRequest) {
 
   const { error } = await supabase
     .from("balances")
-    .update(updates)
-    .eq("user_id", user.userId);
+    .upsert({ user_id: user.userId, ...updates }, { onConflict: "user_id" });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
