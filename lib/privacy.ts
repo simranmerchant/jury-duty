@@ -91,6 +91,6 @@ export function buildStakeNotificationBody(
   question: string,
   isAnonymous: boolean
 ): string {
-  if (isAnonymous) return `someone anonymously picked a side on "${question}"`;
-  return `${stakerName} picked a side on "${question}"`;
+  if (isAnonymous) return `someone anonymously placed their bet on "${question}"`;
+  return `${stakerName} placed their bet on "${question}"`;
 }
