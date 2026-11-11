@@ -45,7 +45,7 @@ export function shapeProfilePosts(
   limit = 60
 ): ProfilePost[] {
   return [
-    ...(betPosts ?? []).map((p): ProfilePost => ({
+    ...(betPosts ?? []).filter(p => p.bets !== null).map((p): ProfilePost => ({
       id: p.id,
       type: "post",
       photo_url: p.photo_url ?? null,
@@ -54,7 +54,7 @@ export function shapeProfilePosts(
       comment_count: (p.post_comments ?? []).length,
       created_at: p.created_at,
     })),
-    ...(explorePosts ?? []).map((p): ProfilePost => ({
+    ...(explorePosts ?? []).filter(p => p.explore_bets !== null).map((p): ProfilePost => ({
       id: p.explore_bet_id,
       type: "explore_bet_post",
       photo_url: p.photo_url ?? null,
@@ -63,7 +63,7 @@ export function shapeProfilePosts(
       comment_count: (p.explore_bets?.explore_bet_comments ?? []).length,
       created_at: p.created_at,
     })),
-    ...(pollPosts ?? []).map((p): ProfilePost => ({
+    ...(pollPosts ?? []).filter(p => p.polls !== null).map((p): ProfilePost => ({
       id: p.poll_id,
       type: "poll_post",
       photo_url: p.photo_url ?? null,
