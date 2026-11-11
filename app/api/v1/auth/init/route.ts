@@ -16,7 +16,9 @@ export async function POST(req: NextRequest) {
   // For Supabase Auth users: migrate from old Privy ID via phone match.
   if (user.provider === "supabase") {
     const { data: authUser } = await supabase.auth.admin.getUserById(user.userId);
-    const phone = authUser?.user?.phone;
+    const rawPhone = authUser?.user?.phone;
+    // Supabase Auth stores phones without the leading '+'; balances.phone uses E.164 (+1...)
+    const phone = rawPhone ? (rawPhone.startsWith("+") ? rawPhone : `+${rawPhone}`) : null;
     if (phone) {
       const { data: existing } = await supabase
         .from("balances")
