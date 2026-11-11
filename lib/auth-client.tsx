@@ -63,8 +63,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+const SSR_FALLBACK: AuthContextType = {
+  ready: false,
+  authenticated: false,
+  user: null,
+  getAccessToken: async () => null,
+  logout: async () => {},
+  login: () => {},
+};
+
 export function useAuth() {
   const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuth must be used inside AuthProvider");
-  return ctx;
+  return ctx ?? SSR_FALLBACK;
 }
