@@ -42,7 +42,7 @@ export async function POST(
   // Auto-create/update post on resolution:
   // - feed bets (event_id === null): always upsert
   // - group bets: only upsert when user explicitly provides media/caption
-  const shouldPost = bet && (bet.event_id === null || caption || photo_url || video_url);
+  const shouldPost = bet && (caption || photo_url || video_url);
   if (shouldPost) {
     const { error: postError } = await supabase.from("posts").upsert(
       {
