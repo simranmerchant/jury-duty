@@ -44,7 +44,7 @@ export async function POST(
   // - group bets: only upsert when user explicitly provides media/caption
   const shouldPost = bet && (bet.event_id === null || caption || photo_url || video_url);
   if (shouldPost) {
-    await supabase.from("posts").upsert(
+    const { error: postError } = await supabase.from("posts").upsert(
       {
         user_id: user.userId,
         bet_id: betId,
@@ -55,6 +55,7 @@ export async function POST(
       },
       { onConflict: "user_id,bet_id" }
     );
+    if (postError) console.error("[resolve] post upsert failed:", postError.message);
   }
 
   if (bet) {
