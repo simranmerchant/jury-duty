@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
+import { shouldCreatePost } from "@/lib/resolve-post";
 import { sendPushToUsers } from "@/lib/push";
 import { sendWebPushToUsers } from "@/lib/webpush";
 import { buildResolveNotifications } from "@/lib/resolve-notifications";
@@ -39,10 +40,7 @@ export async function POST(
     .eq("id", betId)
     .single();
 
-  // Auto-create/update post on resolution:
-  // - feed bets (event_id === null): always upsert
-  // - group bets: only upsert when user explicitly provides media/caption
-  const shouldPost = bet && (caption || photo_url || video_url);
+  const shouldPost = shouldCreatePost(bet, caption, photo_url, video_url);
   if (shouldPost) {
     const { error: postError } = await supabase.from("posts").upsert(
       {
