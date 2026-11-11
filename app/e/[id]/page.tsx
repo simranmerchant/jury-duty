@@ -1,6 +1,6 @@
 "use client";
 
-import { usePrivy } from "@privy-io/react-auth";
+import { useAuth } from "@/lib/auth-client";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { filterTagPickerGuests } from "../../../lib/tag-picker";
@@ -53,7 +53,7 @@ type Event = {
 };
 
 export default function EventPage() {
-  const { ready, authenticated, getAccessToken } = usePrivy();
+  const { ready, authenticated, getAccessToken } = useAuth();
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
@@ -663,7 +663,7 @@ function BetCard({
   userPoints: number | null;
   onUpdate: () => void;
 }) {
-  const { getAccessToken } = usePrivy();
+  const { getAccessToken } = useAuth();
   const router = useRouter();
 
   // Blur/reveal state — private bets start blurred

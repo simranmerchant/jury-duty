@@ -1,11 +1,11 @@
 "use client";
 
-import { usePrivy } from "@privy-io/react-auth";
+import { useAuth } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
 export default function Home() {
-  const { ready, authenticated } = usePrivy();
+  const { ready, authenticated } = useAuth();
   const router = useRouter();
 
   useEffect(() => {

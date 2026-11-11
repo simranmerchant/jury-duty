@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
 
   const { data: entries, error } = await supabase
     .from("bet_entries")
-    .select("id, option_id, points_staked, bets!inner(id, question, status, winning_option_id, event_id, deadline)")
+    .select("id, option_id, points_staked, bets!inner(id, question, status, winning_option_id, event_id, deadline), bet_options(label)")
     .eq("user_id", user.userId)
     .eq("is_hidden_from_profile", false)
     .in("bets.status", filter === "open" ? ["open"] : ["resolved"])
@@ -32,7 +32,8 @@ export async function GET(req: NextRequest) {
       const won = isResolved && bet.winning_option_id === e.option_id;
       const lost = isResolved && bet.winning_option_id !== null && bet.winning_option_id !== e.option_id;
       const outcome: "won" | "lost" | "open" = won ? "won" : lost ? "lost" : "open";
-      return { id: e.id, bet_id: bet.id, question: bet.question, points_staked: e.points_staked, outcome, event_id: bet.event_id, deadline: bet.deadline };
+      const option_label: string | null = Array.isArray(e.bet_options) ? (e.bet_options[0]?.label ?? null) : (e.bet_options?.label ?? null);
+      return { id: e.id, bet_id: bet.id, question: bet.question, option_label, points_staked: e.points_staked, outcome, event_id: bet.event_id, deadline: bet.deadline };
     })
     .filter((e) => filter === "all" || e.outcome === filter);
 

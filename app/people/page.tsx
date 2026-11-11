@@ -1,6 +1,6 @@
 "use client";
 
-import { usePrivy } from "@privy-io/react-auth";
+import { useAuth } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useRef, useCallback } from "react";
 import BottomNav from "@/components/BottomNav";
@@ -18,7 +18,7 @@ type Suggestion = UserResult & {
 };
 
 export default function PeoplePage() {
-  const { ready, authenticated, getAccessToken } = usePrivy();
+  const { ready, authenticated, getAccessToken } = useAuth();
   const router = useRouter();
 
   const [query, setQuery] = useState("");

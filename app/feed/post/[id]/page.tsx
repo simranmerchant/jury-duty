@@ -1,6 +1,6 @@
 "use client";
 
-import { usePrivy } from "@privy-io/react-auth";
+import { useAuth } from "@/lib/auth-client";
 import { useRouter, useParams } from "next/navigation";
 import { useEffect, useState, useCallback, useRef } from "react";
 import BottomNav from "@/components/BottomNav";
@@ -33,7 +33,7 @@ function timeAgo(d: string) {
 }
 
 export default function PostDetailPage() {
-  const { ready, authenticated, getAccessToken, user: privyUser } = usePrivy();
+  const { ready, authenticated, getAccessToken, user } = useAuth();
   const router = useRouter();
   const { id } = useParams<{ id: string }>();
 
@@ -61,13 +61,13 @@ export default function PostDetailPage() {
       const data = await res.json();
       const p: Post = data.post;
       setPost(p);
-      setLiked(p.post_likes.some((l) => l.user_id === privyUser?.id));
+      setLiked(p.post_likes.some((l) => l.user_id === user?.id));
       setLikeCount(p.post_likes.length);
       setCommentCount(p.post_comments.length);
       setLoading(false);
     }
     load();
-  }, [ready, authenticated, id, getAccessToken, privyUser?.id, router]);
+  }, [ready, authenticated, id, getAccessToken, user?.id, router]);
 
   const loadComments = useCallback(async () => {
     if (!post) return;
@@ -193,7 +193,7 @@ export default function PostDetailPage() {
                   const pct = totalStaked > 0 ? Math.round((optTotal / totalStaked) * 100) : 0;
                   const isWinner = bet.winning_option_id === opt.id;
                   const isLoss = bet.winning_option_id !== null && !isWinner;
-                  const isMe = voters.some((e) => e.user_id === privyUser?.id);
+                  const isMe = voters.some((e) => e.user_id === user?.id);
                   return (
                     <div key={opt.id} className="rounded-[10px] p-2.5 flex flex-col gap-1.5"
                       style={{ background: isWinner ? "var(--win-dim)" : isLoss ? "var(--loss-dim)" : "rgba(255,255,255,0.03)", border: `1px solid ${isWinner ? "var(--win-border)" : isLoss ? "var(--loss-border)" : "rgba(255,255,255,0.06)"}` }}>

@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { usePrivy } from "@privy-io/react-auth";
+import { useAuth } from "@/lib/auth-client";
 import { useEffect, useState } from "react";
 
 function HomeIcon({ color }: { color: string }) {
@@ -78,7 +78,7 @@ function UserIcon({ color }: { color: string }) {
 export default function BottomNav() {
   const pathname = usePathname();
   const router = useRouter();
-  const { getAccessToken, authenticated } = usePrivy();
+  const { getAccessToken, authenticated } = useAuth();
   const [unread, setUnread] = useState(0);
 
   useEffect(() => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { usePrivy } from "@privy-io/react-auth";
+import { useAuth } from "@/lib/auth-client";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -24,7 +24,7 @@ export default function PublicProfilePage() {
   const params = useParams();
   const router = useRouter();
   const username = params.username as string;
-  const { ready, authenticated, getAccessToken, user: privyUser } = usePrivy();
+  const { ready, authenticated, getAccessToken, user } = useAuth();
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [winRate, setWinRate] = useState<number | null>(null);
@@ -119,7 +119,7 @@ export default function PublicProfilePage() {
 
   const name = profile?.display_name ?? profile?.username ?? "unknown";
   const isMutual = mutualEvents.length > 0;
-  const isOwnProfile = !!privyUser && profile?.user_id === privyUser.id;
+  const isOwnProfile = !!user && profile?.user_id === user.id;
 
   return (
     <div className="min-h-screen" style={{ background: "var(--bg)", color: "var(--text)" }}>

@@ -1,6 +1,6 @@
 "use client";
 
-import { usePrivy } from "@privy-io/react-auth";
+import { useAuth } from "@/lib/auth-client";
 import { useRouter, useParams } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
 import BottomNav from "@/components/BottomNav";
@@ -35,7 +35,7 @@ function timeAgo(d: string) {
 }
 
 export default function ExplorePostDetailPage() {
-  const { ready, authenticated, getAccessToken, user: privyUser } = usePrivy();
+  const { ready, authenticated, getAccessToken, user } = useAuth();
   const router = useRouter();
   const { id } = useParams<{ id: string }>();
 
@@ -126,7 +126,7 @@ export default function ExplorePostDetailPage() {
   const pctA = totalPts > 0 ? Math.round(((bet?.total_pts_a ?? 0) / totalPts) * 100) : 50;
   const pctB = totalPts > 0 ? Math.round(((bet?.total_pts_b ?? 0) / totalPts) * 100) : 50;
   const isResolved = bet?.status === "resolved";
-  const currentUserId = privyUser?.id;
+  const currentUserId = user?.id;
 
   return (
     <div className="min-h-screen pb-20" style={{ background: "var(--bg)" }}>

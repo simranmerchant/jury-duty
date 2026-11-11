@@ -1,6 +1,6 @@
 "use client";
 
-import { usePrivy } from "@privy-io/react-auth";
+import { useAuth } from "@/lib/auth-client";
 import { useRouter, useParams } from "next/navigation";
 import { useEffect, useState, useCallback, useRef } from "react";
 
@@ -8,7 +8,7 @@ type Guest = { user_id: string; display_name: string | null; username: string | 
 type BetOption = { label: string; tagged_user_id?: string; tagged_display_name?: string; tagged_username?: string | null };
 
 export default function NewBetPage() {
-  const { ready, authenticated, getAccessToken } = usePrivy();
+  const { ready, authenticated, getAccessToken } = useAuth();
   const router = useRouter();
   const params = useParams();
   const eventId = params.id as string;

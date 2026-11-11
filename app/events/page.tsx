@@ -1,6 +1,6 @@
 "use client";
 
-import { usePrivy } from "@privy-io/react-auth";
+import { useAuth } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import BottomNav from "@/components/BottomNav";
 import { useEffect, useState, useCallback, useRef } from "react";
@@ -27,7 +27,7 @@ type Event = {
 };
 
 export default function EventsPage() {
-  const { ready, authenticated, getAccessToken } = usePrivy();
+  const { ready, authenticated, getAccessToken } = useAuth();
   const router = useRouter();
   const [events, setEvents] = useState<Event[]>([]);
   const [activeTab, setActiveTab] = useState<Tab>("events");

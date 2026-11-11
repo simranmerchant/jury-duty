@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { usePrivy } from "@privy-io/react-auth";
+import { useAuth } from "@/lib/auth-client";
 import { usePathname } from "next/navigation";
 
 type Platform = "ios" | "android" | null;
@@ -32,7 +32,7 @@ function isSnoozed(): boolean {
 }
 
 export default function InstallPrompt() {
-  const { ready, authenticated, getAccessToken } = usePrivy();
+  const { ready, authenticated, getAccessToken } = useAuth();
   const pathname = usePathname();
   const [step, setStep] = useState<Step>("done");
   const [platform, setPlatform] = useState<Platform>(null);

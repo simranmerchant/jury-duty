@@ -1,12 +1,12 @@
 "use client";
 
-import { usePrivy } from "@privy-io/react-auth";
+import { useAuth } from "@/lib/auth-client";
 import { useEffect, useState } from "react";
 
 const STORAGE_KEY = "jd_terms_v1";
 
 export default function TermsGate({ children }: { children: React.ReactNode }) {
-  const { authenticated, getAccessToken } = usePrivy();
+  const { authenticated, getAccessToken } = useAuth();
   const [agreed, setAgreed] = useState(true);
 
   useEffect(() => {

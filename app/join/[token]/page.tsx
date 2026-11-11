@@ -1,6 +1,6 @@
 "use client";
 
-import { usePrivy } from "@privy-io/react-auth";
+import { useAuth } from "@/lib/auth-client";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useEffect, useState, Suspense } from "react";
 
@@ -15,7 +15,7 @@ type EventPreview = {
 };
 
 function JoinPageInner() {
-  const { ready, authenticated, login, getAccessToken } = usePrivy();
+  const { ready, authenticated, login, getAccessToken } = useAuth();
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();

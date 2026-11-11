@@ -1,6 +1,6 @@
 "use client";
 
-import { usePrivy } from "@privy-io/react-auth";
+import { useAuth } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback, useRef } from "react";
 import BottomNav from "@/components/BottomNav";
@@ -39,7 +39,7 @@ const OUTCOME_STYLE: Record<string, { label: string; color: string; bg: string; 
 };
 
 export default function ProfilePage() {
-  const { ready, authenticated, getAccessToken, logout } = usePrivy();
+  const { ready, authenticated, getAccessToken, logout } = useAuth();
   const router = useRouter();
 
   const [points, setPoints] = useState<number | null>(null);

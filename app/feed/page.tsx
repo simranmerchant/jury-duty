@@ -1,6 +1,6 @@
 "use client";
 
-import { usePrivy } from "@privy-io/react-auth";
+import { useAuth } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import BottomNav from "@/components/BottomNav";
 import { useEffect, useState, useCallback, useRef } from "react";
@@ -94,7 +94,7 @@ function timeAgo(dateString: string): string {
 }
 
 export default function FeedPage() {
-  const { ready, authenticated, getAccessToken, user: privyUser } = usePrivy();
+  const { ready, authenticated, getAccessToken, user } = useAuth();
   const router = useRouter();
 
   const [items, setItems] = useState<FeedItem[]>([]);
@@ -197,7 +197,7 @@ export default function FeedPage() {
     if (res.ok) {
       setItems((prev) => prev.map((item) => {
         if (item.type !== "bet" || item.id !== betId) return item;
-        return { ...item, bet_entries: [...item.bet_entries, { user_id: privyUser!.id, option_id: optionId, points_staked: 50, balances: null }] };
+        return { ...item, bet_entries: [...item.bet_entries, { user_id: user!.id, option_id: optionId, points_staked: 50, balances: null }] };
       }));
       if (myPoints !== null) setMyPoints((p) => (p ?? 0) - 50);
     }
@@ -317,7 +317,7 @@ export default function FeedPage() {
               <PostCard
                 key={`post-${item.id}`}
                 item={item}
-                currentUserId={privyUser?.id}
+                currentUserId={user?.id}
                 followedIds={followedIds}
                 getAccessToken={getAccessToken}
                 onDelete={() => setItems((prev) => prev.filter((i) => i.id !== item.id))}
@@ -330,7 +330,7 @@ export default function FeedPage() {
               <PollPostCard
                 key={`poll-post-${item.poll_id}`}
                 item={item}
-                currentUserId={privyUser?.id}
+                currentUserId={user?.id}
                 getAccessToken={getAccessToken}
                 onDelete={() => setItems((prev) => prev.filter((i) => i.type !== "poll_post" || i.poll_id !== item.poll_id))}
               />
@@ -342,7 +342,7 @@ export default function FeedPage() {
               <ExploreBetPostCard
                 key={`ebp-${item.explore_bet_id}`}
                 item={item}
-                currentUserId={privyUser?.id}
+                currentUserId={user?.id}
                 getAccessToken={getAccessToken}
                 onDelete={() => setItems((prev) => prev.filter((i) => i.type !== "explore_bet_post" || i.explore_bet_id !== item.explore_bet_id))}
               />
@@ -354,7 +354,7 @@ export default function FeedPage() {
             <FeedBetCard
               key={`bet-${item.id}`}
               item={item}
-              currentUserId={privyUser?.id}
+              currentUserId={user?.id}
               seenBetIds={seenBetIds}
               getAccessToken={getAccessToken}
               onVote={(betId, optionId) => vote(betId, optionId)}
